@@ -1,19 +1,60 @@
 {
   "camps": [
     {
-      "name": "Pioneer",
+      "name": "Junior",
       "bunks": [
-        {"name": "Bunk 1", "number": 1},
-        {"name": "Bunk 2", "number": 2},
-        {"name": "Bunk 3", "number": 3}
+        {"name": "01 Munchkins", "number": 1},
+        {"name": "02 Rugrats",   "number": 2},
+        {"name": "03 Cheetahs",  "number": 3},
+        {"name": "04 Tigers",    "number": 4},
+        {"name": "05 Hawks",     "number": 5},
+        {"name": "06 Bulldogs",  "number": 6},
+        {"name": "07 Lions",     "number": 7}
+      ]
+    },
+    {
+      "name": "Inter",
+      "bunks": [
+        {"name": "08 Belles",  "number": 8},
+        {"name": "09 Sparks",  "number": 9},
+        {"name": "10 Jets",    "number": 10},
+        {"name": "11 Raiders", "number": 11},
+        {"name": "12 Fusion",  "number": 12},
+        {"name": "13 Eagles",  "number": 13},
+        {"name": "14 Wings",   "number": 14}
       ]
     },
     {
       "name": "Senior",
       "bunks": [
-        {"name": "Bunk 4", "number": 4},
-        {"name": "Bunk 5", "number": 5},
-        {"name": "Bunk 6", "number": 6}
+        {"name": "15 Spirit",  "number": 15},
+        {"name": "16 Galaxy",  "number": 16},
+        {"name": "17 Charge",  "number": 17},
+        {"name": "18 Union",   "number": 18},
+        {"name": "19 Phils",   "number": 19},
+        {"name": "20 Flyers",  "number": 20},
+        {"name": "21 Thunder", "number": 21},
+        {"name": "22 Comets",  "number": 22},
+        {"name": "23 Stars",   "number": 23},
+        {"name": "24 Meteors", "number": 24}
+      ]
+    },
+    {
+      "name": "Upper",
+      "bunks": [
+        {"name": "25 Mystics",  "number": 25},
+        {"name": "26 Titans",   "number": 26},
+        {"name": "27 Warriors", "number": 27},
+        {"name": "28 Soul",     "number": 28},
+        {"name": "29 Sixers",   "number": 29},
+        {"name": "30 PT CITs",  "number": 30},
+        {"name": "31 PT CITs",  "number": 31}
+      ]
+    },
+    {
+      "name": "FT CITs",
+      "bunks": [
+        {"name": "FT CITs", "number": 99}
       ]
     }
   ]

@@ -324,11 +324,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       </div>
     </div>
     <div class="report-types" id="report-types">
-      <!-- Populated dynamically — add report types here as they are configured -->
-      <button class="rtype-btn active" data-rtype="placeholder">Sample Report</button>
-    </div>
-    <div style="margin-top:.75rem;font-size:.75rem;color:#aaa;">
-      Additional report types will appear here once transformation logic is configured.
+        <button class="rtype-btn active" data-rtype="bunk_snapshot">Bunk Snapshot</button>
     </div>
   </div>
 
@@ -341,10 +337,10 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       </div>
     </div>
     <div class="drop-zone" id="drop-zone">
-      <input type="file" id="excel-file" accept=".xlsx,.xls">
+      <input type="file" id="excel-file" accept=".csv,.xlsx,.xls">
       <div class="drop-icon">📊</div>
-      <div class="drop-text"><strong>Click to choose</strong> or drag &amp; drop your Excel file</div>
-      <div class="drop-meta">Accepted formats: .xlsx, .xls</div>
+      <div class="drop-text"><strong>Click to choose</strong> or drag &amp; drop your report file</div>
+      <div class="drop-meta">Accepted formats: .csv, .xlsx, .xls — export directly from your camp management system</div>
     </div>
     <div class="file-chosen" id="file-chosen">
       <span>✅</span>
@@ -368,7 +364,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   </div>
 
   <div class="action-bar" id="action-bar" style="display:none">
-    <a class="dl-btn" id="dl-link" href="#" download>⬇ Download Converted Report</a>
+    <a class="dl-btn" id="dl-link" href="#" download>⬇ Download Excel Report</a>
   </div>
 
   <div id="error-card">
@@ -444,7 +440,7 @@ dropZone.addEventListener('drop', e => {
   e.preventDefault();
   dropZone.classList.remove('drag-over');
   const f = e.dataTransfer.files[0];
-  if (f && (f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) setFile(f);
+  if (f && (f.name.endsWith('.csv') || f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) setFile(f);
 });
 fileInput.addEventListener('change', e => {
   if (e.target.files[0]) setFile(e.target.files[0]);
