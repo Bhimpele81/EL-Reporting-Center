@@ -597,72 +597,113 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
             seen.append(bk)
         groups[bk].append(c)
 
-    # ---- Styles ----
-    hdr_font   = Font(name="Calibri", bold=True, color=WHITE, size=10)
-    body_font  = Font(name="Calibri", size=10)
-    bold_font  = Font(name="Calibri", bold=True, size=10)
-    brand_fill = PatternFill("solid", fgColor=BRAND)
-    alt_fill   = PatternFill("solid", fgColor=BRAND_ALT)
-    total_fill = PatternFill("solid", fgColor=LIGHT_GREY)
-    center     = Alignment(horizontal="center", vertical="center")
-    left       = Alignment(horizontal="left",   vertical="center")
+    # ---- Fonts (matching example exactly) ----
+    F_HDR_SM  = Font(name="Calibri", bold=True,  size=11)   # header bunk/day cols
+    F_HDR_LG  = Font(name="Calibri", bold=True,  size=16)   # header Camper col
+    F_LABEL   = Font(name="Calibri", bold=True,  size=22)   # col A bunk label
+    F_BUNK    = Font(name="Calibri", bold=False, size=11)   # col B bunk name
+    F_NAME    = Font(name="Calibri", bold=True,  size=16)   # col C camper name
+    F_ENROLL  = Font(name="Calibri", bold=False, size=16)   # col I enrolled
+    F_COUNT   = Font(name="Calibri", bold=True,  size=16)   # subtotal/total counts
+    F_HDR_BRD = Font(name="Calibri", bold=True,  size=11, color=WHITE)  # branded hdr
 
-    def _c(r, col, val=None, font=None, fill=None, align=None, border=None):
-        cell = ws.cell(row=r, column=col, value=val)
-        if font:   cell.font   = font
-        if fill:   cell.fill   = fill
-        if align:  cell.alignment = align
-        if border: cell.border  = border
+    # ---- Borders ----
+    _med  = Side(style="medium")
+    _thin = Side(style="thin")
+    B_MED_BOT  = Border(bottom=_med)
+    B_THIN_BOT = Border(bottom=_thin)
+    B_THIN_ALL = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
+    B_HDR_DAY  = Border(left=_thin, right=_thin, top=_thin, bottom=_med)
 
-    # ---- Header row ----
-    headers = [None, "Bunk", "Camper", "MON", "TUES", "WED", "THURS", "FRI", "Enrolled"]
-    for ci, h in enumerate(headers, 1):
-        _c(1, ci, h, font=hdr_font if h else None,
-           fill=brand_fill if h else None,
-           align=center, border=THIN_BORDER if h else None)
+    # ---- Fills ----
+    BRAND_FILL = PatternFill("solid", fgColor=BRAND)
 
-    row = 2
+    CENTER = Alignment(horizontal="center", vertical="center")
+
+    # ---- Row 1: branded header ----
+    ws.row_dimensions[1].height = 14.25
+    # Col A: empty
+    # Col B: Bunk
+    c = ws.cell(row=1, column=2, value="Bunk")
+    c.font = F_HDR_BRD; c.fill = BRAND_FILL; c.alignment = CENTER
+    # Col C: Camper — larger font, medium bottom border
+    c = ws.cell(row=1, column=3, value="Camper")
+    c.font = Font(name="Calibri", bold=True, size=16, color=WHITE)
+    c.fill = BRAND_FILL; c.alignment = CENTER; c.border = B_MED_BOT
+    # Cols D–H: day names
+    for ci, lbl in enumerate(["MON", "TUES", "WED", "THURS", "FRI"], start=4):
+        c = ws.cell(row=1, column=ci, value=lbl)
+        c.font = F_HDR_BRD; c.fill = BRAND_FILL; c.alignment = CENTER
+        c.border = B_HDR_DAY
+    # Col I: Enrolled — medium bottom border
+    c = ws.cell(row=1, column=9, value="Enrolled")
+    c.font = F_HDR_BRD; c.fill = BRAND_FILL; c.alignment = CENTER; c.border = B_MED_BOT
+
+    # ---- Row 2: blank divider — D–H get medium bottom border ----
+    ws.row_dimensions[2].height = 14.65
+    for ci in range(4, 9):
+        ws.cell(row=2, column=ci).border = B_MED_BOT
+
+    # ---- Data rows ----
+    row = 3
     total_count = 0
+    bunk_start_rows = []   # track each bunk's start row for SUBTOTAL formula
 
     for bk in seen:
-        group = groups[bk]
-        count = len(group)
+        group    = groups[bk]
+        count    = len(group)
         total_count += count
-        alt = (len(seen) % 2 == 0)   # track alternating at bunk level
+        bk_start = row
 
         for i, camper in enumerate(group):
-            fill = alt_fill if (row % 2 == 0) else None
-            col_a = bk + " " if i == 0 else None
-            _c(row, 1, col_a, font=body_font, fill=fill, align=left)
-            _c(row, 2, bk,           font=body_font, fill=fill, align=left,   border=THIN_BORDER)
-            _c(row, 3, camper["name"], font=body_font, fill=fill, align=left, border=THIN_BORDER)
-            for ci in range(4, 9):   # MON–FRI blank
-                _c(row, ci, None, fill=fill, border=THIN_BORDER)
-            _c(row, 9, camper["enrolled"] or None, font=body_font, fill=fill,
-               align=center, border=THIN_BORDER)
+            ws.row_dimensions[row].height = 31.5
+
+            # Col A: large bunk label on first camper row only
+            if i == 0:
+                c = ws.cell(row=row, column=1, value=bk + " ")
+                c.font = F_LABEL; c.alignment = CENTER
+
+            # Col B: bunk name every row
+            ws.cell(row=row, column=2, value=bk).font = F_BUNK
+
+            # Col C: camper name — bold 16pt, thin bottom border
+            c = ws.cell(row=row, column=3, value=camper["name"])
+            c.font = F_NAME; c.alignment = CENTER; c.border = B_THIN_BOT
+
+            # Cols D–H: blank signing cells with full thin borders
+            for ci in range(4, 9):
+                ws.cell(row=row, column=ci).border = B_THIN_ALL
+
+            # Col I: enrolled string — thin bottom border
+            c = ws.cell(row=row, column=9, value=camper["enrolled"] or None)
+            c.font = F_ENROLL; c.alignment = CENTER; c.border = B_THIN_BOT
+
             row += 1
 
         # Subtotal row
-        _c(row, 2, count, font=bold_font, fill=total_fill, align=center, border=THIN_BORDER)
-        _c(row, 3, count, font=bold_font, fill=total_fill, align=center, border=THIN_BORDER)
-        for ci in [1, 4, 5, 6, 7, 8, 9]:
-            _c(row, ci, None, fill=total_fill, border=THIN_BORDER if ci != 1 else None)
+        ws.row_dimensions[row].height = 31.5
+        ws.cell(row=row, column=2,
+                value=f"=SUBTOTAL(3,B{bk_start}:B{row-1})").font = F_BUNK
+        c = ws.cell(row=row, column=3, value=count)
+        c.font = F_COUNT; c.alignment = CENTER; c.border = B_THIN_BOT
+        bunk_start_rows.append((bk_start, row))
         row += 1
 
-    # Grand total
-    _c(row, 2, total_count, font=bold_font, fill=PatternFill("solid", fgColor=DARK_GREY),
-       align=center, border=THIN_BORDER)
-    ws.cell(row=row, column=2).font = Font(name="Calibri", bold=True, color=WHITE, size=10)
-    _c(row, 3, total_count, font=Font(name="Calibri", bold=True, color=WHITE, size=10),
-       fill=PatternFill("solid", fgColor=DARK_GREY), align=center, border=THIN_BORDER)
+    # Grand total row
+    ws.row_dimensions[row].height = 31.5
+    ws.cell(row=row, column=2,
+            value=f"=SUBTOTAL(3,B3:B{row-1})").font = F_BUNK
+    c = ws.cell(row=row, column=3, value=total_count)
+    c.font = F_COUNT; c.alignment = CENTER; c.border = B_THIN_BOT
 
-    # Column widths
-    ws.column_dimensions["A"].width = 16
-    ws.column_dimensions["B"].width = 16
-    ws.column_dimensions["C"].width = 26
-    for col in ["D", "E", "F", "G", "H"]:
-        ws.column_dimensions[col].width = 8
-    ws.column_dimensions["I"].width = 12
+    # ---- Column widths (matching example) ----
+    ws.column_dimensions["A"].width = 6.4
+    ws.column_dimensions["B"].width = 15.1
+    ws.column_dimensions["C"].width = 30.7
+    ws.column_dimensions["D"].width = 12.1
+    for col in ["E", "F", "G", "H"]:
+        ws.column_dimensions[col].width = 10
+    ws.column_dimensions["I"].width = 8.4
 
 
 # ---------------------------------------------------------------------------
