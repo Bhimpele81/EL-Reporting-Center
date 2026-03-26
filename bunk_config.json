@@ -1,0 +1,20 @@
+{
+  "camps": [
+    {
+      "name": "Pioneer",
+      "bunks": [
+        {"name": "Bunk 1", "number": 1},
+        {"name": "Bunk 2", "number": 2},
+        {"name": "Bunk 3", "number": 3}
+      ]
+    },
+    {
+      "name": "Senior",
+      "bunks": [
+        {"name": "Bunk 4", "number": 4},
+        {"name": "Bunk 5", "number": 5},
+        {"name": "Bunk 6", "number": 6}
+      ]
+    }
+  ]
+}
