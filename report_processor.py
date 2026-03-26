@@ -78,9 +78,9 @@ def normalize_grade(raw: str) -> str:
 WEEK_RE = re.compile(r"Week\s+(\d+)", re.IGNORECASE)
 
 
-def parse_raw_csv(file_bytes: bytes) -> list:
+def _rows_to_campers(rows: list) -> list:
     """
-    Parse the raw bunk-snapshot CSV export.
+    Convert a list of rows (list-of-strings) into camper dicts.
 
     Expected columns (0-indexed):
       0  row#
@@ -95,34 +95,24 @@ def parse_raw_csv(file_bytes: bytes) -> list:
       9  Wednesday?
       10 Thursday?
       11 Friday?
-
-    Returns list of camper dicts.
     """
-    content = file_bytes.decode("utf-8-sig", errors="replace")
-    reader = csv.reader(io.StringIO(content))
-    rows = list(reader)
-    if not rows:
-        return []
-
     campers = []
     for row in rows[1:]:          # skip header
-        # skip blank / placeholder rows
         if len(row) < 4 or not str(row[0]).strip().isdigit():
             continue
 
-        last    = str(row[1]).strip()
-        first   = str(row[2]).strip()
-        bunk    = str(row[3]).strip()
+        last     = str(row[1]).strip()
+        first    = str(row[2]).strip()
+        bunk     = str(row[3]).strip()
         sessions = str(row[4]).strip() if len(row) > 4 else ""
-        age     = str(row[5]).strip() if len(row) > 5 else ""
-        grade   = normalize_grade(row[6]) if len(row) > 6 else ""
-        mon     = str(row[7]).strip()  if len(row) > 7  else ""
-        tue     = str(row[8]).strip()  if len(row) > 8  else ""
-        wed     = str(row[9]).strip()  if len(row) > 9  else ""
-        thu     = str(row[10]).strip() if len(row) > 10 else ""
-        fri     = str(row[11]).strip() if len(row) > 11 else ""
+        age      = str(row[5]).strip() if len(row) > 5 else ""
+        grade    = normalize_grade(row[6]) if len(row) > 6 else ""
+        mon      = str(row[7]).strip()  if len(row) > 7  else ""
+        tue      = str(row[8]).strip()  if len(row) > 8  else ""
+        wed      = str(row[9]).strip()  if len(row) > 9  else ""
+        thu      = str(row[10]).strip() if len(row) > 10 else ""
+        fri      = str(row[11]).strip() if len(row) > 11 else ""
 
-        # ---- Parse weeks ------------------------------------------------
         weeks = [0] * 8
         for part in sessions.split(","):
             m = WEEK_RE.search(part)
@@ -131,8 +121,6 @@ def parse_raw_csv(file_bytes: bytes) -> list:
                 if 1 <= wk <= 8:
                     weeks[wk - 1] = 1
 
-        # ---- Parse days --------------------------------------------------
-        # If none of the day fields are set, camper attends ALL days.
         any_day_specified = any(
             d.lower() in ("yes", "no") for d in [mon, tue, wed, thu, fri]
         )
@@ -155,6 +143,24 @@ def parse_raw_csv(file_bytes: bytes) -> list:
         })
 
     return campers
+
+
+def parse_raw_csv(file_bytes: bytes) -> list:
+    """Parse a raw bunk-snapshot export — accepts CSV or XLSX."""
+    # XLSX files start with the ZIP magic bytes PK\x03\x04
+    if file_bytes[:4] == b'PK\x03\x04':
+        from openpyxl import load_workbook
+        wb = load_workbook(filename=io.BytesIO(file_bytes), read_only=True, data_only=True)
+        ws = wb.active
+        rows = [[str(cell.value) if cell.value is not None else "" for cell in row]
+                for row in ws.iter_rows()]
+        wb.close()
+        return _rows_to_campers(rows)
+
+    content = file_bytes.decode("utf-8-sig", errors="replace")
+    reader  = csv.reader(io.StringIO(content))
+    rows    = list(reader)
+    return _rows_to_campers(rows)
 
 
 # ---------------------------------------------------------------------------

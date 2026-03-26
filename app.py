@@ -415,7 +415,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 // Upload tab state
 // ─────────────────────────────────────────────
 let excelFile = null;
-let selectedReportType = 'placeholder';
+let selectedReportType = 'bunk_snapshot';
 let currentJobId = null;
 let pollTimer = null;
 let lastLineCount = 0;
@@ -567,10 +567,13 @@ let campConfig = {camps: []};
 async function loadConfig() {
   try {
     const res  = await fetch('/api/config');
-    campConfig = await res.json();
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    campConfig = data;
     renderCamps();
   } catch(e) {
-    console.error('Could not load config', e);
+    document.getElementById('camp-list').innerHTML =
+      `<div style="padding:1rem;color:#c0392b;font-size:.85rem">⚠ Could not load configuration: ${e.message}</div>`;
   }
 }
 
