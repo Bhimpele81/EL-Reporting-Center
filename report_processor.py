@@ -644,10 +644,12 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
     for ci in range(4, 9):
         ws.cell(row=2, column=ci).border = B_MED_BOT
 
+    ALT_FILL  = PatternFill("solid", fgColor="D9D9D9")
+    VERT_CTR  = Alignment(horizontal="center", vertical="center", text_rotation=90)
+
     # ---- Data rows ----
     row = 3
     total_count = 0
-    bunk_start_rows = []   # track each bunk's start row for SUBTOTAL formula
 
     for bk in seen:
         group    = groups[bk]
@@ -657,48 +659,59 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
 
         for i, camper in enumerate(group):
             ws.row_dimensions[row].height = 31.5
+            use_alt = (row % 2 == 0)
 
-            # Col A: large bunk label on first camper row only
-            if i == 0:
-                c = ws.cell(row=row, column=1, value=bk + " ")
-                c.font = F_LABEL; c.alignment = CENTER
-
-            # Col B: bunk name every row
+            # Col B: bunk name every row (hidden, used for SUBTOTAL count)
             ws.cell(row=row, column=2, value=bk).font = F_BUNK
 
-            # Col C: camper name — bold 16pt, thin bottom border
+            # Col C: camper name
             c = ws.cell(row=row, column=3, value=camper["name"])
             c.font = F_NAME; c.alignment = CENTER; c.border = B_THIN_BOT
+            if use_alt: c.fill = ALT_FILL
 
-            # Cols D–H: blank signing cells with full thin borders
+            # Cols D–H: blank signing cells
             for ci in range(4, 9):
-                ws.cell(row=row, column=ci).border = B_THIN_ALL
+                c = ws.cell(row=row, column=ci)
+                c.border = B_THIN_ALL
+                if use_alt: c.fill = ALT_FILL
 
-            # Col I: enrolled string — thin bottom border
+            # Col I: enrolled
             c = ws.cell(row=row, column=9, value=camper["enrolled"] or None)
             c.font = F_ENROLL; c.alignment = CENTER; c.border = B_THIN_BOT
+            if use_alt: c.fill = ALT_FILL
 
             row += 1
 
         # Subtotal row
         ws.row_dimensions[row].height = 31.5
+        use_alt = (row % 2 == 0)
         ws.cell(row=row, column=2,
                 value=f"=SUBTOTAL(3,B{bk_start}:B{row-1})").font = F_BUNK
         c = ws.cell(row=row, column=3, value=count)
         c.font = F_COUNT; c.alignment = CENTER; c.border = B_THIN_BOT
-        bunk_start_rows.append((bk_start, row))
+        if use_alt: c.fill = ALT_FILL
+        bk_end = row
         row += 1
+
+        # Merge col A across entire bunk group and rotate text
+        ws.merge_cells(start_row=bk_start, start_column=1,
+                       end_row=bk_end,   end_column=1)
+        c = ws.cell(row=bk_start, column=1, value=bk)
+        c.font = F_LABEL; c.alignment = VERT_CTR
 
     # Grand total row
     ws.row_dimensions[row].height = 31.5
+    use_alt = (row % 2 == 0)
     ws.cell(row=row, column=2,
             value=f"=SUBTOTAL(3,B3:B{row-1})").font = F_BUNK
     c = ws.cell(row=row, column=3, value=total_count)
     c.font = F_COUNT; c.alignment = CENTER; c.border = B_THIN_BOT
+    if use_alt: c.fill = ALT_FILL
 
-    # ---- Column widths (matching example) ----
-    ws.column_dimensions["A"].width = 6.4
+    # ---- Column widths; hide col B ----
+    ws.column_dimensions["A"].width = 4
     ws.column_dimensions["B"].width = 15.1
+    ws.column_dimensions["B"].hidden = True
     ws.column_dimensions["C"].width = 30.7
     ws.column_dimensions["D"].width = 12.1
     for col in ["E", "F", "G", "H"]:
