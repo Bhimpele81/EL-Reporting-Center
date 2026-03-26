@@ -511,52 +511,231 @@ def build_totals_sheet(ws, campers: list, config: dict,
 
 
 # ---------------------------------------------------------------------------
+# Group Attendance parser + builder
+# ---------------------------------------------------------------------------
+
+def parse_group_attendance(file_bytes: bytes) -> list:
+    """
+    Parse raw group attendance CSV/XLSX export.
+
+    Expected columns (0-indexed):
+      0  row#
+      1  Bunk name
+      2  Last name
+      3  First name
+      4  Monday?   (Yes / No / blank)
+      5  Tuesday?
+      6  Wednesday?
+      7  Thursday?
+      8  Friday?
+    """
+    if file_bytes[:4] == b'PK\x03\x04':
+        from openpyxl import load_workbook as _lw
+        _wb = _lw(filename=io.BytesIO(file_bytes), read_only=True, data_only=True)
+        _ws = _wb.active
+        rows = [[str(c.value) if c.value is not None else "" for c in r]
+                for r in _ws.iter_rows()]
+        _wb.close()
+    else:
+        content = file_bytes.decode("utf-8-sig", errors="replace")
+        rows = list(csv.reader(io.StringIO(content)))
+
+    campers = []
+    for row in rows[1:]:
+        if len(row) < 4 or not str(row[0]).strip().isdigit():
+            continue
+        bunk  = str(row[1]).strip()
+        last  = str(row[2]).strip()
+        first = str(row[3]).strip()
+        mon   = str(row[4]).strip() if len(row) > 4 else ""
+        tue   = str(row[5]).strip() if len(row) > 5 else ""
+        wed   = str(row[6]).strip() if len(row) > 6 else ""
+        thu   = str(row[7]).strip() if len(row) > 7 else ""
+        fri   = str(row[8]).strip() if len(row) > 8 else ""
+
+        any_specified = any(d.lower() in ("yes", "no") for d in [mon, tue, wed, thu, fri])
+        if any_specified:
+            enrolled = (
+                ("M" if mon.lower() == "yes" else "") +
+                ("T" if tue.lower() == "yes" else "") +
+                ("W" if wed.lower() == "yes" else "") +
+                ("R" if thu.lower() == "yes" else "") +
+                ("F" if fri.lower() == "yes" else "")
+            )
+            if enrolled == "MTWRF":
+                enrolled = ""   # full week — treat same as blank
+        else:
+            enrolled = ""
+
+        campers.append({"name": f"{last}, {first}", "bunk": bunk, "enrolled": enrolled})
+
+    return campers
+
+
+def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
+    """Build the single Data1 sheet for the Group Attendance report."""
+
+    # Bunk sort order from config
+    bunk_order = {}
+    idx = 0
+    for camp in config.get("camps", []):
+        for bunk in camp.get("bunks", []):
+            bunk_order[bunk["name"]] = idx
+            idx += 1
+
+    campers_sorted = sorted(
+        campers,
+        key=lambda c: (bunk_order.get(c["bunk"], 9999), c["name"])
+    )
+
+    # Group by bunk preserving sort order
+    seen, groups = [], {}
+    for c in campers_sorted:
+        bk = c["bunk"]
+        if bk not in groups:
+            groups[bk] = []
+            seen.append(bk)
+        groups[bk].append(c)
+
+    # ---- Styles ----
+    hdr_font   = Font(name="Calibri", bold=True, color=WHITE, size=10)
+    body_font  = Font(name="Calibri", size=10)
+    bold_font  = Font(name="Calibri", bold=True, size=10)
+    brand_fill = PatternFill("solid", fgColor=BRAND)
+    alt_fill   = PatternFill("solid", fgColor=BRAND_ALT)
+    total_fill = PatternFill("solid", fgColor=LIGHT_GREY)
+    center     = Alignment(horizontal="center", vertical="center")
+    left       = Alignment(horizontal="left",   vertical="center")
+
+    def _c(r, col, val=None, font=None, fill=None, align=None, border=None):
+        cell = ws.cell(row=r, column=col, value=val)
+        if font:   cell.font   = font
+        if fill:   cell.fill   = fill
+        if align:  cell.alignment = align
+        if border: cell.border  = border
+
+    # ---- Header row ----
+    headers = [None, "Bunk", "Camper", "MON", "TUES", "WED", "THURS", "FRI", "Enrolled"]
+    for ci, h in enumerate(headers, 1):
+        _c(1, ci, h, font=hdr_font if h else None,
+           fill=brand_fill if h else None,
+           align=center, border=THIN_BORDER if h else None)
+
+    row = 2
+    total_count = 0
+
+    for bk in seen:
+        group = groups[bk]
+        count = len(group)
+        total_count += count
+        alt = (len(seen) % 2 == 0)   # track alternating at bunk level
+
+        for i, camper in enumerate(group):
+            fill = alt_fill if (row % 2 == 0) else None
+            col_a = bk + " " if i == 0 else None
+            _c(row, 1, col_a, font=body_font, fill=fill, align=left)
+            _c(row, 2, bk,           font=body_font, fill=fill, align=left,   border=THIN_BORDER)
+            _c(row, 3, camper["name"], font=body_font, fill=fill, align=left, border=THIN_BORDER)
+            for ci in range(4, 9):   # MON–FRI blank
+                _c(row, ci, None, fill=fill, border=THIN_BORDER)
+            _c(row, 9, camper["enrolled"] or None, font=body_font, fill=fill,
+               align=center, border=THIN_BORDER)
+            row += 1
+
+        # Subtotal row
+        _c(row, 2, count, font=bold_font, fill=total_fill, align=center, border=THIN_BORDER)
+        _c(row, 3, count, font=bold_font, fill=total_fill, align=center, border=THIN_BORDER)
+        for ci in [1, 4, 5, 6, 7, 8, 9]:
+            _c(row, ci, None, fill=total_fill, border=THIN_BORDER if ci != 1 else None)
+        row += 1
+
+    # Grand total
+    _c(row, 2, total_count, font=bold_font, fill=PatternFill("solid", fgColor=DARK_GREY),
+       align=center, border=THIN_BORDER)
+    ws.cell(row=row, column=2).font = Font(name="Calibri", bold=True, color=WHITE, size=10)
+    _c(row, 3, total_count, font=Font(name="Calibri", bold=True, color=WHITE, size=10),
+       fill=PatternFill("solid", fgColor=DARK_GREY), align=center, border=THIN_BORDER)
+
+    # Column widths
+    ws.column_dimensions["A"].width = 16
+    ws.column_dimensions["B"].width = 16
+    ws.column_dimensions["C"].width = 26
+    for col in ["D", "E", "F", "G", "H"]:
+        ws.column_dimensions[col].width = 8
+    ws.column_dimensions["I"].width = 12
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
 def process_report(file_bytes: bytes, report_type: str,
                    config: dict, job_id: str, output_dir: str) -> dict:
 
-    if report_type != "bunk_snapshot":
+    supported = ("bunk_snapshot", "group_attendance")
+    if report_type not in supported:
         return {
             "success": False,
             "message": (
                 f"Report type '{report_type}' is not configured. "
-                "Currently supported: 'bunk_snapshot'."
+                f"Currently supported: {', '.join(repr(s) for s in supported)}."
             ),
         }
 
-    # Parse
-    try:
-        campers = parse_raw_csv(file_bytes)
-    except Exception as e:
-        return {"success": False, "message": f"Could not parse file: {e}"}
-
-    if not campers:
-        return {"success": False, "message": "No camper data found in file. Check the file format."}
-
-    bunk_lookup    = get_bunk_lookup(config)
-    ordered_bunks  = get_ordered_bunks(config)
-    report_date    = date.today()
-
-    # Build workbook
-    wb = Workbook()
-    ws_report = wb.active
-    ws_report.title = "Report"
-    ws_totals = wb.create_sheet("Totals")
-
-    build_report_sheet(ws_report, campers, bunk_lookup, ordered_bunks, report_date)
-    build_totals_sheet(ws_totals, campers, config, bunk_lookup, report_date)
-
-    # Save
+    report_date = date.today()
     os.makedirs(output_dir, exist_ok=True)
-    out_filename = f"Bunk Snapshot {report_date.strftime('%m%d%Y')}.xlsx"
-    out_path = os.path.join(output_dir, out_filename)
-    wb.save(out_path)
 
-    return {
-        "success":  True,
-        "message":  f"Processed {len(campers)} campers successfully.",
-        "filename": out_filename,
-        "rows":     len(campers),
-    }
+    # ---- Bunk Snapshot ----
+    if report_type == "bunk_snapshot":
+        try:
+            campers = parse_raw_csv(file_bytes)
+        except Exception as e:
+            return {"success": False, "message": f"Could not parse file: {e}"}
+        if not campers:
+            return {"success": False, "message": "No camper data found in file. Check the file format."}
+
+        bunk_lookup   = get_bunk_lookup(config)
+        ordered_bunks = get_ordered_bunks(config)
+
+        wb = Workbook()
+        ws_report = wb.active
+        ws_report.title = "Report"
+        ws_totals = wb.create_sheet("Totals")
+        build_report_sheet(ws_report, campers, bunk_lookup, ordered_bunks, report_date)
+        build_totals_sheet(ws_totals, campers, config, bunk_lookup, report_date)
+
+        out_filename = f"Bunk Snapshot {report_date.strftime('%m%d%Y')}.xlsx"
+        out_path = os.path.join(output_dir, out_filename)
+        wb.save(out_path)
+
+        return {
+            "success":  True,
+            "message":  f"Processed {len(campers)} campers successfully.",
+            "filename": out_filename,
+            "rows":     len(campers),
+        }
+
+    # ---- Group Attendance ----
+    if report_type == "group_attendance":
+        try:
+            campers = parse_group_attendance(file_bytes)
+        except Exception as e:
+            return {"success": False, "message": f"Could not parse file: {e}"}
+        if not campers:
+            return {"success": False, "message": "No camper data found in file. Check the file format."}
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Data1"
+        build_group_attendance_sheet(ws, campers, config)
+
+        out_filename = f"Group Attendance {report_date.strftime('%m%d%Y')}.xlsx"
+        out_path = os.path.join(output_dir, out_filename)
+        wb.save(out_path)
+
+        return {
+            "success":  True,
+            "message":  f"Processed {len(campers)} campers successfully.",
+            "filename": out_filename,
+            "rows":     len(campers),
+        }
