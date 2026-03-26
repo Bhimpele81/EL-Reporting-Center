@@ -153,9 +153,10 @@ def api_download(job_id: str):
     return send_file(path, as_attachment=True, download_name=job["filename"])
 
 
+@app.route("/health")
 @app.route("/healthz")
 def health():
-    return "ok"
+    return "OK"
 
 
 # ---------------------------------------------------------------------------
