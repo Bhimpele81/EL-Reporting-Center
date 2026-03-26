@@ -573,22 +573,33 @@ def parse_group_attendance(file_bytes: bytes) -> list:
 
 
 def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
-    """Build the single Data1 sheet for the Group Attendance report."""
+    """
+    Build the Data1 sheet for Group Attendance.
+
+    Column layout (no hidden helper column):
+      A  – Bunk name  (merged + rotated 90° for entire bunk group)
+      B  – Camper     (bold 16pt)
+      C  – MON        (blank signing cell)
+      D  – TUES
+      E  – WED
+      F  – THURS
+      G  – FRI
+      H  – Enrolled
+    """
+    from openpyxl.worksheet.pagebreak import Break
 
     # Bunk sort order from config
     bunk_order = {}
-    idx = 0
-    for camp in config.get("camps", []):
-        for bunk in camp.get("bunks", []):
-            bunk_order[bunk["name"]] = idx
-            idx += 1
+    for idx, bunk in enumerate(
+        b for camp in config.get("camps", []) for b in camp.get("bunks", [])
+    ):
+        bunk_order[bunk["name"]] = idx
 
     campers_sorted = sorted(
         campers,
         key=lambda c: (bunk_order.get(c["bunk"], 9999), c["name"])
     )
 
-    # Group by bunk preserving sort order
     seen, groups = [], {}
     for c in campers_sorted:
         bk = c["bunk"]
@@ -597,87 +608,69 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
             seen.append(bk)
         groups[bk].append(c)
 
-    # ---- Fonts (matching example exactly) ----
-    F_HDR_SM  = Font(name="Calibri", bold=True,  size=11)   # header bunk/day cols
-    F_HDR_LG  = Font(name="Calibri", bold=True,  size=16)   # header Camper col
-    F_LABEL   = Font(name="Calibri", bold=True,  size=22)   # col A bunk label
-    F_BUNK    = Font(name="Calibri", bold=False, size=11)   # col B bunk name
-    F_NAME    = Font(name="Calibri", bold=True,  size=16)   # col C camper name
-    F_ENROLL  = Font(name="Calibri", bold=False, size=16)   # col I enrolled
-    F_COUNT   = Font(name="Calibri", bold=True,  size=16)   # subtotal/total counts
-    F_HDR_BRD = Font(name="Calibri", bold=True,  size=11, color=WHITE)  # branded hdr
-
-    # ---- Borders ----
-    _med  = Side(style="medium")
+    # ---- Styles ----
     _thin = Side(style="thin")
-    B_MED_BOT  = Border(bottom=_med)
-    B_THIN_BOT = Border(bottom=_thin)
-    B_THIN_ALL = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
-    B_HDR_DAY  = Border(left=_thin, right=_thin, top=_thin, bottom=_med)
+    _med  = Side(style="medium")
+    T_ALL = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
+    T_BOT = Border(left=_thin, right=_thin,             bottom=_thin)
+    M_BOT = Border(                                      bottom=_med)
 
-    # ---- Fills ----
+    F_WH_LG  = Font(name="Calibri", bold=True,  size=16, color=WHITE)
+    F_WH_SM  = Font(name="Calibri", bold=True,  size=11, color=WHITE)
+    F_LABEL  = Font(name="Calibri", bold=True,  size=22)
+    F_NAME   = Font(name="Calibri", bold=True,  size=16)
+    F_ENROLL = Font(name="Calibri", bold=False, size=16)
+    F_COUNT  = Font(name="Calibri", bold=True,  size=16)
+
     BRAND_FILL = PatternFill("solid", fgColor=BRAND)
+    ALT_FILL   = PatternFill("solid", fgColor="D9D9D9")
+    CTR        = Alignment(horizontal="center", vertical="center")
+    VERT_CTR   = Alignment(horizontal="center", vertical="center", text_rotation=90)
 
-    CENTER = Alignment(horizontal="center", vertical="center")
+    # ---- Row 1: header ----
+    ws.row_dimensions[1].height = 20
+    hdr = [("A", None, ""),
+           ("B", F_WH_LG, "Camper"),
+           ("C", F_WH_SM, "MON"),
+           ("D", F_WH_SM, "TUES"),
+           ("E", F_WH_SM, "WED"),
+           ("F", F_WH_SM, "THURS"),
+           ("G", F_WH_SM, "FRI"),
+           ("H", F_WH_SM, "Enrolled")]
+    for col_letter, font, label in hdr:
+        col_idx = ord(col_letter) - ord("A") + 1
+        c = ws.cell(row=1, column=col_idx, value=label or None)
+        if font:
+            c.font = font; c.fill = BRAND_FILL; c.alignment = CTR; c.border = T_ALL
 
-    # ---- Row 1: branded header ----
-    ws.row_dimensions[1].height = 14.25
-    # Col A: empty
-    # Col B: Bunk
-    c = ws.cell(row=1, column=2, value="Bunk")
-    c.font = F_HDR_BRD; c.fill = BRAND_FILL; c.alignment = CENTER
-    # Col C: Camper — larger font, medium bottom border
-    c = ws.cell(row=1, column=3, value="Camper")
-    c.font = Font(name="Calibri", bold=True, size=16, color=WHITE)
-    c.fill = BRAND_FILL; c.alignment = CENTER; c.border = B_MED_BOT
-    # Cols D–H: day names
-    for ci, lbl in enumerate(["MON", "TUES", "WED", "THURS", "FRI"], start=4):
-        c = ws.cell(row=1, column=ci, value=lbl)
-        c.font = F_HDR_BRD; c.fill = BRAND_FILL; c.alignment = CENTER
-        c.border = B_HDR_DAY
-    # Col I: Enrolled — medium bottom border
-    c = ws.cell(row=1, column=9, value="Enrolled")
-    c.font = F_HDR_BRD; c.fill = BRAND_FILL; c.alignment = CENTER; c.border = B_MED_BOT
-
-    # ---- Row 2: blank divider — D–H get medium bottom border ----
-    ws.row_dimensions[2].height = 14.65
-    for ci in range(4, 9):
-        ws.cell(row=2, column=ci).border = B_MED_BOT
-
-    ALT_FILL  = PatternFill("solid", fgColor="D9D9D9")
-    VERT_CTR  = Alignment(horizontal="center", vertical="center", text_rotation=90)
-
-    # ---- Data rows ----
-    row = 3
+    # ---- Data rows: one bunk per page ----
+    row = 2
     total_count = 0
 
-    for bk in seen:
+    for bk_idx, bk in enumerate(seen):
         group    = groups[bk]
         count    = len(group)
         total_count += count
         bk_start = row
 
-        for i, camper in enumerate(group):
+        for camper in group:
             ws.row_dimensions[row].height = 31.5
             use_alt = (row % 2 == 0)
 
-            # Col B: bunk name every row (hidden, used for SUBTOTAL count)
-            ws.cell(row=row, column=2, value=bk).font = F_BUNK
-
-            # Col C: camper name
-            c = ws.cell(row=row, column=3, value=camper["name"])
-            c.font = F_NAME; c.alignment = CENTER; c.border = B_THIN_BOT
+            # Col B: camper name
+            c = ws.cell(row=row, column=2, value=camper["name"])
+            c.font = F_NAME; c.alignment = CTR; c.border = T_ALL
             if use_alt: c.fill = ALT_FILL
 
-            # Cols D–H: blank signing cells
-            for ci in range(4, 9):
+            # Cols C–G: blank signing cells
+            for ci in range(3, 8):
                 c = ws.cell(row=row, column=ci)
-                c.border = B_THIN_ALL
+                c.border = T_ALL
                 if use_alt: c.fill = ALT_FILL
 
-            # Col I: enrolled
-            c = ws.cell(row=row, column=9, value=camper["enrolled"] or None)
-            c.font = F_ENROLL; c.alignment = CENTER; c.border = B_THIN_BOT
+            # Col H: enrolled
+            c = ws.cell(row=row, column=8, value=camper["enrolled"] or None)
+            c.font = F_ENROLL; c.alignment = CTR; c.border = T_ALL
             if use_alt: c.fill = ALT_FILL
 
             row += 1
@@ -685,38 +678,49 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
         # Subtotal row
         ws.row_dimensions[row].height = 31.5
         use_alt = (row % 2 == 0)
-        ws.cell(row=row, column=2,
-                value=f"=SUBTOTAL(3,B{bk_start}:B{row-1})").font = F_BUNK
-        c = ws.cell(row=row, column=3, value=count)
-        c.font = F_COUNT; c.alignment = CENTER; c.border = B_THIN_BOT
+        c = ws.cell(row=row, column=2, value=count)
+        c.font = F_COUNT; c.alignment = CTR; c.border = T_ALL
         if use_alt: c.fill = ALT_FILL
+        for ci in range(3, 9):
+            c = ws.cell(row=row, column=ci)
+            c.border = T_ALL
+            if use_alt: c.fill = ALT_FILL
         bk_end = row
         row += 1
 
-        # Merge col A across entire bunk group and rotate text
+        # Merge col A for entire bunk group, rotate text 90°
         ws.merge_cells(start_row=bk_start, start_column=1,
-                       end_row=bk_end,   end_column=1)
+                       end_row=bk_end,     end_column=1)
         c = ws.cell(row=bk_start, column=1, value=bk)
-        c.font = F_LABEL; c.alignment = VERT_CTR
+        c.font = F_LABEL; c.alignment = VERT_CTR; c.border = T_ALL
+
+        # Page break after each bunk (except the last)
+        if bk_idx < len(seen) - 1:
+            ws.row_breaks.append(Break(id=bk_end))
 
     # Grand total row
     ws.row_dimensions[row].height = 31.5
     use_alt = (row % 2 == 0)
-    ws.cell(row=row, column=2,
-            value=f"=SUBTOTAL(3,B3:B{row-1})").font = F_BUNK
-    c = ws.cell(row=row, column=3, value=total_count)
-    c.font = F_COUNT; c.alignment = CENTER; c.border = B_THIN_BOT
+    c = ws.cell(row=row, column=2, value=total_count)
+    c.font = F_COUNT; c.alignment = CTR; c.border = T_ALL
     if use_alt: c.fill = ALT_FILL
+    for ci in range(3, 9):
+        ws.cell(row=row, column=ci).border = T_ALL
 
-    # ---- Column widths; hide col B ----
+    # ---- Column widths ----
     ws.column_dimensions["A"].width = 4
-    ws.column_dimensions["B"].width = 15.1
-    ws.column_dimensions["B"].hidden = True
-    ws.column_dimensions["C"].width = 30.7
-    ws.column_dimensions["D"].width = 12.1
-    for col in ["E", "F", "G", "H"]:
-        ws.column_dimensions[col].width = 10
-    ws.column_dimensions["I"].width = 8.4
+    ws.column_dimensions["B"].width = 32
+    for col in ["C", "D", "E", "F", "G"]:
+        ws.column_dimensions[col].width = 12
+    ws.column_dimensions["H"].width = 10
+
+    # ---- Print settings ----
+    ws.print_title_rows = "1:1"          # repeat header on every printed page
+    ws.page_setup.orientation = "portrait"
+    ws.page_setup.fitToPage   = True
+    ws.page_setup.fitToWidth  = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
 
 
 # ---------------------------------------------------------------------------
