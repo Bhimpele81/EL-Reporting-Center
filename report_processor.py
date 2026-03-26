@@ -692,7 +692,7 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
         ws.merge_cells(start_row=bk_start, start_column=1,
                        end_row=bk_end,     end_column=1)
         c = ws.cell(row=bk_start, column=1, value=bk)
-        c.font = F_LABEL; c.alignment = VERT_CTR; c.border = T_ALL
+        c.font = F_LABEL; c.alignment = VERT_CTR
 
         # Page break after each bunk (except the last)
         if bk_idx < len(seen) - 1:
