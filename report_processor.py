@@ -550,7 +550,7 @@ def process_report(file_bytes: bytes, report_type: str,
 
     # Save
     os.makedirs(output_dir, exist_ok=True)
-    out_filename = f"Bunk Snapshot {report_date.strftime('%d%m%Y')}.xlsx"
+    out_filename = f"Bunk Snapshot {report_date.strftime('%m%d%Y')}.xlsx"
     out_path = os.path.join(output_dir, out_filename)
     wb.save(out_path)
 
