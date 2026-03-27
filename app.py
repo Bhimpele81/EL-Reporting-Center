@@ -622,7 +622,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <span id="error-msg"></span>
   </div>
 
-  <div class="card" id="calendar-card">
+  <div class="card" id="calendar-card" style="margin-top:2.5rem">
     <div class="card-hd">
       <span class="card-num">📅</span>
       <div>
