@@ -381,6 +381,16 @@ label.lbl{display:block;font-size:.75rem;font-weight:600;color:var(--brand-dark)
 .action-bar{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1.1rem}
 .dl-btn{display:inline-flex;align-items:center;gap:.55rem;padding:.75rem 1.5rem;background:var(--gold);color:#1a1018;border-radius:8px;text-decoration:none;font-weight:700;font-size:.9rem;transition:background .15s,transform .1s;box-shadow:0 3px 10px rgba(201,168,76,.35);border:none;cursor:pointer}
 .dl-btn:hover{background:var(--gold-lt);transform:translateY(-1px)}
+/* Calendar card */
+.cal-list{display:flex;flex-direction:column;gap:0}
+.cal-row{display:flex;align-items:center;gap:1rem;padding:.6rem 0;border-bottom:1px solid var(--border)}
+.cal-row:last-child{border-bottom:none}
+.cal-dot{width:10px;height:10px;border-radius:50%;background:var(--brand);flex-shrink:0}
+.cal-week .cal-dot{background:var(--gold)}
+.cal-info{display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap}
+.cal-date{font-size:.82rem;font-weight:700;color:var(--brand-dark);min-width:110px}
+.cal-event{font-size:.85rem;color:#555}
+.cal-week .cal-event{font-style:italic;color:var(--brand)}
 /* Error card */
 #error-card{display:none;background:#2d0d13;border:1px solid #6d1f2f;border-radius:var(--r);padding:1.1rem 1.4rem;margin-top:1.1rem;color:#f5c2cb;font-size:.85rem}
 #error-card.visible{display:block}
@@ -610,6 +620,66 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   <div id="error-card">
     <strong>⚠ Processing Error</strong>
     <span id="error-msg"></span>
+  </div>
+
+  <div class="card" id="calendar-card">
+    <div class="card-hd">
+      <span class="card-num">📅</span>
+      <div>
+        <div class="card-title">Important Dates — Summer 2026</div>
+      </div>
+    </div>
+    <div class="cal-list">
+      <div class="cal-row cal-week">
+        <div class="cal-dot"></div>
+        <div class="cal-info">
+          <div class="cal-date">Week of June 15</div>
+          <div class="cal-event">Minicamp #1</div>
+        </div>
+      </div>
+      <div class="cal-row">
+        <div class="cal-dot"></div>
+        <div class="cal-info">
+          <div class="cal-date">June 22</div>
+          <div class="cal-event">First Day of Camp</div>
+        </div>
+      </div>
+      <div class="cal-row">
+        <div class="cal-dot"></div>
+        <div class="cal-info">
+          <div class="cal-date">July 7</div>
+          <div class="cal-event">Camp Pictures</div>
+        </div>
+      </div>
+      <div class="cal-row">
+        <div class="cal-dot"></div>
+        <div class="cal-info">
+          <div class="cal-date">July 20</div>
+          <div class="cal-event">Olde Tyme Country Fair</div>
+        </div>
+      </div>
+      <div class="cal-row">
+        <div class="cal-dot"></div>
+        <div class="cal-info">
+          <div class="cal-date">August 4</div>
+          <div class="cal-event">Family Fun Night</div>
+        </div>
+      </div>
+      <div class="cal-row">
+        <div class="cal-dot"></div>
+        <div class="cal-info">
+          <div class="cal-date">August 14</div>
+          <div class="cal-event">Last Day of Camp</div>
+        </div>
+      </div>
+      <div class="cal-row cal-week">
+        <div class="cal-dot"></div>
+        <div class="cal-info">
+          <div class="cal-date">Week of August 17</div>
+          <div class="cal-event">Minicamp #2</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="recent-card" class="card">
