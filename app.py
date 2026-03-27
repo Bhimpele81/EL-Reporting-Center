@@ -722,9 +722,19 @@ loadConfig();
   const input    = document.getElementById('pw-input');
   const btn      = document.getElementById('pw-submit');
   const errEl    = document.getElementById('pw-error');
+  const KEY      = 'el_rc_auth';
+  const TTL_MS   = 3 * 60 * 60 * 1000; // 3 hours
+
+  // Skip gate if still within the 3-hour window
+  const saved = localStorage.getItem(KEY);
+  if (saved && (Date.now() - parseInt(saved, 10)) < TTL_MS) {
+    overlay.classList.add('hidden');
+    return;
+  }
 
   function attempt() {
     if (input.value.trim().toLowerCase() === 'trial') {
+      localStorage.setItem(KEY, Date.now().toString());
       overlay.classList.add('hidden');
     } else {
       errEl.textContent = 'Incorrect access code. Please try again.';
