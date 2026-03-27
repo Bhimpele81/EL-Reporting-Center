@@ -9,7 +9,9 @@ import os
 import json
 import uuid
 import threading
-from flask import Flask, request, jsonify, send_file, render_template_string
+import boto3
+from botocore.exceptions import ClientError
+from flask import Flask, request, jsonify, send_file, render_template_string, redirect
 
 from report_processor import process_report, load_bunk_config, save_bunk_config
 
@@ -27,6 +29,45 @@ OUTPUT_DIR  = os.path.join(BASE_DIR, "outputs")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# S3 setup (optional — falls back to local if env vars not set)
+S3_BUCKET = os.environ.get("AWS_S3_BUCKET")
+_s3 = boto3.client("s3") if S3_BUCKET else None
+
+def _s3_upload(local_path: str, filename: str) -> None:
+    if _s3:
+        _s3.upload_file(local_path, S3_BUCKET, filename)
+
+def _s3_presign(filename: str, expires: int = 3600) -> str | None:
+    if _s3:
+        try:
+            return _s3.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": S3_BUCKET, "Key": filename},
+                ExpiresIn=expires,
+            )
+        except ClientError:
+            pass
+    return None
+
+def _s3_list_recent(limit: int = 10) -> list:
+    if not _s3:
+        return []
+    resp = _s3.list_objects_v2(Bucket=S3_BUCKET)
+    objects = resp.get("Contents", [])
+    objects.sort(key=lambda o: o["LastModified"], reverse=True)
+    return objects[:limit]
+
+def _s3_delete_old(keep: int = 10) -> None:
+    if not _s3:
+        return
+    resp = _s3.list_objects_v2(Bucket=S3_BUCKET)
+    objects = sorted(resp.get("Contents", []), key=lambda o: o["LastModified"], reverse=True)
+    for obj in objects[keep:]:
+        try:
+            _s3.delete_object(Bucket=S3_BUCKET, Key=obj["Key"])
+        except ClientError:
+            pass
 
 # In-memory job store  {job_id: {status, progress, result}}
 jobs: dict = {}
@@ -58,7 +99,14 @@ def run_job(job_id: str, file_bytes: bytes, report_type: str) -> None:
                 jobs[job_id]["status"]   = "done"
                 jobs[job_id]["filename"] = result["filename"]
                 jobs[job_id]["rows"]     = result.get("rows", 0)
-            # Keep only the 10 most recent output files
+            # Upload to S3 and clean up old files
+            try:
+                local_path = os.path.join(OUTPUT_DIR, result["filename"])
+                _s3_upload(local_path, result["filename"])
+                _s3_delete_old(keep=10)
+            except Exception:
+                pass
+            # Keep only 10 most recent local files
             try:
                 all_files = sorted(
                     [f for f in os.listdir(OUTPUT_DIR) if f.endswith(".xlsx")],
@@ -158,16 +206,22 @@ def api_download(job_id: str):
         job = jobs.get(job_id)
     if job is None or job.get("status") != "done":
         return jsonify({"error": "File not ready."}), 404
-    path = os.path.join(OUTPUT_DIR, job["filename"])
+    filename = job["filename"]
+    url = _s3_presign(filename)
+    if url:
+        return redirect(url)
+    path = os.path.join(OUTPUT_DIR, filename)
     if not os.path.exists(path):
         return jsonify({"error": "Output file missing."}), 500
-    return send_file(path, as_attachment=True, download_name=job["filename"])
+    return send_file(path, as_attachment=True, download_name=filename)
 
 
 @app.route("/api/files/<path:filename>")
 def api_download_file(filename: str):
-    # Prevent path traversal
     safe = os.path.basename(filename)
+    url = _s3_presign(safe)
+    if url:
+        return redirect(url)
     path = os.path.join(OUTPUT_DIR, safe)
     if not os.path.exists(path):
         return jsonify({"error": "File not found."}), 404
@@ -177,18 +231,25 @@ def api_download_file(filename: str):
 @app.route("/api/recent")
 def api_recent():
     try:
+        if _s3:
+            objects = _s3_list_recent(10)
+            return jsonify([{
+                "name":  o["Key"],
+                "mtime": o["LastModified"].timestamp(),
+                "url":   f"/api/files/{o['Key']}",
+            } for o in objects])
+        # Fallback to local filesystem
         files = []
         for f in os.listdir(OUTPUT_DIR):
             if f.endswith(".xlsx"):
                 fpath = os.path.join(OUTPUT_DIR, f)
                 files.append({"name": f, "mtime": os.path.getmtime(fpath)})
         files.sort(key=lambda x: x["mtime"], reverse=True)
-        files = files[:10]
         return jsonify([{
             "name":  f["name"],
             "mtime": f["mtime"],
             "url":   f"/api/files/{f['name']}",
-        } for f in files])
+        } for f in files[:10]])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
