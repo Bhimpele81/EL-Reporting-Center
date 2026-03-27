@@ -305,9 +305,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .h-support,.h-pricing{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.05em;padding:.45rem 1rem;border-radius:6px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:.4rem;transition:background .18s}
 .h-support:hover,.h-pricing:hover{background:rgba(255,255,255,.28)}
 /* ---- Pricing modal ---- */
-#pricing-overlay{position:fixed;inset:0;background:rgba(20,6,9,.72);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center}
+#pricing-overlay{position:fixed;inset:0;background:rgba(20,6,9,.72);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:2rem 0}
 #pricing-overlay.hidden{display:none}
-#pricing-box{background:#fff;border-radius:16px;padding:2.4rem 2.2rem 2rem;max-width:820px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.35);position:relative}
+#pricing-box{background:#fff;border-radius:16px;padding:2.4rem 2.2rem 2rem;max-width:820px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.35);position:relative;margin:auto}
 #pricing-box .px-close{position:absolute;top:1rem;right:1.2rem;background:none;border:none;font-size:1.4rem;color:#bbb;cursor:pointer;line-height:1;transition:color .15s}
 #pricing-box .px-close:hover{color:var(--brand)}
 #pricing-box h2{font-family:'Roboto Slab',serif;font-size:1.4rem;color:var(--brand-dark);text-align:center;margin-bottom:.3rem}
