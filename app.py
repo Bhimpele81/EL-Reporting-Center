@@ -32,7 +32,8 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # S3 setup (optional — falls back to local if env vars not set)
 S3_BUCKET = os.environ.get("AWS_S3_BUCKET")
-_s3 = boto3.client("s3") if S3_BUCKET else None
+S3_REGION = os.environ.get("AWS_S3_REGION", "us-east-1")
+_s3 = boto3.client("s3", region_name=S3_REGION) if S3_BUCKET else None
 
 def _s3_upload(local_path: str, filename: str) -> None:
     if _s3:
