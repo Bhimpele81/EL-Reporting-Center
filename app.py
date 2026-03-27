@@ -295,9 +295,38 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 .bunk-table{font-size:.78rem}
 .bunk-table th,.bunk-table td{padding:.4rem .6rem}
 }
+/* ---- Password modal ---- */
+#pw-overlay{position:fixed;inset:0;background:rgba(20,6,9,.72);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center}
+#pw-overlay.hidden{display:none}
+#pw-box{background:#fff;border-radius:14px;padding:2.4rem 2.2rem 2rem;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.35);text-align:center}
+#pw-box .pw-logo{width:72px;height:72px;background:url('/logo.png') center/contain no-repeat;margin:0 auto .9rem}
+#pw-box h2{font-family:'Roboto Slab',serif;font-size:1.25rem;color:var(--brand);margin:0 0 .4rem}
+#pw-box .pw-sub{font-size:.85rem;color:#555;margin:0 0 1.4rem;line-height:1.55}
+#pw-box .pw-sub strong{color:var(--brand-dark)}
+#pw-input-wrap{display:flex;gap:.5rem;margin-bottom:.6rem}
+#pw-input{flex:1;padding:.7rem 1rem;border:1.5px solid #ddd;border-radius:8px;font-size:.95rem;outline:none;transition:border .18s}
+#pw-input:focus{border-color:var(--brand)}
+#pw-submit{padding:.7rem 1.2rem;background:var(--brand);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.95rem;cursor:pointer;transition:background .18s}
+#pw-submit:hover{background:var(--brand-dark)}
+#pw-error{font-size:.82rem;color:#c0392b;min-height:1.1rem;margin-top:.15rem}
 </style>
 </head>
 <body>
+
+<!-- Password gate -->
+<div id="pw-overlay">
+  <div id="pw-box">
+    <div class="pw-logo"></div>
+    <h2>Elbow Lane Reporting Center</h2>
+    <p class="pw-sub">You have <strong>trial access</strong> to this reporting center at no cost.<br>Enter your access code to continue.</p>
+    <div id="pw-input-wrap">
+      <input id="pw-input" type="password" placeholder="Enter access code" autocomplete="off">
+      <button id="pw-submit">Enter</button>
+    </div>
+    <div id="pw-error"></div>
+  </div>
+</div>
+
 <header>
   <div class="h-logo" role="img" aria-label="Elbow Lane Day Camp"></div>
   <div>
@@ -686,6 +715,28 @@ function escHtml(s) {
 
 // Boot
 loadConfig();
+
+// ---- Password gate ----
+(function() {
+  const overlay  = document.getElementById('pw-overlay');
+  const input    = document.getElementById('pw-input');
+  const btn      = document.getElementById('pw-submit');
+  const errEl    = document.getElementById('pw-error');
+
+  function attempt() {
+    if (input.value.trim().toLowerCase() === 'trial') {
+      overlay.classList.add('hidden');
+    } else {
+      errEl.textContent = 'Incorrect access code. Please try again.';
+      input.value = '';
+      input.focus();
+    }
+  }
+
+  btn.addEventListener('click', attempt);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') attempt(); });
+  input.focus();
+})();
 </script>
 </body>
 </html>
