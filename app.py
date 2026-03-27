@@ -271,8 +271,9 @@ label.lbl{display:block;font-size:.75rem;font-weight:600;color:var(--brand-dark)
 .add-camp-btn:hover{border-color:var(--brand-mid);background:var(--brand-light)}
 .save-config-btn{width:100%;padding:.85rem 2rem;background:var(--brand);color:#fff;border:none;border-radius:var(--r);font-family:'Roboto Slab',serif;font-size:1rem;font-weight:700;letter-spacing:.02em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.65rem;transition:background .18s,transform .1s,box-shadow .18s;box-shadow:0 4px 14px rgba(109,31,47,.3)}
 .save-config-btn:hover{background:var(--brand-dark);box-shadow:0 6px 20px rgba(109,31,47,.4);transform:translateY(-1px)}
-#save-msg{display:none;margin-top:.75rem;padding:.6rem 1rem;border-radius:8px;font-size:.83rem;font-weight:500;text-align:center}
-#save-msg.ok{display:block;background:#edfaf3;border:1px solid #a3d9b8;color:var(--success)}
+#save-msg{display:none;margin-top:.75rem;padding:.75rem 1.25rem;border-radius:8px;font-size:.95rem;font-weight:600;text-align:center;transition:opacity .6s ease}
+#save-msg.ok{display:flex;align-items:center;justify-content:center;gap:.5rem;background:#edfaf3;border:1.5px solid #4caf82;color:#1e7d4a}
+#save-msg.ok.fade-out{opacity:0}
 #save-msg.err{display:block;background:#2d0d13;border:1px solid #6d1f2f;color:#f5c2cb}
 /* Misc */
 .section-title{font-family:'Roboto Slab',serif;font-size:.85rem;font-weight:700;color:var(--brand-dark);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.65rem}
@@ -662,8 +663,14 @@ document.getElementById('save-config-btn').addEventListener('click', async () =>
     });
     const data = await res.json();
     if (data.ok) {
-      msg.textContent = '✅ Configuration saved successfully.';
+      msg.innerHTML   = '<span style="font-size:1.2rem">✔</span> Configuration saved successfully.';
       msg.className   = 'ok';
+      msg.style.opacity = '1';
+      clearTimeout(msg._fadeTimer);
+      msg._fadeTimer = setTimeout(() => {
+        msg.classList.add('fade-out');
+        setTimeout(() => { msg.style.display = 'none'; msg.className = ''; }, 650);
+      }, 3000);
     } else {
       msg.textContent = '⚠ ' + (data.error || 'Save failed.');
       msg.className   = 'err';
