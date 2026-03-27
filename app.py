@@ -329,6 +329,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <button class="rtype-btn" data-rtype="group_attendance">Group Attendance</button>
         <button class="rtype-btn" data-rtype="am_extend">AM Extend</button>
         <button class="rtype-btn" data-rtype="pm_extend">PM Extend</button>
+        <button class="rtype-btn" data-rtype="pm_grp_extend">PM GRP Extend</button>
     </div>
   </div>
 
@@ -598,6 +599,7 @@ function renderCamps() {
           <tr>
             <th>Bunk Name</th>
             <th style="width:90px">Number</th>
+            <th style="width:70px">Grp</th>
             <th style="width:36px"></th>
           </tr>
         </thead>
@@ -617,6 +619,8 @@ function bunkRow(ci, bi, b) {
       oninput="campConfig.camps[${ci}].bunks[${bi}].name = this.value"></td>
     <td><input class="bunk-input bunk-num-input" type="number" min="0" value="${b.number}"
       oninput="campConfig.camps[${ci}].bunks[${bi}].number = parseInt(this.value)||0"></td>
+    <td><input class="bunk-input" value="${escHtml(b.grp||'')}" placeholder="Grp"
+      oninput="campConfig.camps[${ci}].bunks[${bi}].grp = this.value"></td>
     <td><button class="bunk-rm" title="Remove bunk" onclick="removeBunk(${ci},${bi})">✕</button></td>
   </tr>`;
 }
@@ -632,7 +636,7 @@ function removeCamp(ci) {
 }
 
 function addBunk(ci) {
-  campConfig.camps[ci].bunks.push({name: '', number: 0});
+  campConfig.camps[ci].bunks.push({name: '', number: 0, grp: ''});
   renderCamps();
   // Focus the new bunk name input
   const rows = document.querySelectorAll(`#bunk-body-${ci} tr`);

@@ -938,13 +938,149 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# PM GRP Extend helpers
+# ---------------------------------------------------------------------------
+
+_GRP_ORDER = ["Jr1", "Jr2", "Jr3", "Int1", "Int2", "Sr1", "Sr2", "Up1", "Up2", "CIT"]
+_GRP_IDX   = {g: i for i, g in enumerate(_GRP_ORDER)}
+
+_BUNK_RANGES = [
+    (range(1,  3),  "Jr1"),
+    (range(3,  6),  "Jr2"),
+    (range(6,  9),  "Jr3"),
+    (range(9,  12), "Int1"),
+    (range(12, 16), "Int2"),
+    (range(16, 20), "Sr1"),
+    (range(20, 24), "Sr2"),
+    (range(24, 28), "Up1"),
+    (range(28, 32), "Up2"),
+]
+
+
+def _bunk_to_grp(bunk_name: str) -> str:
+    m = re.match(r'^(\d+)', bunk_name.strip())
+    if m:
+        n = int(m.group(1))
+        for rng, grp in _BUNK_RANGES:
+            if n in rng:
+                return grp
+    return "CIT"
+
+
+def parse_pm_grp_extend(file_bytes: bytes) -> list:
+    """
+    Parse PM Extended data and annotate each camper with their group code.
+    Returns campers sorted by group order, bunk number, then name.
+    """
+    campers = parse_extend(file_bytes, period="pm")
+    for c in campers:
+        c["grp"] = _bunk_to_grp(c["bunk"])
+        m = re.match(r'^(\d+)', c["bunk"].strip())
+        c["bunk_num"] = int(m.group(1)) if m else 999
+    campers.sort(key=lambda c: (_GRP_IDX.get(c["grp"], 99), c["bunk_num"], c["name"].lower()))
+    return campers
+
+
+def build_pm_grp_extend_sheet(ws, campers: list) -> None:
+    """
+    PM GRP EXTEND: landscape, 10 cols (Grp|BUNK|CAMPER|Pick Up|Mon–Fri|Days),
+    grouped by Grp with a subtotal count row after each group.
+    """
+    _thin = Side(style="thin")
+    T_ALL = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
+
+    HDR_FILL = PatternFill("solid", fgColor="6A1330")
+    FONT_NAME = "Aptos Narrow"
+
+    F_HDR  = Font(name=FONT_NAME, bold=True,  size=11, color=WHITE)
+    F_DATA = Font(name=FONT_NAME, bold=False, size=11)
+    F_WK   = Font(name=FONT_NAME, bold=False, size=11)
+
+    CTR  = Alignment(horizontal="center", vertical="center")
+    LEFT = Alignment(horizontal="left",   vertical="center")
+
+    # ---- Row 1: Week label ----
+    ws.row_dimensions[1].height = 19.25
+    c = ws.cell(row=1, column=2, value="Week:")
+    c.font = F_WK; c.alignment = CTR
+
+    # ---- Row 2: Header ----
+    ws.row_dimensions[2].height = 19.25
+    for ci, lbl in enumerate(
+        ["Grp", "BUNK", "CAMPER", "Pick Up", "Mon", "Tue", "Wed", "Thu", "Fri", "Days"], 1
+    ):
+        c = ws.cell(row=2, column=ci, value=lbl)
+        c.font = F_HDR; c.fill = HDR_FILL; c.alignment = CTR; c.border = T_ALL
+
+    # ---- Data rows (grouped) ----
+    r = 3
+    current_grp = None
+    group_start = r
+    group_count = 0
+
+    def _flush_subtotal():
+        nonlocal group_start, group_count
+        if group_count:
+            ws.row_dimensions[r].height = 19.25
+            ws.cell(row=r, column=1, value=group_count)
+
+    for camper in campers:
+        if camper["grp"] != current_grp:
+            if current_grp is not None:
+                _flush_subtotal()
+                r += 1
+            current_grp = camper["grp"]
+            group_count = 0
+
+        ws.row_dimensions[r].height = 19.25
+        t = camper["time"]
+        time_str = (f"{t.hour}:{t.minute:02d}" if t.minute else str(t.hour)) if t else None
+
+        for col, val, align in [
+            (1,  camper["grp"],             CTR),
+            (2,  camper["bunk"],            CTR),
+            (3,  camper["name"],            LEFT),
+            (4,  time_str,                  CTR),
+            (10, camper["days_wk"] or None, CTR),
+        ]:
+            cell = ws.cell(row=r, column=col, value=val)
+            cell.font = F_DATA; cell.alignment = align; cell.border = T_ALL
+
+        for ci in range(5, 10):
+            ws.cell(row=r, column=ci).border = T_ALL
+
+        r += 1
+        group_count += 1
+
+    # flush last group
+    if current_grp is not None:
+        _flush_subtotal()
+
+    # ---- Column widths ----
+    ws.column_dimensions["A"].width = 3.93
+    ws.column_dimensions["B"].width = 11.60
+    ws.column_dimensions["C"].width = 16.86
+    ws.column_dimensions["D"].width = 6.66
+    ws.column_dimensions["E"].width = 9.53
+    ws.column_dimensions["J"].width = 9.07
+
+    # ---- Print settings ----
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToPage   = True
+    ws.page_setup.fitToWidth  = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_title_rows = "1:2"
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
 def process_report(file_bytes: bytes, report_type: str,
                    config: dict, job_id: str, output_dir: str) -> dict:
 
-    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend")
+    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend")
     if report_type not in supported:
         return {
             "success": False,
@@ -1052,6 +1188,31 @@ def process_report(file_bytes: bytes, report_type: str,
         build_extend_sheet(ws, campers, period="pm")
 
         out_filename = f"PM Extend {report_date.strftime('%m%d%Y')}.xlsx"
+        out_path = os.path.join(output_dir, out_filename)
+        wb.save(out_path)
+
+        return {
+            "success":  True,
+            "message":  f"Processed {len(campers)} campers successfully.",
+            "filename": out_filename,
+            "rows":     len(campers),
+        }
+
+    # ---- PM GRP Extend ----
+    if report_type == "pm_grp_extend":
+        try:
+            campers = parse_pm_grp_extend(file_bytes)
+        except Exception as e:
+            return {"success": False, "message": f"Could not parse file: {e}"}
+        if not campers:
+            return {"success": False, "message": "No PM Extended campers found in file."}
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "PM GRP Extend"
+        build_pm_grp_extend_sheet(ws, campers)
+
+        out_filename = f"PM GRP Extend {report_date.strftime('%m%d%Y')}.xlsx"
         out_path = os.path.join(output_dir, out_filename)
         wb.save(out_path)
 

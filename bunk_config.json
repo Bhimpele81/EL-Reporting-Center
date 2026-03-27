@@ -3,58 +3,58 @@
     {
       "name": "Junior",
       "bunks": [
-        {"name": "01 Munchkins", "number": 1},
-        {"name": "02 Rugrats",   "number": 2},
-        {"name": "03 Cheetahs",  "number": 3},
-        {"name": "04 Tigers",    "number": 4},
-        {"name": "05 Hawks",     "number": 5},
-        {"name": "06 Bulldogs",  "number": 6},
-        {"name": "07 Lions",     "number": 7}
+        {"name": "01 Munchkins", "number": 1,  "grp": "Jr1"},
+        {"name": "02 Rugrats",   "number": 2,  "grp": "Jr1"},
+        {"name": "03 Cheetahs",  "number": 3,  "grp": "Jr2"},
+        {"name": "04 Tigers",    "number": 4,  "grp": "Jr2"},
+        {"name": "05 Hawks",     "number": 5,  "grp": "Jr2"},
+        {"name": "06 Bulldogs",  "number": 6,  "grp": "Jr3"},
+        {"name": "07 Lions",     "number": 7,  "grp": "Jr3"}
       ]
     },
     {
       "name": "Inter",
       "bunks": [
-        {"name": "08 Belles",  "number": 8},
-        {"name": "09 Sparks",  "number": 9},
-        {"name": "10 Jets",    "number": 10},
-        {"name": "11 Raiders", "number": 11},
-        {"name": "12 Fusion",  "number": 12},
-        {"name": "13 Eagles",  "number": 13},
-        {"name": "14 Wings",   "number": 14}
+        {"name": "08 Belles",  "number": 8,  "grp": "Jr3"},
+        {"name": "09 Sparks",  "number": 9,  "grp": "Int1"},
+        {"name": "10 Jets",    "number": 10, "grp": "Int1"},
+        {"name": "11 Raiders", "number": 11, "grp": "Int1"},
+        {"name": "12 Fusion",  "number": 12, "grp": "Int2"},
+        {"name": "13 Eagles",  "number": 13, "grp": "Int2"},
+        {"name": "14 Wings",   "number": 14, "grp": "Int2"}
       ]
     },
     {
       "name": "Senior",
       "bunks": [
-        {"name": "15 Spirit",  "number": 15},
-        {"name": "16 Galaxy",  "number": 16},
-        {"name": "17 Charge",  "number": 17},
-        {"name": "18 Union",   "number": 18},
-        {"name": "19 Phils",   "number": 19},
-        {"name": "20 Flyers",  "number": 20},
-        {"name": "21 Thunder", "number": 21},
-        {"name": "22 Comets",  "number": 22},
-        {"name": "23 Stars",   "number": 23},
-        {"name": "24 Meteors", "number": 24}
+        {"name": "15 Spirit",  "number": 15, "grp": "Int2"},
+        {"name": "16 Galaxy",  "number": 16, "grp": "Sr1"},
+        {"name": "17 Charge",  "number": 17, "grp": "Sr1"},
+        {"name": "18 Union",   "number": 18, "grp": "Sr1"},
+        {"name": "19 Phils",   "number": 19, "grp": "Sr1"},
+        {"name": "20 Flyers",  "number": 20, "grp": "Sr2"},
+        {"name": "21 Thunder", "number": 21, "grp": "Sr2"},
+        {"name": "22 Comets",  "number": 22, "grp": "Sr2"},
+        {"name": "23 Stars",   "number": 23, "grp": "Sr2"},
+        {"name": "24 Meteors", "number": 24, "grp": "Up1"}
       ]
     },
     {
       "name": "Upper",
       "bunks": [
-        {"name": "25 Mystics",  "number": 25},
-        {"name": "26 Titans",   "number": 26},
-        {"name": "27 Warriors", "number": 27},
-        {"name": "28 Soul",     "number": 28},
-        {"name": "29 Sixers",   "number": 29},
-        {"name": "30 PT CITs",  "number": 30},
-        {"name": "31 PT CITs",  "number": 31}
+        {"name": "25 Mystics",  "number": 25, "grp": "Up1"},
+        {"name": "26 Titans",   "number": 26, "grp": "Up1"},
+        {"name": "27 Warriors", "number": 27, "grp": "Up1"},
+        {"name": "28 Soul",     "number": 28, "grp": "Up2"},
+        {"name": "29 Sixers",   "number": 29, "grp": "Up2"},
+        {"name": "30 PT CITs",  "number": 30, "grp": "CIT"},
+        {"name": "31 PT CITs",  "number": 31, "grp": "CIT"}
       ]
     },
     {
       "name": "FT CITs",
       "bunks": [
-        {"name": "FT CITs", "number": 99}
+        {"name": "FT CITs", "number": 99, "grp": "CIT"}
       ]
     }
   ]
