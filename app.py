@@ -232,8 +232,34 @@ HTML = r"""<!DOCTYPE html>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans',sans-serif;background:var(--mist);color:var(--ink);min-height:100vh}
 header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-items:center;gap:1.25rem;height:80px;box-shadow:0 2px 16px rgba(109,31,47,.35);position:sticky;top:0;z-index:200}
-.h-support{margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.05em;padding:.45rem 1rem;border-radius:6px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:.4rem;transition:background .18s}
-.h-support:hover{background:rgba(255,255,255,.28)}
+.h-nav{margin-left:auto;display:flex;align-items:center;gap:.6rem}
+.h-support,.h-pricing{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.05em;padding:.45rem 1rem;border-radius:6px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:.4rem;transition:background .18s}
+.h-support:hover,.h-pricing:hover{background:rgba(255,255,255,.28)}
+/* ---- Pricing modal ---- */
+#pricing-overlay{position:fixed;inset:0;background:rgba(20,6,9,.72);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center}
+#pricing-overlay.hidden{display:none}
+#pricing-box{background:#fff;border-radius:16px;padding:2.4rem 2.2rem 2rem;max-width:820px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.35);position:relative}
+#pricing-box .px-close{position:absolute;top:1rem;right:1.2rem;background:none;border:none;font-size:1.4rem;color:#bbb;cursor:pointer;line-height:1;transition:color .15s}
+#pricing-box .px-close:hover{color:var(--brand)}
+#pricing-box h2{font-family:'Roboto Slab',serif;font-size:1.4rem;color:var(--brand-dark);text-align:center;margin-bottom:.3rem}
+#pricing-box .px-sub{text-align:center;font-size:.85rem;color:#888;margin-bottom:2rem}
+.px-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem}
+.px-card{border:2px solid var(--border);border-radius:12px;padding:1.6rem 1.4rem;display:flex;flex-direction:column;gap:.6rem;position:relative;transition:border-color .2s,box-shadow .2s}
+.px-card:hover{border-color:var(--brand-mid);box-shadow:0 6px 24px rgba(109,31,47,.1)}
+.px-card.featured{border-color:var(--brand);box-shadow:0 6px 24px rgba(109,31,47,.15)}
+.px-badge{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:.25rem .85rem;border-radius:20px;white-space:nowrap}
+.px-tier{font-family:'Roboto Slab',serif;font-size:1rem;font-weight:700;color:var(--brand-dark);text-transform:uppercase;letter-spacing:.04em}
+.px-price{font-family:'Roboto Slab',serif;font-size:2rem;font-weight:700;color:var(--brand)}
+.px-price span{font-size:.85rem;font-weight:400;color:#999}
+.px-desc{font-size:.82rem;color:#666;line-height:1.55;flex:1}
+.px-features{list-style:none;display:flex;flex-direction:column;gap:.45rem;margin-top:.4rem}
+.px-features li{font-size:.8rem;color:#555;display:flex;align-items:flex-start;gap:.5rem}
+.px-features li::before{content:"✓";color:var(--brand);font-weight:700;flex-shrink:0}
+.px-cta{margin-top:1rem;padding:.65rem 1rem;background:var(--brand);color:#fff;border:none;border-radius:8px;font-family:'Roboto Slab',serif;font-size:.82rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:background .18s;text-align:center}
+.px-cta:hover{background:var(--brand-dark)}
+.px-card.featured .px-cta{background:var(--brand-dark)}
+.px-note{text-align:center;font-size:.75rem;color:#aaa;margin-top:1.4rem}
+@media(max-width:640px){.px-grid{grid-template-columns:1fr}.h-nav{gap:.4rem}}
 .h-logo{width:60px;height:60px;flex-shrink:0;border-radius:50%;background-image:url("/logo.png");background-size:90%;background-position:center;background-repeat:no-repeat;background-color:var(--brand-dark)}
 .h-title{font-family:'Roboto Slab',serif;font-size:1.25rem;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
 .h-sub{font-size:.72rem;opacity:.75;font-weight:400;margin-top:2px;letter-spacing:.08em;text-transform:uppercase}
@@ -380,13 +406,70 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   </div>
 </div>
 
+<!-- Pricing modal -->
+<div id="pricing-overlay" class="hidden">
+  <div id="pricing-box">
+    <button class="px-close" id="pricing-close">&#x2715;</button>
+    <h2>Simple, Transparent Pricing</h2>
+    <p class="px-sub">Choose the plan that fits your camp&rsquo;s needs. No contracts, cancel anytime.</p>
+    <div class="px-grid">
+      <div class="px-card">
+        <div class="px-tier">Starter</div>
+        <div class="px-price">$9.99<span>/mo</span></div>
+        <p class="px-desc">Perfect for smaller camps or those just getting started with digital reporting.</p>
+        <ul class="px-features">
+          <li>20 reports per month</li>
+          <li>All 5 report types</li>
+          <li>Configurable bunks &amp; camps</li>
+          <li>Print-ready Excel output</li>
+          <li>Email support</li>
+        </ul>
+        <button class="px-cta" onclick="document.getElementById('pricing-overlay').classList.add('hidden')">Get Started</button>
+      </div>
+      <div class="px-card featured">
+        <div class="px-badge">Most Popular</div>
+        <div class="px-tier">Pro</div>
+        <div class="px-price">$16.99<span>/mo</span></div>
+        <p class="px-desc">For active camps that run reports throughout the season on a regular basis.</p>
+        <ul class="px-features">
+          <li>50 reports per month</li>
+          <li>All 5 report types</li>
+          <li>Configurable bunks &amp; camps</li>
+          <li>Print-ready Excel output</li>
+          <li>Recent reports history</li>
+          <li>Priority email support</li>
+        </ul>
+        <button class="px-cta" onclick="document.getElementById('pricing-overlay').classList.add('hidden')">Get Started</button>
+      </div>
+      <div class="px-card">
+        <div class="px-tier">Unlimited</div>
+        <div class="px-price">$29.99<span>/mo</span></div>
+        <p class="px-desc">Full access for camps that need unrestricted reporting all season long.</p>
+        <ul class="px-features">
+          <li>Unlimited reports</li>
+          <li>All 5 report types</li>
+          <li>Configurable bunks &amp; camps</li>
+          <li>Print-ready Excel output</li>
+          <li>Recent reports history</li>
+          <li>Priority support &amp; onboarding</li>
+        </ul>
+        <button class="px-cta" onclick="document.getElementById('pricing-overlay').classList.add('hidden')">Get Started</button>
+      </div>
+    </div>
+    <p class="px-note">All plans include a 14-day free trial &mdash; no credit card required.</p>
+  </div>
+</div>
+
 <header>
   <div class="h-logo" role="img" aria-label="Elbow Lane Day Camp"></div>
   <div>
     <div class="h-title">Elbow Lane Day Camp</div>
     <div class="h-sub">Reporting Center</div>
   </div>
-  <a class="h-support" href="mailto:bhimpele@gmail.com?subject=EL%20Reporting%20Center%20Support">✉ Support</a>
+  <div class="h-nav">
+    <button class="h-pricing" id="pricing-btn">$ Pricing</button>
+    <a class="h-support" href="mailto:bhimpele@gmail.com?subject=EL%20Reporting%20Center%20Support">✉ Support</a>
+  </div>
 </header>
 
 <div class="tab-bar">
@@ -753,6 +836,7 @@ document.getElementById('save-config-btn').addEventListener('click', async () =>
     if (data.ok) {
       msg.innerHTML   = '<span style="font-size:1.2rem">✔</span> Configuration saved successfully.';
       msg.className   = 'ok';
+      msg.style.display = '';
       msg.style.opacity = '1';
       clearTimeout(msg._fadeTimer);
       msg._fadeTimer = setTimeout(() => {
@@ -804,6 +888,14 @@ async function loadRecent() {
 // Boot
 loadConfig();
 loadRecent();
+
+// ---- Pricing modal ----
+(function() {
+  const overlay = document.getElementById('pricing-overlay');
+  document.getElementById('pricing-btn').addEventListener('click', () => overlay.classList.remove('hidden'));
+  document.getElementById('pricing-close').addEventListener('click', () => overlay.classList.add('hidden'));
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.add('hidden'); });
+})();
 
 // ---- Password gate ----
 (function() {
