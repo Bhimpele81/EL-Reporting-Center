@@ -11,7 +11,7 @@ import uuid
 import threading
 import boto3
 from botocore.exceptions import ClientError
-from flask import Flask, request, jsonify, send_file, render_template_string, redirect
+from flask import Flask, request, jsonify, send_file, render_template_string
 
 from report_processor import process_report, load_bunk_config, save_bunk_config
 
@@ -44,17 +44,18 @@ def _s3_upload(local_path: str, filename: str) -> None:
     if _s3:
         _s3.upload_file(local_path, S3_BUCKET, filename)
 
-def _s3_presign(filename: str, expires: int = 3600) -> str | None:
-    if _s3:
-        try:
-            return _s3.generate_presigned_url(
-                "get_object",
-                Params={"Bucket": S3_BUCKET, "Key": filename},
-                ExpiresIn=expires,
-            )
-        except ClientError:
-            pass
-    return None
+def _s3_get_file(filename: str):
+    """Download file from S3 into a BytesIO buffer and return it."""
+    if not _s3:
+        return None
+    try:
+        import io
+        buf = io.BytesIO()
+        _s3.download_fileobj(S3_BUCKET, filename, buf)
+        buf.seek(0)
+        return buf
+    except ClientError:
+        return None
 
 def _s3_list_recent(limit: int = 10) -> list:
     if not _s3:
@@ -213,9 +214,10 @@ def api_download(job_id: str):
     if job is None or job.get("status") != "done":
         return jsonify({"error": "File not ready."}), 404
     filename = job["filename"]
-    url = _s3_presign(filename)
-    if url:
-        return redirect(url)
+    buf = _s3_get_file(filename)
+    if buf:
+        return send_file(buf, as_attachment=True, download_name=filename,
+                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     path = os.path.join(OUTPUT_DIR, filename)
     if not os.path.exists(path):
         return jsonify({"error": "Output file missing."}), 500
@@ -225,9 +227,10 @@ def api_download(job_id: str):
 @app.route("/api/files/<path:filename>")
 def api_download_file(filename: str):
     safe = os.path.basename(filename)
-    url = _s3_presign(safe)
-    if url:
-        return redirect(url)
+    buf = _s3_get_file(safe)
+    if buf:
+        return send_file(buf, as_attachment=True, download_name=safe,
+                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     path = os.path.join(OUTPUT_DIR, safe)
     if not os.path.exists(path):
         return jsonify({"error": "File not found."}), 404
