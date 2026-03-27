@@ -58,6 +58,17 @@ def run_job(job_id: str, file_bytes: bytes, report_type: str) -> None:
                 jobs[job_id]["status"]   = "done"
                 jobs[job_id]["filename"] = result["filename"]
                 jobs[job_id]["rows"]     = result.get("rows", 0)
+            # Keep only the 10 most recent output files
+            try:
+                all_files = sorted(
+                    [f for f in os.listdir(OUTPUT_DIR) if f.endswith(".xlsx")],
+                    key=lambda f: os.path.getmtime(os.path.join(OUTPUT_DIR, f)),
+                    reverse=True
+                )
+                for old in all_files[10:]:
+                    os.remove(os.path.join(OUTPUT_DIR, old))
+            except Exception:
+                pass
         else:
             log(result["message"], "err")
             with jobs_lock:
@@ -151,6 +162,35 @@ def api_download(job_id: str):
     if not os.path.exists(path):
         return jsonify({"error": "Output file missing."}), 500
     return send_file(path, as_attachment=True, download_name=job["filename"])
+
+
+@app.route("/api/files/<path:filename>")
+def api_download_file(filename: str):
+    # Prevent path traversal
+    safe = os.path.basename(filename)
+    path = os.path.join(OUTPUT_DIR, safe)
+    if not os.path.exists(path):
+        return jsonify({"error": "File not found."}), 404
+    return send_file(path, as_attachment=True, download_name=safe)
+
+
+@app.route("/api/recent")
+def api_recent():
+    try:
+        files = []
+        for f in os.listdir(OUTPUT_DIR):
+            if f.endswith(".xlsx"):
+                fpath = os.path.join(OUTPUT_DIR, f)
+                files.append({"name": f, "mtime": os.path.getmtime(fpath)})
+        files.sort(key=lambda x: x["mtime"], reverse=True)
+        files = files[:10]
+        return jsonify([{
+            "name":  f["name"],
+            "mtime": f["mtime"],
+            "url":   f"/api/files/{f['name']}",
+        } for f in files])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/health")
@@ -248,6 +288,17 @@ label.lbl{display:block;font-size:.75rem;font-weight:600;color:var(--brand-dark)
 #error-card{display:none;background:#2d0d13;border:1px solid #6d1f2f;border-radius:var(--r);padding:1.1rem 1.4rem;margin-top:1.1rem;color:#f5c2cb;font-size:.85rem}
 #error-card.visible{display:block}
 #error-card strong{display:block;margin-bottom:.35rem;font-size:.95rem}
+#recent-card{margin-top:1.4rem}
+#recent-card .recent-hd{font-family:'Roboto Slab',serif;font-size:.85rem;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.7rem}
+#recent-list{display:flex;flex-direction:column;gap:.45rem}
+.recent-row{display:flex;align-items:center;justify-content:space-between;background:#faf7f7;border:1px solid #ecdcdf;border-radius:8px;padding:.55rem .9rem;gap:.75rem}
+.recent-row:hover{background:#f5eeef}
+.recent-info{flex:1;min-width:0}
+.recent-name{font-size:.85rem;font-weight:600;color:#2d1018;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recent-time{font-size:.75rem;color:#888;margin-top:.1rem}
+.recent-dl{flex-shrink:0;padding:.35rem .85rem;background:var(--brand);color:#fff;border:none;border-radius:6px;font-size:.78rem;font-weight:600;text-decoration:none;cursor:pointer;transition:background .15s}
+.recent-dl:hover{background:var(--brand-dark)}
+#recent-empty{font-size:.82rem;color:#aaa;text-align:center;padding:.5rem 0}
 /* ---- Config tab ---- */
 .camp-block{background:#fff;border:1px solid var(--border);border-radius:var(--r);margin-bottom:1rem;overflow:hidden}
 .camp-header{display:flex;align-items:center;gap:.75rem;padding:.8rem 1.1rem;background:var(--brand-light);border-bottom:1px solid var(--border)}
@@ -404,6 +455,11 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   <div id="error-card">
     <strong>⚠ Processing Error</strong>
     <span id="error-msg"></span>
+  </div>
+
+  <div id="recent-card" class="card">
+    <div class="recent-hd">Recent Reports</div>
+    <div id="recent-list"><div id="recent-empty">No reports yet.</div></div>
   </div>
 
 </div><!-- /tab-upload -->
@@ -572,6 +628,7 @@ async function pollStatus() {
       const dlLink = document.getElementById('dl-link');
       dlLink.href  = `/api/download/${currentJobId}`;
       document.getElementById('action-bar').style.display = 'flex';
+      loadRecent();
     }
 
     if (data.status === 'error') {
@@ -713,8 +770,37 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ---- Recent Reports ----
+async function loadRecent() {
+  const list = document.getElementById('recent-list');
+  try {
+    const res   = await fetch('/api/recent');
+    const files = await res.json();
+    if (!files.length) {
+      list.innerHTML = '<div id="recent-empty">No reports yet.</div>';
+      return;
+    }
+    list.innerHTML = files.map(f => {
+      const d   = new Date(f.mtime * 1000);
+      const fmt = d.toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'})
+                + ' ' + d.toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'});
+      const name = f.name.replace(/\.xlsx$/i, '');
+      return `<div class="recent-row">
+        <div class="recent-info">
+          <div class="recent-name" title="${escHtml(f.name)}">${escHtml(name)}</div>
+          <div class="recent-time">${fmt}</div>
+        </div>
+        <a class="recent-dl" href="${escHtml(f.url)}" download="${escHtml(f.name)}">⬇ Download</a>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = '<div id="recent-empty">Could not load recent reports.</div>';
+  }
+}
+
 // Boot
 loadConfig();
+loadRecent();
 
 // ---- Password gate ----
 (function() {
