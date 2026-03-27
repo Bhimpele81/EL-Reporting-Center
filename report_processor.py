@@ -729,7 +729,7 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
 # ---------------------------------------------------------------------------
 
 _EXT_TIME_RE    = re.compile(r"Hours\s+(\d+(?::\d+)?)\s*[-–]", re.IGNORECASE)
-_PM_EXT_TIME_RE = re.compile(r"Pick-up\s+\d+(?::\d+)?\s*[-–]\s*(\d+(?::\d+)?)", re.IGNORECASE)
+_PM_EXT_TIME_RE = re.compile(r"Pick-up\s+\d+(?::\d+)?\s*[^\d\s]\s*(\d+(?::\d+)?)", re.IGNORECASE)
 
 
 def _parse_ext_time(token: str) -> datetime.time:
