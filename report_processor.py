@@ -728,7 +728,8 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
 # AM / PM Extend parser + builder
 # ---------------------------------------------------------------------------
 
-_EXT_TIME_RE = re.compile(r"Hours\s+(\d+(?::\d+)?)\s*[-–]", re.IGNORECASE)
+_EXT_TIME_RE    = re.compile(r"Hours\s+(\d+(?::\d+)?)\s*[-–]", re.IGNORECASE)
+_PM_EXT_TIME_RE = re.compile(r"Pick-up\s+\d+(?::\d+)?\s*[-–]\s*(\d+(?::\d+)?)", re.IGNORECASE)
 
 
 def _parse_ext_time(token: str) -> datetime.time:
@@ -784,8 +785,10 @@ def parse_extend(file_bytes: bytes, period: str = "am") -> list:
         thu   = str(row[8]).strip() if len(row) > 8 else ""
         fri   = str(row[9]).strip() if len(row) > 9 else ""
 
-        # Extract start time from enrollment string
-        m = _EXT_TIME_RE.search(enrollment)
+        # Extract time from enrollment string
+        # AM: use start time (before dash); PM: use end/pickup time (after dash)
+        time_re = _PM_EXT_TIME_RE if period == "pm" else _EXT_TIME_RE
+        m = time_re.search(enrollment)
         start_time = _parse_ext_time(m.group(1)) if m else None
 
         # Days/Wk
@@ -819,10 +822,8 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
     """
     Build the single sheet for AM/PM Extend report.
 
-    Layout:
-      Row 1: "WEEK:" label
-      Row 2: Header — CAMPER, BUNK, TIME, MON/TUES/WED/THURS/FRI (Date\\nTime), Days/Wk
-      Row 3+: one row per camper, sorted alphabetically
+    AM layout (9 cols A-I):  CAMPER, BUNK, TIME, MON-FRI (1 col each), Days/Wk
+    PM layout (14 cols A-N): CAMPER, BUNK, TIME, MON-FRI (2 merged cols each), Days/Wk
     """
     _thin = Side(style="thin")
     _med  = Side(style="medium")
@@ -830,13 +831,28 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
     T_BOT_MED  = Border(bottom=_med)
     T_ALL_THIN = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
 
-    BRAND_FILL = PatternFill("solid", fgColor=BRAND)
-    F_HDR  = Font(name="Calibri", bold=True,  size=11, color=WHITE)
-    F_NAME = Font(name="Calibri", bold=False, size=11)
-    F_BUNK = Font(name="Calibri", bold=False, size=9)
-    F_TIME = Font(name="Calibri", bold=True,  size=11)
-    F_DAYS = Font(name="Calibri", bold=False, size=11)
-    F_WEEK = Font(name="Calibri", bold=True,  size=11)
+    if period == "pm":
+        HDR_COLOR = "6A1330"
+        ALT_COLOR = "DCDCDC"
+        FONT_NAME = "Aptos Narrow"
+        DAYS_COL  = 14
+        SIGN_RANGE = range(4, 14)   # D–M (10 signing cols, 2 per day)
+    else:
+        HDR_COLOR = BRAND
+        ALT_COLOR = "D9D9D9"
+        FONT_NAME = "Calibri"
+        DAYS_COL  = 9
+        SIGN_RANGE = range(4, 9)    # D–H (5 signing cols)
+
+    HDR_FILL = PatternFill("solid", fgColor=HDR_COLOR)
+    ALT_FILL = PatternFill("solid", fgColor=ALT_COLOR)
+
+    F_HDR  = Font(name=FONT_NAME, bold=True,  size=11, color=WHITE)
+    F_NAME = Font(name=FONT_NAME, bold=False, size=11)
+    F_BUNK = Font(name=FONT_NAME, bold=False, size=9)
+    F_TIME = Font(name=FONT_NAME, bold=True,  size=11)
+    F_DAYS = Font(name=FONT_NAME, bold=False, size=11)
+    F_WEEK = Font(name=FONT_NAME, bold=True,  size=11)
 
     CTR  = Alignment(horizontal="center", vertical="center")
     WRAP = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -849,61 +865,68 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
 
     # ---- Row 2: header ----
     ws.row_dimensions[2].height = 44.35
-    hdr_cols = [
-        (1, "CAMPER"),
-        (2, "BUNK"),
-        (3, "TIME"),
-        (4, "MON\nDate\nTime"),
-        (5, "TUES\nDate\nTime"),
-        (6, "WED\nDate\nTime"),
-        (7, "THURS\nDate\nTime"),
-        (8, "FRI\nDate\nTime"),
-        (9, "Days/Wk"),
-    ]
-    for ci, lbl in hdr_cols:
-        c = ws.cell(row=2, column=ci, value=lbl)
-        c.font = F_HDR; c.fill = BRAND_FILL
-        c.alignment = WRAP if "\n" in lbl else CTR
-        c.border = T_BOT_MED
+
+    def _hdr(col, val, align=CTR):
+        c = ws.cell(row=2, column=col, value=val)
+        c.font = F_HDR; c.fill = HDR_FILL
+        c.alignment = align; c.border = T_BOT_MED
+
+    _hdr(1, "CAMPER"); _hdr(2, "BUNK"); _hdr(3, "TIME")
+    _hdr(DAYS_COL, "Days/Wk")
+
+    if period == "pm":
+        day_pairs = [
+            (4, 5,  "MON\nDate\nTime     Initial"),
+            (6, 7,  "TUES\nDate\nTime     Initial"),
+            (8, 9,  "WED\nDate\nTime     Initial"),
+            (10, 11, "THURS\nDate\nTime     Initial"),
+            (12, 13, "FRI\nDate\nTime     Initial"),
+        ]
+        for c1, c2, lbl in day_pairs:
+            ws.merge_cells(start_row=2, start_column=c1, end_row=2, end_column=c2)
+            _hdr(c1, lbl, WRAP)
+            ws.cell(row=2, column=c2).border = T_BOT_MED
+    else:
+        for ci, lbl in [(4, "MON\nDate\nTime"), (5, "TUES\nDate\nTime"),
+                        (6, "WED\nDate\nTime"), (7, "THURS\nDate\nTime"),
+                        (8, "FRI\nDate\nTime")]:
+            _hdr(ci, lbl, WRAP)
 
     # ---- Data rows ----
     for i, camper in enumerate(campers):
         r = i + 3
         ws.row_dimensions[r].height = 23.75
-        use_alt = (i % 2 == 1)
-        alt_fill = PatternFill("solid", fgColor="D9D9D9") if use_alt else None
+        af = ALT_FILL if (i % 2 == 1) else None
 
         def _set(col, val, font, align=CTR):
             cell = ws.cell(row=r, column=col, value=val)
             cell.font = font; cell.alignment = align; cell.border = T_BOT_THIN
-            if alt_fill: cell.fill = alt_fill
+            if af: cell.fill = af
 
         _set(1, camper["name"], F_NAME, LEFT)
-        _set(2, camper["bunk"], F_BUNK, CTR)
+        _set(2, camper["bunk"], F_BUNK)
 
-        # TIME: format as "H:MM" string for clarity
         t = camper["time"]
-        if t:
-            time_str = f"{t.hour}:{t.minute:02d}" if t.minute else str(t.hour)
-        else:
-            time_str = None
+        time_str = (f"{t.hour}:{t.minute:02d}" if t.minute else str(t.hour)) if t else None
         _set(3, time_str, F_TIME)
 
-        # Day signing cols D–H (blank)
-        for ci in range(4, 9):
+        for ci in SIGN_RANGE:
             cell = ws.cell(row=r, column=ci)
             cell.border = T_ALL_THIN
-            if alt_fill: cell.fill = alt_fill
+            if af: cell.fill = af
 
-        _set(9, camper["days_wk"] or None, F_DAYS)
+        _set(DAYS_COL, camper["days_wk"] or None, F_DAYS)
 
     # ---- Column widths ----
     ws.column_dimensions["A"].width = 18
     ws.column_dimensions["B"].width = 9
     ws.column_dimensions["C"].width = 9
-    for col in ["D", "E", "F", "G", "H"]:
-        ws.column_dimensions[col].width = 11.6
-    ws.column_dimensions["I"].width = 11.6
+    if period == "pm":
+        ws.column_dimensions["D"].width = 6.27
+        ws.column_dimensions[get_column_letter(DAYS_COL)].width = 11.6
+    else:
+        for col in ["D", "E", "F", "G", "H", "I"]:
+            ws.column_dimensions[col].width = 11.6
 
     # ---- Print settings ----
     ws.page_setup.orientation = "portrait"
