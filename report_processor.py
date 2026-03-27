@@ -430,36 +430,37 @@ def build_totals_sheet(ws, campers: list, config: dict,
         _cell(ws, r_total, RT_W1 + wi, grand_weeks[wi],
               font=TOTAL_FONT, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
 
-    # Left & Middle sections: per-bunk rows + per-camp subtotals
-    mid_data_rows = {}  # camp -> (row, count)
-    mid_row = 4
-
+    # Left section: per-bunk rows
     for ci, camp in enumerate(config["camps"]):
         cn = camp["name"]
-        camp_start_mid = mid_row
-
         for bi, bunk in enumerate(camp["bunks"]):
             bk = bunk["name"]
             alt = (data_row % 2 == 0)
             fill = ALT_FILL if alt else None
-
             _cell(ws, data_row, LEFT_C, cn,  font=BODY_FONT, fill=fill, align=LEFT,   border=THIN_BORDER)
             _cell(ws, data_row, LEFT_B, bk,  font=BODY_FONT, fill=fill, align=LEFT,   border=THIN_BORDER)
             _cell(ws, data_row, LEFT_N, bunk_count.get(bk, 0),
                   font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
             data_row += 1
-            mid_row  += 1
 
-        # Middle section camp subtotal
-        _cell(ws, camp_start_mid, MID_C, cn,
-              font=BODY_FONT, fill=LGREY_FILL, align=LEFT, border=THIN_BORDER)
-        _cell(ws, camp_start_mid, MID_T, camp_count[cn],
-              font=BODY_FONT, fill=LGREY_FILL, align=CENTER, border=THIN_BORDER)
-
-    # Grand total rows
+    # Grand total row (left section)
     _cell(ws, data_row, LEFT_C, "TOTAL", font=TOTAL_FONT, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
     _cell(ws, data_row, LEFT_B, None,    font=TOTAL_FONT, fill=TOTAL_FILL, border=THIN_BORDER)
     _cell(ws, data_row, LEFT_N, grand_total, font=TOTAL_FONT, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
+
+    # Middle section: consecutive rows (one per camp), independent of bunk rows
+    mid_row = 4
+    for ci, camp in enumerate(config["camps"]):
+        cn = camp["name"]
+        alt = (ci % 2 == 1)
+        fill = ALT_FILL if alt else None
+        _cell(ws, mid_row, MID_C, cn,            font=BODY_FONT,  fill=fill,       align=LEFT,   border=THIN_BORDER)
+        _cell(ws, mid_row, MID_T, camp_count[cn], font=BODY_FONT, fill=fill,       align=CENTER, border=THIN_BORDER)
+        mid_row += 1
+
+    # Grand total row (middle section)
+    _cell(ws, mid_row, MID_C, "Total",     font=TOTAL_FONT, fill=TOTAL_FILL, align=LEFT,   border=THIN_BORDER)
+    _cell(ws, mid_row, MID_T, grand_total, font=TOTAL_FONT, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
 
     # ----- Bunk Totals by Week section (below right section gap) -----------
     bunk_wk_start = r_total + 2
@@ -509,6 +510,13 @@ def build_totals_sheet(ws, campers: list, config: dict,
     ws.column_dimensions["I"].width = 18   # Label
     for wi in range(8):
         ws.column_dimensions[get_column_letter(RT_W1 + wi)].width = 6
+
+    # ---- Print settings: landscape, single page ----------------------------
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToPage   = True
+    ws.page_setup.fitToWidth  = 1
+    ws.page_setup.fitToHeight = 1
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
 
 
 # ---------------------------------------------------------------------------
