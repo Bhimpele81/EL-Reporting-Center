@@ -988,16 +988,29 @@ def _bunk_to_grp(bunk_name: str) -> str:
     return "CIT"
 
 
-def parse_pm_grp_extend(file_bytes: bytes) -> list:
+def parse_pm_grp_extend(file_bytes: bytes, config: dict) -> list:
     """
     Parse PM Extended data and annotate each camper with their group code.
+    Grp is resolved from bunk_config.json (by bunk number), falling back
+    to hardcoded ranges for any bunk not found in the config.
     Returns campers sorted by group order, bunk number, then name.
     """
+    # Build number → grp from config
+    num_to_grp = {}
+    for camp in config.get("camps", []):
+        for bunk in camp.get("bunks", []):
+            grp = bunk.get("grp", "").strip()
+            if grp:
+                num_to_grp[bunk["number"]] = grp
+
     campers = parse_extend(file_bytes, period="pm")
     for c in campers:
-        c["grp"] = _bunk_to_grp(c["bunk"])
         m = re.match(r'^(\d+)', c["bunk"].strip())
-        c["bunk_num"] = int(m.group(1)) if m else 999
+        bunk_num = int(m.group(1)) if m else 999
+        c["bunk_num"] = bunk_num
+        # Config lookup first; fall back to hardcoded ranges
+        c["grp"] = num_to_grp.get(bunk_num) or _bunk_to_grp(c["bunk"])
+
     campers.sort(key=lambda c: (_GRP_IDX.get(c["grp"], 99), c["bunk_num"], c["name"].lower()))
     return campers
 
@@ -1222,7 +1235,7 @@ def process_report(file_bytes: bytes, report_type: str,
     # ---- PM GRP Extend ----
     if report_type == "pm_grp_extend":
         try:
-            campers = parse_pm_grp_extend(file_bytes)
+            campers = parse_pm_grp_extend(file_bytes, config)
         except Exception as e:
             return {"success": False, "message": f"Could not parse file: {e}"}
         if not campers:
