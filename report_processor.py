@@ -288,7 +288,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
             _cell(ws, row, 2,  bunk_name,        font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
 
             for wi, wv in enumerate(camper["weeks"]):
-                _cell(ws, row, 3 + wi, wv if wv else None,
+                _cell(ws, row, 3 + wi, wv,
                       font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
                 week_sums[wi] += wv
 
