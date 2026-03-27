@@ -304,7 +304,6 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="h-title">Elbow Lane Day Camp</div>
     <div class="h-sub">Reporting Center</div>
   </div>
-  <span class="h-badge">Report Tools</span>
 </header>
 
 <div class="tab-bar">
