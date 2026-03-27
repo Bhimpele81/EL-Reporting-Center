@@ -169,7 +169,7 @@ HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏕️</text></svg>">
+<link rel="icon" type="image/png" href="/logo.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Elbow Lane — Reporting Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
