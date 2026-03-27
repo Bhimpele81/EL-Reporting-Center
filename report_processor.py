@@ -5,6 +5,7 @@ Transforms raw camp management CSV exports into formatted Excel workbooks.
 """
 
 import csv
+import datetime
 import io
 import json
 import os
@@ -724,13 +725,203 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# AM / PM Extend parser + builder
+# ---------------------------------------------------------------------------
+
+_EXT_TIME_RE = re.compile(r"Hours\s+(\d+(?::\d+)?)\s*[-–]", re.IGNORECASE)
+
+
+def _parse_ext_time(token: str) -> datetime.time:
+    """Convert '7', '7:30', '8', '8:30' to datetime.time."""
+    if ":" in token:
+        h, m = token.split(":")
+        return datetime.time(int(h), int(m))
+    return datetime.time(int(token), 0)
+
+
+def parse_extend(file_bytes: bytes, period: str = "am") -> list:
+    """
+    Parse raw AM/PM Extended Hours export (XLSX or CSV).
+
+    Expected columns (0-indexed):
+      0  row#
+      1  Last name
+      2  First name
+      3  Bunk name
+      4  Enrollment string  (e.g. "AM Extended Hours 8-8:30 drop-off: 5 Days 6 Wks")
+      5  Monday?   (Yes / No / blank)
+      6  Tuesday?
+      7  Wednesday?
+      8  Thursday?
+      9  Friday?
+    """
+    if file_bytes[:4] == b'PK\x03\x04':
+        from openpyxl import load_workbook as _lw
+        _wb = _lw(filename=io.BytesIO(file_bytes), read_only=True, data_only=True)
+        _ws = _wb.active
+        rows = [[str(c.value) if c.value is not None else "" for c in r]
+                for r in _ws.iter_rows()]
+        _wb.close()
+    else:
+        content = file_bytes.decode("utf-8-sig", errors="replace")
+        rows = list(csv.reader(io.StringIO(content)))
+
+    keyword = "am extended" if period == "am" else "pm extended"
+    campers = []
+    for row in rows[1:]:
+        if len(row) < 4 or not str(row[0]).strip().isdigit():
+            continue
+        enrollment = str(row[4]).strip() if len(row) > 4 else ""
+        if keyword not in enrollment.lower():
+            continue
+
+        last  = str(row[1]).strip()
+        first = str(row[2]).strip()
+        bunk  = str(row[3]).strip()
+        mon   = str(row[5]).strip() if len(row) > 5 else ""
+        tue   = str(row[6]).strip() if len(row) > 6 else ""
+        wed   = str(row[7]).strip() if len(row) > 7 else ""
+        thu   = str(row[8]).strip() if len(row) > 8 else ""
+        fri   = str(row[9]).strip() if len(row) > 9 else ""
+
+        # Extract start time from enrollment string
+        m = _EXT_TIME_RE.search(enrollment)
+        start_time = _parse_ext_time(m.group(1)) if m else None
+
+        # Days/Wk
+        any_specified = any(d.lower() in ("yes", "no") for d in [mon, tue, wed, thu, fri])
+        if any_specified:
+            days_wk = (
+                ("M" if mon.lower() == "yes" else "") +
+                ("T" if tue.lower() == "yes" else "") +
+                ("W" if wed.lower() == "yes" else "") +
+                ("R" if thu.lower() == "yes" else "") +
+                ("F" if fri.lower() == "yes" else "")
+            )
+            if days_wk == "MTWRF":
+                days_wk = ""
+        else:
+            days_wk = ""
+
+        campers.append({
+            "name":      f"{last}, {first}",
+            "bunk":      bunk,
+            "time":      start_time,
+            "days_wk":   days_wk,
+        })
+
+    # Sort alphabetically by name
+    campers.sort(key=lambda c: c["name"].lower())
+    return campers
+
+
+def build_extend_sheet(ws, campers: list, period: str) -> None:
+    """
+    Build the single sheet for AM/PM Extend report.
+
+    Layout:
+      Row 1: "WEEK:" label
+      Row 2: Header — CAMPER, BUNK, TIME, MON/TUES/WED/THURS/FRI (Date\\nTime), Days/Wk
+      Row 3+: one row per camper, sorted alphabetically
+    """
+    _thin = Side(style="thin")
+    _med  = Side(style="medium")
+    T_BOT_THIN = Border(bottom=_thin)
+    T_BOT_MED  = Border(bottom=_med)
+    T_ALL_THIN = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
+
+    BRAND_FILL = PatternFill("solid", fgColor=BRAND)
+    F_HDR  = Font(name="Calibri", bold=True,  size=11, color=WHITE)
+    F_NAME = Font(name="Calibri", bold=False, size=11)
+    F_BUNK = Font(name="Calibri", bold=False, size=9)
+    F_TIME = Font(name="Calibri", bold=True,  size=11)
+    F_DAYS = Font(name="Calibri", bold=False, size=11)
+    F_WEEK = Font(name="Calibri", bold=True,  size=11)
+
+    CTR  = Alignment(horizontal="center", vertical="center")
+    WRAP = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    LEFT = Alignment(horizontal="left",   vertical="center")
+
+    # ---- Row 1: WEEK label ----
+    ws.row_dimensions[1].height = 14.65
+    c = ws.cell(row=1, column=1, value="WEEK:")
+    c.font = F_WEEK
+
+    # ---- Row 2: header ----
+    ws.row_dimensions[2].height = 44.35
+    hdr_cols = [
+        (1, "CAMPER"),
+        (2, "BUNK"),
+        (3, "TIME"),
+        (4, "MON\nDate\nTime"),
+        (5, "TUES\nDate\nTime"),
+        (6, "WED\nDate\nTime"),
+        (7, "THURS\nDate\nTime"),
+        (8, "FRI\nDate\nTime"),
+        (9, "Days/Wk"),
+    ]
+    for ci, lbl in hdr_cols:
+        c = ws.cell(row=2, column=ci, value=lbl)
+        c.font = F_HDR; c.fill = BRAND_FILL
+        c.alignment = WRAP if "\n" in lbl else CTR
+        c.border = T_BOT_MED
+
+    # ---- Data rows ----
+    for i, camper in enumerate(campers):
+        r = i + 3
+        ws.row_dimensions[r].height = 23.75
+        use_alt = (i % 2 == 1)
+        alt_fill = PatternFill("solid", fgColor="D9D9D9") if use_alt else None
+
+        def _set(col, val, font, align=CTR):
+            cell = ws.cell(row=r, column=col, value=val)
+            cell.font = font; cell.alignment = align; cell.border = T_BOT_THIN
+            if alt_fill: cell.fill = alt_fill
+
+        _set(1, camper["name"], F_NAME, LEFT)
+        _set(2, camper["bunk"], F_BUNK, CTR)
+
+        # TIME: format as "H:MM" string for clarity
+        t = camper["time"]
+        if t:
+            time_str = f"{t.hour}:{t.minute:02d}" if t.minute else str(t.hour)
+        else:
+            time_str = None
+        _set(3, time_str, F_TIME)
+
+        # Day signing cols D–H (blank)
+        for ci in range(4, 9):
+            cell = ws.cell(row=r, column=ci)
+            cell.border = T_ALL_THIN
+            if alt_fill: cell.fill = alt_fill
+
+        _set(9, camper["days_wk"] or None, F_DAYS)
+
+    # ---- Column widths ----
+    ws.column_dimensions["A"].width = 18
+    ws.column_dimensions["B"].width = 9
+    ws.column_dimensions["C"].width = 9
+    for col in ["D", "E", "F", "G", "H"]:
+        ws.column_dimensions[col].width = 11.6
+    ws.column_dimensions["I"].width = 11.6
+
+    # ---- Print settings ----
+    ws.page_setup.orientation = "portrait"
+    ws.page_setup.fitToPage   = True
+    ws.page_setup.fitToWidth  = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_title_rows = "1:2"
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
 def process_report(file_bytes: bytes, report_type: str,
                    config: dict, job_id: str, output_dir: str) -> dict:
 
-    supported = ("bunk_snapshot", "group_attendance")
+    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend")
     if report_type not in supported:
         return {
             "success": False,
@@ -788,6 +979,56 @@ def process_report(file_bytes: bytes, report_type: str,
         build_group_attendance_sheet(ws, campers, config)
 
         out_filename = f"Group Attendance {report_date.strftime('%m%d%Y')}.xlsx"
+        out_path = os.path.join(output_dir, out_filename)
+        wb.save(out_path)
+
+        return {
+            "success":  True,
+            "message":  f"Processed {len(campers)} campers successfully.",
+            "filename": out_filename,
+            "rows":     len(campers),
+        }
+
+    # ---- AM Extend ----
+    if report_type == "am_extend":
+        try:
+            campers = parse_extend(file_bytes, period="am")
+        except Exception as e:
+            return {"success": False, "message": f"Could not parse file: {e}"}
+        if not campers:
+            return {"success": False, "message": "No AM Extended campers found in file."}
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "AM Extend"
+        build_extend_sheet(ws, campers, period="am")
+
+        out_filename = f"AM Extend {report_date.strftime('%m%d%Y')}.xlsx"
+        out_path = os.path.join(output_dir, out_filename)
+        wb.save(out_path)
+
+        return {
+            "success":  True,
+            "message":  f"Processed {len(campers)} campers successfully.",
+            "filename": out_filename,
+            "rows":     len(campers),
+        }
+
+    # ---- PM Extend ----
+    if report_type == "pm_extend":
+        try:
+            campers = parse_extend(file_bytes, period="pm")
+        except Exception as e:
+            return {"success": False, "message": f"Could not parse file: {e}"}
+        if not campers:
+            return {"success": False, "message": "No PM Extended campers found in file."}
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "PM Extend"
+        build_extend_sheet(ws, campers, period="pm")
+
+        out_filename = f"PM Extend {report_date.strftime('%m%d%Y')}.xlsx"
         out_path = os.path.join(output_dir, out_filename)
         wb.save(out_path)
 

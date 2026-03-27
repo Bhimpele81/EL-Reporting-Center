@@ -327,6 +327,8 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="report-types" id="report-types">
         <button class="rtype-btn active" data-rtype="bunk_snapshot">Bunk Snapshot</button>
         <button class="rtype-btn" data-rtype="group_attendance">Group Attendance</button>
+        <button class="rtype-btn" data-rtype="am_extend">AM Extend</button>
+        <button class="rtype-btn" data-rtype="pm_extend">PM Extend</button>
     </div>
   </div>
 
