@@ -232,6 +232,8 @@ HTML = r"""<!DOCTYPE html>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans',sans-serif;background:var(--mist);color:var(--ink);min-height:100vh}
 header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-items:center;gap:1.25rem;height:80px;box-shadow:0 2px 16px rgba(109,31,47,.35);position:sticky;top:0;z-index:200}
+.h-support{margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.05em;padding:.45rem 1rem;border-radius:6px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:.4rem;transition:background .18s}
+.h-support:hover{background:rgba(255,255,255,.28)}
 .h-logo{width:60px;height:60px;flex-shrink:0;border-radius:50%;background-image:url("/logo.png");background-size:90%;background-position:center;background-repeat:no-repeat;background-color:var(--brand-dark)}
 .h-title{font-family:'Roboto Slab',serif;font-size:1.25rem;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
 .h-sub{font-size:.72rem;opacity:.75;font-weight:400;margin-top:2px;letter-spacing:.08em;text-transform:uppercase}
@@ -350,7 +352,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 #pw-overlay{position:fixed;inset:0;background:rgba(20,6,9,.72);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center}
 #pw-overlay.hidden{display:none}
 #pw-box{background:#fff;border-radius:14px;padding:2.4rem 2.2rem 2rem;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.35);text-align:center}
-#pw-box .pw-logo{width:72px;height:72px;background:url('/logo.png') center/contain no-repeat;margin:0 auto .9rem}
+#pw-box .pw-logo{width:72px;height:72px;margin:0 auto .9rem}#pw-box .pw-logo img{width:72px;height:72px;object-fit:contain;mix-blend-mode:multiply;display:block}
 #pw-box h2{font-family:'Roboto Slab',serif;font-size:1.25rem;color:var(--brand);margin:0 0 .4rem}
 #pw-box .pw-sub{font-size:.85rem;color:#555;margin:0 0 1.4rem;line-height:1.55}
 #pw-box .pw-sub strong{color:var(--brand-dark)}
@@ -367,7 +369,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 <!-- Password gate -->
 <div id="pw-overlay">
   <div id="pw-box">
-    <div class="pw-logo"></div>
+    <div class="pw-logo"><img src="/logo.png" alt="Elbow Lane Day Camp"></div>
     <h2>Elbow Lane Reporting Center</h2>
     <p class="pw-sub">You have <strong>trial access</strong> to this reporting center at no cost.<br>Enter your access code to continue.</p>
     <div id="pw-input-wrap">
@@ -384,6 +386,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="h-title">Elbow Lane Day Camp</div>
     <div class="h-sub">Reporting Center</div>
   </div>
+  <a class="h-support" href="mailto:bhimpele@gmail.com?subject=EL%20Reporting%20Center%20Support">✉ Support</a>
 </header>
 
 <div class="tab-bar">
