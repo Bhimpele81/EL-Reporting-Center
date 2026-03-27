@@ -484,7 +484,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="px-grid">
       <div class="px-card">
         <div class="px-tier">Starter</div>
-        <div class="px-price">$9.99<span>/mo</span></div>
+        <div class="px-price">$14.99<span>/mo</span></div>
         <p class="px-desc">Perfect for smaller camps or those just getting started with digital reporting.</p>
         <ul class="px-features">
           <li>20 reports per month</li>
@@ -498,7 +498,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       <div class="px-card featured">
         <div class="px-badge">Most Popular</div>
         <div class="px-tier">Pro</div>
-        <div class="px-price">$16.99<span>/mo</span></div>
+        <div class="px-price">$24.99<span>/mo</span></div>
         <p class="px-desc">For active camps that run reports throughout the season on a regular basis.</p>
         <ul class="px-features">
           <li>50 reports per month</li>
@@ -512,7 +512,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       </div>
       <div class="px-card">
         <div class="px-tier">Unlimited</div>
-        <div class="px-price">$29.99<span>/mo</span></div>
+        <div class="px-price">$49.99<span>/mo</span></div>
         <p class="px-desc">Full access for camps that need unrestricted reporting all season long.</p>
         <ul class="px-features">
           <li>Unlimited reports</li>
