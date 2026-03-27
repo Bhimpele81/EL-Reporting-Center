@@ -315,6 +315,11 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
               font=TOTAL_FONT, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
         row += 1
 
+        # Page break after each bunk (except the last)
+        if bk_idx < len(display_order) - 1:
+            from openpyxl.worksheet.pagebreak import Break
+            ws.row_breaks.append(Break(id=row - 1))
+
     # ----- Column widths ----------------------------------------------------
     ws.column_dimensions["A"].width = 26   # Child
     ws.column_dimensions["B"].width = 16   # Bunk
@@ -328,6 +333,14 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
 
     # Freeze panes below header
     ws.freeze_panes = "A3"
+
+    # ----- Print settings: landscape, fit to 1 page wide, header rows repeat -
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToPage   = True
+    ws.page_setup.fitToWidth  = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_title_rows = "1:2"
 
 
 # ---------------------------------------------------------------------------
