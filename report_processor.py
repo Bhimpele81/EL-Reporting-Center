@@ -299,13 +299,13 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
                 _cell(ws, row, 11 + di, dv,
                       font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
 
-            # Store age/grade as numbers if possible to suppress green error arrows
+            # Store age/grade as numbers — try float first to handle decimals
             age_val = camper["age"]
-            try: age_val = int(age_val)
-            except (ValueError, TypeError): pass
+            try: age_val = float(str(age_val).strip())
+            except (ValueError, TypeError): age_val = None
             grade_val = camper["grade"]
-            try: grade_val = int(grade_val)
-            except (ValueError, TypeError): pass
+            try: grade_val = int(float(str(grade_val).strip()))
+            except (ValueError, TypeError): grade_val = None
 
             _cell(ws, row, 16, age_val,   font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
             _cell(ws, row, 17, grade_val, font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
@@ -362,6 +362,8 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
             err = etree.SubElement(ie_elem, f"{{{ns}}}ignoredError")
             err.set("sqref", f"P3:Q{last_row}")
             err.set("numberStoredAsText", "1")
+            err.set("formula", "1")
+            err.set("formulaRange", "1")
         except Exception:
             pass
 
