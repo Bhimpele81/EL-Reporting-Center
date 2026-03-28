@@ -341,7 +341,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     max_r = max((len(str(ws.cell(row=r, column=18).value or ""))
                  for r in range(1, last_row + 1)), default=5)
 
-    ws.column_dimensions["A"].width = max_a + 4
+    ws.column_dimensions["A"].width = int(max_a * 0.9)
     ws.column_dimensions["B"].width = 16
     for col_letter in [get_column_letter(c) for c in range(3, 11)]:
         ws.column_dimensions[col_letter].width = 5   # #1-#8
@@ -349,16 +349,19 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
         ws.column_dimensions[col_letter].width = 4   # M T W R F
     ws.column_dimensions["P"].width = 6
     ws.column_dimensions["Q"].width = 6
-    ws.column_dimensions["R"].width = max_r + 4
+    ws.column_dimensions["R"].width = int(max_r * 0.9)
 
     # ----- Suppress green error indicators in P and Q ----------------------
+    # openpyxl 3.1.x has no IgnoredErrors helper — inject XML directly
     if last_row >= 3:
         try:
-            from openpyxl.worksheet.cell_range import CellRange
-            from openpyxl.worksheet.ignore_errors import IgnoredErrors
-            ie = IgnoredErrors(sqref=CellRange(f"P3:Q{last_row}"),
-                               numberStoredAsText=True)
-            ws.ignored_errors.append(ie)
+            from lxml import etree
+            ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+            ie_elem = etree.SubElement(ws._element,
+                                       f"{{{ns}}}ignoredErrors")
+            err = etree.SubElement(ie_elem, f"{{{ns}}}ignoredError")
+            err.set("sqref", f"P3:Q{last_row}")
+            err.set("numberStoredAsText", "1")
         except Exception:
             pass
 
