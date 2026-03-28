@@ -215,7 +215,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
 
     # ----- Row 1: date header -----------------------------------------------
     ws.row_dimensions[1].height = 18
-    _cell(ws, 1, 1, "Report Date:", font=DATE_FONT)
+    _cell(ws, 1, 1, "Report Date:", font=DATE_FONT, align=RIGHT)
     _cell(ws, 1, 2, report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
           else report_date.strftime("%#m/%#d/%Y"),
           font=DATE_FONT)
@@ -275,6 +275,8 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     # ----- Write rows -------------------------------------------------------
     row = 3
     total_col = 18   # Column R
+    max_col_a = len("Child")   # track max width for column A autofit
+    max_col_r = len("Total:   00")  # track max width for column R autofit
 
     for bk_idx, bunk_name in enumerate(display_order):
         group = bunk_groups[bunk_name]
@@ -286,6 +288,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
 
             _cell(ws, row, 1,  camper["name"],  font=BODY_FONT, fill=fill, align=LEFT,   border=THIN_BORDER)
             _cell(ws, row, 2,  bunk_name,        font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
+            max_col_a = max(max_col_a, len(str(camper["name"] or "")))
 
             for wi, wv in enumerate(camper["weeks"]):
                 _cell(ws, row, 3 + wi, wv,
@@ -296,13 +299,23 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
                 _cell(ws, row, 11 + di, dv,
                       font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
 
-            _cell(ws, row, 16, camper["age"],   font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
-            _cell(ws, row, 17, camper["grade"], font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
+            # Store age/grade as numbers if possible to suppress green error arrows
+            age_val = camper["age"]
+            try: age_val = int(age_val)
+            except (ValueError, TypeError): pass
+            grade_val = camper["grade"]
+            try: grade_val = int(grade_val)
+            except (ValueError, TypeError): pass
+
+            _cell(ws, row, 16, age_val,   font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
+            _cell(ws, row, 17, grade_val, font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
             row += 1
 
         # --- Subtotal row ---
-        _cell(ws, row, 1,  None,         font=TOTAL_FONT, fill=TOTAL_FILL, border=THIN_BORDER)
-        _cell(ws, row, 2,  "-",           font=TOTAL_FONT, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
+        total_text = f"Total:   {len(group)}"
+        max_col_r = max(max_col_r, len(total_text))
+        _cell(ws, row, 1,  None,  font=TOTAL_FONT, fill=TOTAL_FILL, border=THIN_BORDER)
+        _cell(ws, row, 2,  None,  font=TOTAL_FONT, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
         for wi, ws_val in enumerate(week_sums):
             _cell(ws, row, 3 + wi, ws_val,
                   font=TOTAL_FONT, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
@@ -311,7 +324,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
         _cell(ws, row, 16, None, fill=TOTAL_FILL, border=THIN_BORDER)
         _cell(ws, row, 17, None, fill=TOTAL_FILL, border=THIN_BORDER)
         _cell(ws, row, total_col,
-              f"Total:   {len(group)}",
+              total_text,
               font=TOTAL_FONT, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
         row += 1
 
@@ -321,15 +334,15 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
             ws.row_breaks.append(Break(id=row - 1))
 
     # ----- Column widths ----------------------------------------------------
-    ws.column_dimensions["A"].width = 26   # Child
-    ws.column_dimensions["B"].width = 16   # Bunk
+    ws.column_dimensions["A"].width = max_col_a + 2   # Child (autofit)
+    ws.column_dimensions["B"].width = 16              # Bunk
     for col_letter in [get_column_letter(c) for c in range(3, 11)]:
         ws.column_dimensions[col_letter].width = 5   # #1-#8
     for col_letter in [get_column_letter(c) for c in range(11, 16)]:
         ws.column_dimensions[col_letter].width = 4   # M T W R F
-    ws.column_dimensions["P"].width = 6   # Age
-    ws.column_dimensions["Q"].width = 6   # Grade
-    ws.column_dimensions["R"].width = 14  # Total
+    ws.column_dimensions["P"].width = 6              # Age
+    ws.column_dimensions["Q"].width = 6              # Grade
+    ws.column_dimensions["R"].width = max_col_r + 2  # Total (autofit)
 
     # Freeze panes below header
     ws.freeze_panes = "A3"
