@@ -333,26 +333,31 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
             from openpyxl.worksheet.pagebreak import Break
             ws.row_breaks.append(Break(id=row - 1))
 
-    # ----- Column widths (autofit A and R using measured max content) -------
-    # Excel column width units ≈ character width of default font; multiply by
-    # ~1.1 and add padding to match visual autofit behaviour.
-    ws.column_dimensions["A"].width = int(max_col_a * 1.1) + 4   # Child
-    ws.column_dimensions["B"].width = 16                          # Bunk
+    # ----- Column widths ----------------------------------------------------
+    # Autofit A and R by scanning actual written cell values
+    last_row = row - 1
+    max_a = max((len(str(ws.cell(row=r, column=1).value or ""))
+                 for r in range(1, last_row + 1)), default=5)
+    max_r = max((len(str(ws.cell(row=r, column=18).value or ""))
+                 for r in range(1, last_row + 1)), default=5)
+
+    ws.column_dimensions["A"].width = max_a + 4
+    ws.column_dimensions["B"].width = 16
     for col_letter in [get_column_letter(c) for c in range(3, 11)]:
         ws.column_dimensions[col_letter].width = 5   # #1-#8
     for col_letter in [get_column_letter(c) for c in range(11, 16)]:
         ws.column_dimensions[col_letter].width = 4   # M T W R F
-    ws.column_dimensions["P"].width = 6              # Age
-    ws.column_dimensions["Q"].width = 6              # Grade
-    ws.column_dimensions["R"].width = int(max_col_r * 1.1) + 4   # Total
+    ws.column_dimensions["P"].width = 6
+    ws.column_dimensions["Q"].width = 6
+    ws.column_dimensions["R"].width = max_r + 4
 
     # ----- Suppress green error indicators in P and Q ----------------------
-    last_data_row = row - 1
-    if last_data_row >= 3:
+    if last_row >= 3:
         try:
+            from openpyxl.worksheet.cell_range import CellRange
             from openpyxl.worksheet.ignore_errors import IgnoredErrors
-            ie = IgnoredErrors(sqref=f"P3:Q{last_data_row}")
-            ie.numberStoredAsText = True
+            ie = IgnoredErrors(sqref=CellRange(f"P3:Q{last_row}"),
+                               numberStoredAsText=True)
             ws.ignored_errors.append(ie)
         except Exception:
             pass
