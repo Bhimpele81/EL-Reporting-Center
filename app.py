@@ -909,8 +909,8 @@ function renderCamps() {
         <thead>
           <tr>
             <th>Bunk Name</th>
-            <th style="width:90px">Number</th>
-            <th style="width:70px">Grp</th>
+            <th style="width:70px">Number</th>
+            <th style="width:100px">Grp</th>
             <th style="width:36px"></th>
           </tr>
         </thead>
