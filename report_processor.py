@@ -998,56 +998,40 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
 # PM GRP Extend helpers
 # ---------------------------------------------------------------------------
 
-_GRP_ORDER = ["Jr1", "Jr2", "Jr3", "Int1", "Int2", "Sr1", "Sr2", "Up1", "Up2", "CIT"]
-_GRP_IDX   = {g: i for i, g in enumerate(_GRP_ORDER)}
-
-_BUNK_RANGES = [
-    (range(1,  3),  "Jr1"),
-    (range(3,  6),  "Jr2"),
-    (range(6,  9),  "Jr3"),
-    (range(9,  12), "Int1"),
-    (range(12, 16), "Int2"),
-    (range(16, 20), "Sr1"),
-    (range(20, 24), "Sr2"),
-    (range(24, 28), "Up1"),
-    (range(28, 32), "Up2"),
-]
-
-
-def _bunk_to_grp(bunk_name: str) -> str:
-    m = re.match(r'^(\d+)', bunk_name.strip())
-    if m:
-        n = int(m.group(1))
-        for rng, grp in _BUNK_RANGES:
-            if n in rng:
-                return grp
-    return "CIT"
-
-
 def parse_pm_grp_extend(file_bytes: bytes, config: dict) -> list:
     """
     Parse PM Extended data and annotate each camper with their group code.
-    Grp is resolved from bunk_config.json (by bunk number), falling back
-    to hardcoded ranges for any bunk not found in the config.
+    Grp is resolved entirely from bunk_config.json (by bunk number).
+    Group order is derived dynamically from the config — sorted by the
+    lowest bunk number in each group — so no hardcoded mappings are needed.
     Returns campers sorted by group order, bunk number, then name.
     """
-    # Build number → grp from config
-    num_to_grp = {}
+    # Build number → grp AND track the minimum bunk number per group
+    num_to_grp: dict[int, str] = {}
+    grp_min_bunk: dict[str, int] = {}
+
     for camp in config.get("camps", []):
         for bunk in camp.get("bunks", []):
             grp = bunk.get("grp", "").strip()
-            if grp:
-                num_to_grp[bunk["number"]] = grp
+            num = bunk.get("number")
+            if grp and num is not None:
+                num_to_grp[num] = grp
+                if grp not in grp_min_bunk or num < grp_min_bunk[grp]:
+                    grp_min_bunk[grp] = num
+
+    # Dynamic group order — sorted by the first bunk number in each group
+    grp_idx = {g: i for i, g in enumerate(
+        sorted(grp_min_bunk.keys(), key=lambda g: grp_min_bunk[g])
+    )}
 
     campers = parse_extend(file_bytes, period="pm")
     for c in campers:
         m = re.match(r'^(\d+)', c["bunk"].strip())
         bunk_num = int(m.group(1)) if m else 999
         c["bunk_num"] = bunk_num
-        # Config lookup first; fall back to hardcoded ranges
-        c["grp"] = num_to_grp.get(bunk_num) or _bunk_to_grp(c["bunk"])
+        c["grp"] = num_to_grp.get(bunk_num, "Unknown")
 
-    campers.sort(key=lambda c: (_GRP_IDX.get(c["grp"], 99), c["bunk_num"], c["name"].lower()))
+    campers.sort(key=lambda c: (grp_idx.get(c["grp"], 99), c["bunk_num"], c["name"].lower()))
     return campers
 
 
