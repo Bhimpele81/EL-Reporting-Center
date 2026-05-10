@@ -896,7 +896,14 @@ async function loadConfig() {
 function renderCamps() {
   const list = document.getElementById('camp-list');
   list.innerHTML = '';
-  campConfig.camps.forEach((camp, ci) => {
+  // Sort camps by their lowest bunk number; camps with no bunks go to the end
+  const sorted = [...campConfig.camps].map((camp, ci) => ({ camp, ci }))
+    .sort((a, b) => {
+      const minA = a.camp.bunks.length ? Math.min(...a.camp.bunks.map(b => b.number)) : Infinity;
+      const minB = b.camp.bunks.length ? Math.min(...b.camp.bunks.map(b => b.number)) : Infinity;
+      return minA - minB;
+    });
+  sorted.forEach(({ camp, ci }) => {
     const block = document.createElement('div');
     block.className = 'camp-block';
     block.innerHTML = `
@@ -915,7 +922,7 @@ function renderCamps() {
           </tr>
         </thead>
         <tbody id="bunk-body-${ci}">
-          ${camp.bunks.map((b, bi) => bunkRow(ci, bi, b)).join('')}
+          ${[...camp.bunks].sort((a,b) => a.number - b.number).map((b, bi) => bunkRow(ci, camp.bunks.indexOf(b), b)).join('')}
         </tbody>
       </table>
       <button class="add-bunk-btn" onclick="addBunk(${ci})">＋ Add Bunk</button>
