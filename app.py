@@ -57,6 +57,30 @@ def _s3_get_file(filename: str):
     except ClientError:
         return None
 
+def _s3_save_config(config: dict) -> None:
+    """Save bunk config JSON to S3 so it persists across Render restarts."""
+    if not _s3:
+        return
+    try:
+        import io
+        body = json.dumps(config, indent=2).encode("utf-8")
+        _s3.put_object(Bucket=S3_BUCKET, Key="bunk_config.json", Body=body, ContentType="application/json")
+    except ClientError as e:
+        print(f"S3 config save failed: {e}")
+
+def _s3_load_config() -> dict | None:
+    """Load bunk config JSON from S3. Returns None if not found."""
+    if not _s3:
+        return None
+    try:
+        import io
+        buf = io.BytesIO()
+        _s3.download_fileobj(S3_BUCKET, "bunk_config.json", buf)
+        buf.seek(0)
+        return json.load(buf)
+    except ClientError:
+        return None
+
 def _s3_list_recent(limit: int = 10) -> list:
     if not _s3:
         return []
@@ -158,7 +182,8 @@ def logo():
 @app.route("/api/config", methods=["GET"])
 def get_config():
     try:
-        config = load_bunk_config(CONFIG_PATH)
+        # Try S3 first (persists across Render restarts), fall back to local file
+        config = _s3_load_config() or load_bunk_config(CONFIG_PATH)
         return jsonify(config)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -168,7 +193,8 @@ def get_config():
 def save_config():
     try:
         data = request.get_json(force=True)
-        save_bunk_config(CONFIG_PATH, data)
+        save_bunk_config(CONFIG_PATH, data)  # save locally as backup
+        _s3_save_config(data)                # save to S3 for persistence
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
