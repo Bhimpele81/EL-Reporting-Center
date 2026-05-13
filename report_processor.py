@@ -46,10 +46,10 @@ def get_bunk_lookup(config: dict) -> dict:
 
 
 def get_ordered_bunks(config: dict) -> list:
-    """Return list of bunk names in display order (camp order, then bunk order)."""
+    """Return list of bunk names in display order (camp order, then bunk number order)."""
     bunks = []
     for camp in config.get("camps", []):
-        for bunk in camp.get("bunks", []):
+        for bunk in sorted(camp.get("bunks", []), key=lambda b: int(b.get("number") or 999)):
             bunks.append(bunk["name"])
     return bunks
 
@@ -482,7 +482,7 @@ def build_totals_sheet(ws, campers: list, config: dict,
     # Left section: per-bunk rows
     for ci, camp in enumerate(config["camps"]):
         cn = camp["name"]
-        for bi, bunk in enumerate(camp["bunks"]):
+        for bi, bunk in enumerate(sorted(camp["bunks"], key=lambda b: int(b.get("number") or 999))):
             bk = bunk["name"]
             alt = (data_row % 2 == 0)
             fill = ALT_FILL if alt else None
@@ -528,7 +528,7 @@ def build_totals_sheet(ws, campers: list, config: dict,
     bwr = bwh + 1
     all_bunks_ordered = []
     for camp in config["camps"]:
-        all_bunks_ordered.extend([b["name"] for b in camp["bunks"]])
+        all_bunks_ordered.extend([b["name"] for b in sorted(camp["bunks"], key=lambda b: int(b.get("number") or 999))])
 
     for bi, bk in enumerate(all_bunks_ordered):
         if bk not in bunk_weeks:
