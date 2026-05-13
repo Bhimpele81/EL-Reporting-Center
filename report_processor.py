@@ -33,14 +33,20 @@ def save_bunk_config(config_path: str, config: dict) -> None:
         json.dump(config, f, indent=2)
 
 
+def _norm(s: str) -> str:
+    """Normalize a bunk name for matching: strip, collapse spaces, normalize dashes."""
+    return re.sub(r"\s+", " ", str(s).strip()).replace("–", "-").replace("—", "-")
+
+
 def get_bunk_lookup(config: dict) -> dict:
-    """Return {bunk_name: {number, camp}} from config."""
+    """Return {normalized_bunk_name: {number, camp, original}} from config."""
     lookup = {}
     for camp in config.get("camps", []):
         for bunk in camp.get("bunks", []):
-            lookup[bunk["name"]] = {
+            lookup[_norm(bunk["name"])] = {
                 "number": bunk["number"],
                 "camp": camp["name"],
+                "original": bunk["name"],
             }
     return lookup
 
@@ -50,7 +56,7 @@ def get_ordered_bunks(config: dict) -> list:
     bunks = []
     for camp in config.get("camps", []):
         for bunk in sorted(camp.get("bunks", []), key=lambda b: int(b.get("number") or 999)):
-            bunks.append(bunk["name"])
+            bunks.append(_norm(bunk["name"]))
     return bunks
 
 
@@ -104,7 +110,7 @@ def _rows_to_campers(rows: list) -> list:
 
         last     = str(row[1]).strip()
         first    = str(row[2]).strip()
-        bunk     = str(row[3]).strip()
+        bunk     = _norm(row[3])
         sessions = str(row[4]).strip() if len(row) > 4 else ""
         age      = str(row[5]).strip() if len(row) > 5 else ""
         grade    = normalize_grade(row[6]) if len(row) > 6 else ""
@@ -265,7 +271,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
             display_order.append(bk)
     for bk in sorted(bunk_groups.keys()):
         if bk not in display_order:
-            display_order.insert(0, bk)   # unknowns at top as "unassigned"
+            display_order.append(bk)   # unknowns at bottom as "unassigned"
 
     # Separate "unassigned" (not in config) from known bunks
     unknown_bunks = [b for b in display_order if b not in bunk_lookup]
