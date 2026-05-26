@@ -1277,21 +1277,30 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
       K-O  M T W R F (day letters)
       P  Age   Q  Grade   R  Driver
 
-    Per driver group: data rows → SUM row → COUNT row
+    Per driver group: data rows (alternating gray/white) → SUM row → COUNT row
     Grand totals: GRAND COUNT row → GRAND SUM row
+    Each driver group prints on its own page.
     """
-    PLAIN_FONT  = Font(name="Calibri", bold=False, size=11)
-    BOLD_FONT   = Font(name="Calibri", bold=True,  size=11)
-    CENTER_AL   = Alignment(horizontal="center", vertical="center")
-    LEFT_AL     = Alignment(horizontal="left",   vertical="center")
+    from openpyxl.worksheet.pagebreak import Break
+
+    PLAIN_FONT   = Font(name="Calibri", bold=False, size=11)
+    BOLD_FONT    = Font(name="Calibri", bold=True,  size=11)
+    CENTER_AL    = Alignment(horizontal="center", vertical="center")
+    LEFT_AL      = Alignment(horizontal="left",   vertical="center")
+    ROW_ALT_FILL = PatternFill("solid", fgColor="EEEEEE")   # light gray alternating rows
+
+    def _set(r, c, val=None, font=None, align=None, fill=None):
+        cell = ws.cell(row=r, column=c, value=val)
+        if font:  cell.font      = font
+        if align: cell.alignment = align
+        if fill:  cell.fill      = fill
+        return cell
 
     # ----- Row 1: date header -----------------------------------------------
-    ws.cell(row=1, column=1, value="Report Date:").font = BOLD_FONT
+    _set(1, 1, "Report Date:", font=BOLD_FONT)
     date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
                 else report_date.strftime("%#m/%#d/%Y"))
-    date_cell = ws.cell(row=1, column=2, value=date_str)
-    date_cell.font = BOLD_FONT
-    date_cell.alignment = CENTER_AL
+    _set(1, 2, date_str, font=BOLD_FONT, align=CENTER_AL)
 
     # ----- Row 2: column headers --------------------------------------------
     col_headers = [
@@ -1301,9 +1310,7 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
         "Age", "Grade", "Driver",
     ]
     for ci, h in enumerate(col_headers, start=1):
-        c = ws.cell(row=2, column=ci, value=h)
-        c.font = BOLD_FONT
-        c.alignment = CENTER_AL if ci > 1 else LEFT_AL
+        _set(2, ci, h, font=BOLD_FONT, align=LEFT_AL if ci == 1 else CENTER_AL)
 
     # ----- Group and sort campers -------------------------------------------
     driver_groups: dict[str, list] = {}
@@ -1321,81 +1328,62 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
     grand_week_sums = [0] * 8
     grand_count = 0
 
-    for drv in sorted_drivers:
+    for drv_idx, drv in enumerate(sorted_drivers):
         group      = driver_groups[drv]
         week_sums  = [0] * 8
         count      = len(group)
         grand_count += count
 
-        for camper in group:
-            # Col A: Child name
-            ws.cell(row=row, column=1, value=camper["name"]).font  = PLAIN_FONT
-            ws.cell(row=row, column=1).alignment = LEFT_AL
-            # Col B: Bunk
-            ws.cell(row=row, column=2, value=camper["bunk"]).font  = PLAIN_FONT
-            ws.cell(row=row, column=2).alignment = CENTER_AL
+        for ci, camper in enumerate(group):
+            fill = ROW_ALT_FILL if (ci % 2 == 1) else None
 
-            # Cols C-J: weeks (#1-#8)
+            # Apply fill across full row width first
+            if fill:
+                for col in range(1, 19):
+                    ws.cell(row=row, column=col).fill = fill
+
+            _set(row,  1, camper["name"],            font=PLAIN_FONT, align=LEFT_AL,   fill=fill)
+            _set(row,  2, camper["bunk"],             font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+
             for wi, wv in enumerate(camper["weeks"]):
-                ws.cell(row=row, column=3 + wi, value=wv).font      = PLAIN_FONT
-                ws.cell(row=row, column=3 + wi).alignment = CENTER_AL
+                _set(row, 3 + wi, wv, font=PLAIN_FONT, align=CENTER_AL, fill=fill)
                 week_sums[wi]       += wv
                 grand_week_sums[wi] += wv
 
-            # Cols K-O: day letters
             for di, dv in enumerate(camper["days"]):
-                ws.cell(row=row, column=11 + di, value=dv).font     = PLAIN_FONT
-                ws.cell(row=row, column=11 + di).alignment = CENTER_AL
+                _set(row, 11 + di, dv, font=PLAIN_FONT, align=CENTER_AL, fill=fill)
 
-            # Col P: Age
-            ws.cell(row=row, column=16, value=camper["age"]).font   = PLAIN_FONT
-            ws.cell(row=row, column=16).alignment = CENTER_AL
-
-            # Col Q: Grade
-            ws.cell(row=row, column=17, value=camper["grade"] or None).font = PLAIN_FONT
-            ws.cell(row=row, column=17).alignment = CENTER_AL
-
-            # Col R: Driver
-            ws.cell(row=row, column=18, value=drv).font             = PLAIN_FONT
-            ws.cell(row=row, column=18).alignment = LEFT_AL
+            _set(row, 16, camper["age"],              font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+            _set(row, 17, camper["grade"] or None,    font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+            _set(row, 18, drv,                        font=PLAIN_FONT, align=LEFT_AL,   fill=fill)
 
             row += 1
 
         # --- SUM row: week totals + "[Driver] Total" label ------------------
-        for wi, ws_val in enumerate(week_sums):
-            ws.cell(row=row, column=3 + wi, value=ws_val).font = PLAIN_FONT
-            ws.cell(row=row, column=3 + wi).alignment = CENTER_AL
-        drv_total_cell = ws.cell(row=row, column=18, value=f"{drv} Total")
-        drv_total_cell.font = BOLD_FONT
-        drv_total_cell.alignment = LEFT_AL
+        for wi, wsum in enumerate(week_sums):
+            _set(row, 3 + wi, wsum, font=PLAIN_FONT, align=CENTER_AL)
+        _set(row, 18, f"{drv} Total", font=BOLD_FONT, align=LEFT_AL)
         row += 1
 
         # --- COUNT row: driver label + count --------------------------------
-        drv_lbl_cell = ws.cell(row=row, column=17, value=drv)
-        drv_lbl_cell.font = BOLD_FONT
-        drv_lbl_cell.alignment = LEFT_AL
-        count_cell = ws.cell(row=row, column=18, value=count)
-        count_cell.font = PLAIN_FONT
-        count_cell.alignment = CENTER_AL
+        _set(row, 17, drv,   font=BOLD_FONT,  align=LEFT_AL)
+        _set(row, 18, count, font=PLAIN_FONT, align=CENTER_AL)
         row += 1
+
+        # Page break after each driver group (except the last)
+        if drv_idx < len(sorted_drivers) - 1:
+            ws.row_breaks.append(Break(id=row - 1))
 
     # ----- Grand totals -----------------------------------------------------
     # GRAND COUNT row
-    grand_lbl = ws.cell(row=row, column=17, value="Grand")
-    grand_lbl.font = BOLD_FONT
-    grand_lbl.alignment = LEFT_AL
-    grand_cnt = ws.cell(row=row, column=18, value=grand_count)
-    grand_cnt.font = PLAIN_FONT
-    grand_cnt.alignment = CENTER_AL
+    _set(row, 17, "Grand",       font=BOLD_FONT,  align=LEFT_AL)
+    _set(row, 18, grand_count,   font=PLAIN_FONT, align=CENTER_AL)
     row += 1
 
     # GRAND SUM row
     for wi, gs in enumerate(grand_week_sums):
-        ws.cell(row=row, column=3 + wi, value=gs).font = PLAIN_FONT
-        ws.cell(row=row, column=3 + wi).alignment = CENTER_AL
-    grand_total_cell = ws.cell(row=row, column=18, value="Grand Total")
-    grand_total_cell.font = BOLD_FONT
-    grand_total_cell.alignment = LEFT_AL
+        _set(row, 3 + wi, gs, font=PLAIN_FONT, align=CENTER_AL)
+    _set(row, 18, "Grand Total", font=BOLD_FONT, align=LEFT_AL)
 
     # ----- Column widths ----------------------------------------------------
     ws.column_dimensions["A"].width = 22    # Child
