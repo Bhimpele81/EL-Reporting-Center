@@ -1309,10 +1309,16 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
         return cell
 
     # ----- Row 1: date header -----------------------------------------------
-    _set(1, 1, "Report Date:", font=BOLD_FONT)
+    # "Report Date:" sits in col A; the date value goes in col C (Bunk column)
+    # because col B (Stp#) is intentionally narrow and would clip the date.
+    date_lbl = ws.cell(row=1, column=1, value="Report Date:")
+    date_lbl.font = BOLD_FONT
+    date_lbl.alignment = Alignment(horizontal="right", vertical="center")
     date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
                 else report_date.strftime("%#m/%#d/%Y"))
-    _set(1, 2, date_str, font=BOLD_FONT, align=CENTER_AL)
+    date_val = ws.cell(row=1, column=3, value=date_str)
+    date_val.font = BOLD_FONT
+    date_val.alignment = CENTER_AL
 
     # Column layout (19 cols A-S):
     #   A(1)=Child  B(2)=Stp#  C(3)=Bunk
@@ -1418,17 +1424,33 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
         _set(row, COL_WK1 + wi, gs, font=PLAIN_FONT, align=CENTER_AL)
     _set(row, COL_DRIVER, "Grand Total", font=BOLD_FONT, align=LEFT_AL)
 
+    last_row = row   # used for border pass below
+
+    # ----- Vertical separator borders ---------------------------------------
+    # Thin right border on: col B (Stp# | Bunk), col K (#8 | M),
+    # and col P (F | Age) — runs from the header row to the last data row.
+    _vert = Side(style="thin", color="000000")
+    for r in range(2, last_row + 1):
+        for col in (COL_STOP,           # right edge of Stp# col
+                    COL_WK1 + 7,        # right edge of #8 col  (col K)
+                    COL_DAY1 + 4):      # right edge of F col   (col P)
+            cell = ws.cell(row=r, column=col)
+            eb = cell.border
+            cell.border = Border(
+                left=eb.left, right=_vert, top=eb.top, bottom=eb.bottom
+            )
+
     # ----- Column widths ----------------------------------------------------
-    ws.column_dimensions["A"].width = 22    # Child
-    ws.column_dimensions["B"].width = 4.5  # Stp#
-    ws.column_dimensions["C"].width = 18   # Bunk
-    for wi in range(8):                     # #1-#8  (cols D-K)
+    ws.column_dimensions["A"].width = 20    # Child
+    ws.column_dimensions["B"].width = 4.5   # Stp#
+    ws.column_dimensions["C"].width = 18    # Bunk
+    for wi in range(8):                      # #1-#8  (cols D-K)
         ws.column_dimensions[get_column_letter(COL_WK1 + wi)].width = 4.5
-    for di in range(5):                     # M T W R F  (cols L-P)
+    for di in range(5):                      # M T W R F  (cols L-P)
         ws.column_dimensions[get_column_letter(COL_DAY1 + di)].width = 3
-    ws.column_dimensions["Q"].width = 5    # Age
-    ws.column_dimensions["R"].width = 13   # Grade (also holds driver count labels)
-    ws.column_dimensions["S"].width = 16   # Driver
+    ws.column_dimensions["Q"].width = 5     # Age
+    ws.column_dimensions["R"].width = 10    # Grade (also holds driver count labels)
+    ws.column_dimensions["S"].width = 16    # Driver
 
     # ----- Print settings ---------------------------------------------------
     ws.page_setup.orientation = "landscape"
