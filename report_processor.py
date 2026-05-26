@@ -1314,9 +1314,23 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
                 else report_date.strftime("%#m/%#d/%Y"))
     _set(1, 2, date_str, font=BOLD_FONT, align=CENTER_AL)
 
+    # Column layout (19 cols A-S):
+    #   A(1)=Child  B(2)=Stp#  C(3)=Bunk
+    #   D-K(4-11)=#1-#8   L-P(12-16)=M/T/W/R/F
+    #   Q(17)=Age  R(18)=Grade  S(19)=Driver
+    COL_CHILD  = 1
+    COL_STOP   = 2
+    COL_BUNK   = 3
+    COL_WK1    = 4    # weeks occupy cols 4-11
+    COL_DAY1   = 12   # days  occupy cols 12-16
+    COL_AGE    = 17
+    COL_GRADE  = 18
+    COL_DRIVER = 19
+    TOTAL_COLS = 19
+
     # ----- Row 2: column headers --------------------------------------------
     col_headers = [
-        "Child", "Bunk",
+        "Child", "Stp#", "Bunk",
         "#1", "#2", "#3", "#4", "#5", "#6", "#7", "#8",
         "M", "T", "W", "R", "F",
         "Age", "Grade", "Driver",
@@ -1330,8 +1344,7 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
         drv = camper["driver"] or "(No Driver)"
         driver_groups.setdefault(drv, []).append(camper)
 
-    # Sort campers within each driver group by stop # when available,
-    # falling back to alphabetical name for campers without a stop number.
+    # Sort by stop # when available, fall back to alphabetical name
     has_stops = any(c.get("stop") is not None for c in campers)
     for drv in driver_groups:
         if has_stops:
@@ -1357,37 +1370,37 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
         for ci, camper in enumerate(group):
             fill = ROW_ALT_FILL if (ci % 2 == 1) else None
 
-            # Apply fill across full row width first
             if fill:
-                for col in range(1, 19):
+                for col in range(1, TOTAL_COLS + 1):
                     ws.cell(row=row, column=col).fill = fill
 
-            _set(row,  1, camper["name"],            font=PLAIN_FONT, align=LEFT_AL,   fill=fill)
-            _set(row,  2, camper["bunk"],             font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+            _set(row, COL_CHILD,  camper["name"],         font=PLAIN_FONT, align=LEFT_AL,   fill=fill)
+            _set(row, COL_STOP,   camper.get("stop"),     font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+            _set(row, COL_BUNK,   camper["bunk"],         font=PLAIN_FONT, align=CENTER_AL, fill=fill)
 
             for wi, wv in enumerate(camper["weeks"]):
-                _set(row, 3 + wi, wv, font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+                _set(row, COL_WK1 + wi, wv, font=PLAIN_FONT, align=CENTER_AL, fill=fill)
                 week_sums[wi]       += wv
                 grand_week_sums[wi] += wv
 
             for di, dv in enumerate(camper["days"]):
-                _set(row, 11 + di, dv, font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+                _set(row, COL_DAY1 + di, dv, font=PLAIN_FONT, align=CENTER_AL, fill=fill)
 
-            _set(row, 16, camper["age"],              font=PLAIN_FONT, align=CENTER_AL, fill=fill)
-            _set(row, 17, camper["grade"] or None,    font=PLAIN_FONT, align=CENTER_AL, fill=fill)
-            _set(row, 18, drv,                        font=PLAIN_FONT, align=LEFT_AL,   fill=fill)
+            _set(row, COL_AGE,    camper["age"],          font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+            _set(row, COL_GRADE,  camper["grade"] or None,font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+            _set(row, COL_DRIVER, drv,                    font=PLAIN_FONT, align=LEFT_AL,   fill=fill)
 
             row += 1
 
         # --- SUM row: week totals + "[Driver] Total" label ------------------
         for wi, wsum in enumerate(week_sums):
-            _set(row, 3 + wi, wsum, font=PLAIN_FONT, align=CENTER_AL)
-        _set(row, 18, f"{drv} Total", font=BOLD_FONT, align=LEFT_AL)
+            _set(row, COL_WK1 + wi, wsum, font=PLAIN_FONT, align=CENTER_AL)
+        _set(row, COL_DRIVER, f"{drv} Total", font=BOLD_FONT, align=LEFT_AL)
         row += 1
 
         # --- COUNT row: driver label + count --------------------------------
-        _set(row, 17, drv,   font=BOLD_FONT,  align=LEFT_AL)
-        _set(row, 18, count, font=PLAIN_FONT, align=CENTER_AL)
+        _set(row, COL_GRADE,  drv,   font=BOLD_FONT,  align=LEFT_AL)
+        _set(row, COL_DRIVER, count, font=PLAIN_FONT, align=CENTER_AL)
         row += 1
 
         # Page break after each driver group (except the last)
@@ -1396,25 +1409,26 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
 
     # ----- Grand totals -----------------------------------------------------
     # GRAND COUNT row
-    _set(row, 17, "Grand",       font=BOLD_FONT,  align=LEFT_AL)
-    _set(row, 18, grand_count,   font=PLAIN_FONT, align=CENTER_AL)
+    _set(row, COL_GRADE,  "Grand",       font=BOLD_FONT,  align=LEFT_AL)
+    _set(row, COL_DRIVER, grand_count,   font=PLAIN_FONT, align=CENTER_AL)
     row += 1
 
     # GRAND SUM row
     for wi, gs in enumerate(grand_week_sums):
-        _set(row, 3 + wi, gs, font=PLAIN_FONT, align=CENTER_AL)
-    _set(row, 18, "Grand Total", font=BOLD_FONT, align=LEFT_AL)
+        _set(row, COL_WK1 + wi, gs, font=PLAIN_FONT, align=CENTER_AL)
+    _set(row, COL_DRIVER, "Grand Total", font=BOLD_FONT, align=LEFT_AL)
 
     # ----- Column widths ----------------------------------------------------
     ws.column_dimensions["A"].width = 22    # Child
-    ws.column_dimensions["B"].width = 18    # Bunk
-    for wi in range(8):                      # #1-#8
-        ws.column_dimensions[get_column_letter(3 + wi)].width = 4.5
-    for di in range(5):                      # M T W R F
-        ws.column_dimensions[get_column_letter(11 + di)].width = 3
-    ws.column_dimensions["P"].width = 5     # Age
-    ws.column_dimensions["Q"].width = 13    # Grade (also holds driver count labels)
-    ws.column_dimensions["R"].width = 16    # Driver
+    ws.column_dimensions["B"].width = 4.5  # Stp#
+    ws.column_dimensions["C"].width = 18   # Bunk
+    for wi in range(8):                     # #1-#8  (cols D-K)
+        ws.column_dimensions[get_column_letter(COL_WK1 + wi)].width = 4.5
+    for di in range(5):                     # M T W R F  (cols L-P)
+        ws.column_dimensions[get_column_letter(COL_DAY1 + di)].width = 3
+    ws.column_dimensions["Q"].width = 5    # Age
+    ws.column_dimensions["R"].width = 13   # Grade (also holds driver count labels)
+    ws.column_dimensions["S"].width = 16   # Driver
 
     # ----- Print settings ---------------------------------------------------
     ws.page_setup.orientation = "landscape"
