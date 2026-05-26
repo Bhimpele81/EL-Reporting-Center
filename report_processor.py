@@ -228,15 +228,16 @@ def parse_driver_csv(file_bytes: bytes) -> list:
 
     header = rows[0]
     driver_col  = _detect_col(header, ["driver"],    3)
-    bunk_col    = _detect_col(header, ["bunk"],      4)
-    session_col = _detect_col(header, ["session"],   5)
-    age_col     = _detect_col(header, ["age"],       6)
-    grade_col   = _detect_col(header, ["grade"],     7)
-    mon_col     = _detect_col(header, ["monday"],    8)
-    tue_col     = _detect_col(header, ["tuesday"],   9)
-    wed_col     = _detect_col(header, ["wednesday"], 10)
-    thu_col     = _detect_col(header, ["thursday"],  11)
-    fri_col     = _detect_col(header, ["friday"],    12)
+    stop_col    = _detect_col(header, ["stop"],      None)   # optional column
+    bunk_col    = _detect_col(header, ["bunk"],      5)
+    session_col = _detect_col(header, ["session"],   6)
+    age_col     = _detect_col(header, ["age"],       7)
+    grade_col   = _detect_col(header, ["grade"],     8)
+    mon_col     = _detect_col(header, ["monday"],    9)
+    tue_col     = _detect_col(header, ["tuesday"],   10)
+    wed_col     = _detect_col(header, ["wednesday"], 11)
+    thu_col     = _detect_col(header, ["thursday"],  12)
+    fri_col     = _detect_col(header, ["friday"],    13)
 
     def _val(row, col):
         return str(row[col]).strip() if col < len(row) else ""
@@ -250,6 +251,16 @@ def parse_driver_csv(file_bytes: bytes) -> list:
         first    = _val(row, 2)
         raw_drv  = _val(row, driver_col)
         driver   = "" if raw_drv.lower() in ("", "none", "nan", "n/a", "#n/a") else raw_drv
+
+        # Stop #: optional — only present in newer exports
+        if stop_col is not None and stop_col < len(row):
+            try:
+                stop_val = int(float(_val(row, stop_col)))
+            except (ValueError, TypeError):
+                stop_val = None
+        else:
+            stop_val = None
+
         bunk     = _val(row, bunk_col)
         sessions = _val(row, session_col)
         raw_age  = _val(row, age_col)
@@ -291,6 +302,7 @@ def parse_driver_csv(file_bytes: bytes) -> list:
             "name":   f"{last}, {first}",
             "bunk":   bunk,
             "driver": driver,
+            "stop":   stop_val,
             "weeks":  weeks,
             "days":   [day_m, day_t, day_w, day_r, day_f],
             "age":    age_val,
@@ -1318,8 +1330,16 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
         drv = camper["driver"] or "(No Driver)"
         driver_groups.setdefault(drv, []).append(camper)
 
+    # Sort campers within each driver group by stop # when available,
+    # falling back to alphabetical name for campers without a stop number.
+    has_stops = any(c.get("stop") is not None for c in campers)
     for drv in driver_groups:
-        driver_groups[drv].sort(key=lambda x: x["name"].lower())
+        if has_stops:
+            driver_groups[drv].sort(
+                key=lambda x: (x["stop"] is None, x["stop"] or 0, x["name"].lower())
+            )
+        else:
+            driver_groups[drv].sort(key=lambda x: x["name"].lower())
 
     sorted_drivers = sorted(driver_groups.keys())
 
