@@ -1409,9 +1409,8 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
         _set(row, COL_DRIVER, count, font=PLAIN_FONT, align=CENTER_AL)
         row += 1
 
-        # Page break after each driver group (except the last)
-        if drv_idx < len(sorted_drivers) - 1:
-            ws.row_breaks.append(Break(id=row - 1))
+        # Page break after every driver group (grand totals print on their own page)
+        ws.row_breaks.append(Break(id=row - 1))
 
     # ----- Grand totals -----------------------------------------------------
     # GRAND COUNT row
