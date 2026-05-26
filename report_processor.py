@@ -85,6 +85,15 @@ def normalize_grade(raw: str) -> str:
 WEEK_RE = re.compile(r"Week\s+(\d+)", re.IGNORECASE)
 
 
+def _detect_col(header: list, keywords: list, fallback: int) -> int:
+    """Return the first column index whose header contains ALL keywords (case-insensitive)."""
+    for i, h in enumerate(header):
+        h_lower = str(h).lower()
+        if all(kw in h_lower for kw in keywords):
+            return i
+    return fallback
+
+
 def _rows_to_campers(rows: list) -> list:
     """
     Convert a list of rows (list-of-strings) into camper dicts.
@@ -102,7 +111,16 @@ def _rows_to_campers(rows: list) -> list:
       9  Wednesday?
       10 Thursday?
       11 Friday?
+      ?  Driver      (detected by header name — column position varies)
     """
+    # Detect the driver column by scanning header for any cell containing "driver"
+    header = rows[0] if rows else []
+    driver_col = None
+    for i, h in enumerate(header):
+        if "driver" in str(h).strip().lower():
+            driver_col = i
+            break
+
     campers = []
     for row in rows[1:]:          # skip header
         if len(row) < 4 or not str(row[0]).strip().isdigit():
@@ -119,6 +137,10 @@ def _rows_to_campers(rows: list) -> list:
         wed      = str(row[9]).strip()  if len(row) > 9  else ""
         thu      = str(row[10]).strip() if len(row) > 10 else ""
         fri      = str(row[11]).strip() if len(row) > 11 else ""
+
+        # Driver: read from detected column; skip None/nan/empty values
+        raw_driver = str(row[driver_col]).strip() if (driver_col is not None and driver_col < len(row)) else ""
+        driver = "" if raw_driver.lower() in ("", "none", "nan", "n/a", "#n/a") else raw_driver
 
         weeks = [0] * 8
         for part in sessions.split(","):
@@ -141,12 +163,13 @@ def _rows_to_campers(rows: list) -> list:
             day_m, day_t, day_w, day_r, day_f = "M", "T", "W", "R", "F"
 
         campers.append({
-            "name":  f"{last}, {first}",
-            "bunk":  bunk,
-            "weeks": weeks,
-            "days":  [day_m, day_t, day_w, day_r, day_f],
-            "age":   age,
-            "grade": grade,
+            "name":   f"{last}, {first}",
+            "bunk":   bunk,
+            "weeks":  weeks,
+            "days":   [day_m, day_t, day_w, day_r, day_f],
+            "age":    age,
+            "grade":  grade,
+            "driver": driver,
         })
 
     return campers
@@ -168,6 +191,113 @@ def parse_raw_csv(file_bytes: bytes) -> list:
     reader  = csv.reader(io.StringIO(content))
     rows    = list(reader)
     return _rows_to_campers(rows)
+
+
+def parse_driver_csv(file_bytes: bytes) -> list:
+    """
+    Parse a raw Driver Totals export (CSV or XLSX).
+
+    Expected columns (0-indexed, detected by header name with fallbacks):
+      0  row#
+      1  Last name
+      2  First name
+      3  Driver        (header contains "driver")
+      4  Bunk name     (header contains "bunk")
+      5  Session name  (header contains "session")
+      6  Age           (header contains "age")
+      7  Grade         (header contains "grade")
+      8  Monday?       (header contains "monday" or "mon")
+      9  Tuesday?
+      10 Wednesday?
+      11 Thursday?
+      12 Friday?
+    """
+    if file_bytes[:4] == b'PK\x03\x04':
+        from openpyxl import load_workbook as _lw
+        _wb = _lw(filename=io.BytesIO(file_bytes), read_only=True, data_only=True)
+        _ws = _wb.active
+        rows = [[str(c.value) if c.value is not None else "" for c in r]
+                for r in _ws.iter_rows()]
+        _wb.close()
+    else:
+        content = file_bytes.decode("utf-8-sig", errors="replace")
+        rows = list(csv.reader(io.StringIO(content)))
+
+    if not rows:
+        return []
+
+    header = rows[0]
+    driver_col  = _detect_col(header, ["driver"],    3)
+    bunk_col    = _detect_col(header, ["bunk"],      4)
+    session_col = _detect_col(header, ["session"],   5)
+    age_col     = _detect_col(header, ["age"],       6)
+    grade_col   = _detect_col(header, ["grade"],     7)
+    mon_col     = _detect_col(header, ["monday"],    8)
+    tue_col     = _detect_col(header, ["tuesday"],   9)
+    wed_col     = _detect_col(header, ["wednesday"], 10)
+    thu_col     = _detect_col(header, ["thursday"],  11)
+    fri_col     = _detect_col(header, ["friday"],    12)
+
+    def _val(row, col):
+        return str(row[col]).strip() if col < len(row) else ""
+
+    campers = []
+    for row in rows[1:]:
+        if len(row) < 2 or not str(row[0]).strip().isdigit():
+            continue
+
+        last     = _val(row, 1)
+        first    = _val(row, 2)
+        raw_drv  = _val(row, driver_col)
+        driver   = "" if raw_drv.lower() in ("", "none", "nan", "n/a", "#n/a") else raw_drv
+        bunk     = _val(row, bunk_col)
+        sessions = _val(row, session_col)
+        raw_age  = _val(row, age_col)
+        raw_grade = _val(row, grade_col)
+
+        # Age: keep as float if possible
+        try:
+            age_val = float(raw_age)
+        except (ValueError, TypeError):
+            age_val = raw_age if raw_age else None
+
+        grade_val = normalize_grade(raw_grade)
+
+        mon = _val(row, mon_col)
+        tue = _val(row, tue_col)
+        wed = _val(row, wed_col)
+        thu = _val(row, thu_col)
+        fri = _val(row, fri_col)
+
+        weeks = [0] * 8
+        for part in sessions.split(","):
+            m = WEEK_RE.search(part)
+            if m:
+                wk = int(m.group(1))
+                if 1 <= wk <= 8:
+                    weeks[wk - 1] = 1
+
+        any_day_specified = any(d.lower() in ("yes", "no") for d in [mon, tue, wed, thu, fri])
+        if any_day_specified:
+            day_m = "M" if mon.lower() == "yes" else None
+            day_t = "T" if tue.lower() == "yes" else None
+            day_w = "W" if wed.lower() == "yes" else None
+            day_r = "R" if thu.lower() == "yes" else None
+            day_f = "F" if fri.lower() == "yes" else None
+        else:
+            day_m, day_t, day_w, day_r, day_f = "M", "T", "W", "R", "F"
+
+        campers.append({
+            "name":   f"{last}, {first}",
+            "bunk":   bunk,
+            "driver": driver,
+            "weeks":  weeks,
+            "days":   [day_m, day_t, day_w, day_r, day_f],
+            "age":    age_val,
+            "grade":  grade_val,
+        })
+
+    return campers
 
 
 # ---------------------------------------------------------------------------
@@ -1134,13 +1264,164 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Driver Totals builder
+# ---------------------------------------------------------------------------
+
+def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
+    """
+    Build the Driver Totals sheet.
+
+    Column layout (18 cols A-R):
+      A  Child       B  Bunk
+      C-J  #1-#8 (week indicators)
+      K-O  M T W R F (day letters)
+      P  Age   Q  Grade   R  Driver
+
+    Per driver group: data rows → SUM row → COUNT row
+    Grand totals: GRAND COUNT row → GRAND SUM row
+    """
+    PLAIN_FONT  = Font(name="Calibri", bold=False, size=11)
+    BOLD_FONT   = Font(name="Calibri", bold=True,  size=11)
+    CENTER_AL   = Alignment(horizontal="center", vertical="center")
+    LEFT_AL     = Alignment(horizontal="left",   vertical="center")
+
+    # ----- Row 1: date header -----------------------------------------------
+    ws.cell(row=1, column=1, value="Report Date:").font = BOLD_FONT
+    date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
+                else report_date.strftime("%#m/%#d/%Y"))
+    date_cell = ws.cell(row=1, column=2, value=date_str)
+    date_cell.font = BOLD_FONT
+    date_cell.alignment = CENTER_AL
+
+    # ----- Row 2: column headers --------------------------------------------
+    col_headers = [
+        "Child", "Bunk",
+        "#1", "#2", "#3", "#4", "#5", "#6", "#7", "#8",
+        "M", "T", "W", "R", "F",
+        "Age", "Grade", "Driver",
+    ]
+    for ci, h in enumerate(col_headers, start=1):
+        c = ws.cell(row=2, column=ci, value=h)
+        c.font = BOLD_FONT
+        c.alignment = CENTER_AL if ci > 1 else LEFT_AL
+
+    # ----- Group and sort campers -------------------------------------------
+    driver_groups: dict[str, list] = {}
+    for camper in campers:
+        drv = camper["driver"] or "(No Driver)"
+        driver_groups.setdefault(drv, []).append(camper)
+
+    for drv in driver_groups:
+        driver_groups[drv].sort(key=lambda x: x["name"].lower())
+
+    sorted_drivers = sorted(driver_groups.keys())
+
+    # ----- Write rows -------------------------------------------------------
+    row = 3
+    grand_week_sums = [0] * 8
+    grand_count = 0
+
+    for drv in sorted_drivers:
+        group      = driver_groups[drv]
+        week_sums  = [0] * 8
+        count      = len(group)
+        grand_count += count
+
+        for camper in group:
+            # Col A: Child name
+            ws.cell(row=row, column=1, value=camper["name"]).font  = PLAIN_FONT
+            ws.cell(row=row, column=1).alignment = LEFT_AL
+            # Col B: Bunk
+            ws.cell(row=row, column=2, value=camper["bunk"]).font  = PLAIN_FONT
+            ws.cell(row=row, column=2).alignment = CENTER_AL
+
+            # Cols C-J: weeks (#1-#8)
+            for wi, wv in enumerate(camper["weeks"]):
+                ws.cell(row=row, column=3 + wi, value=wv).font      = PLAIN_FONT
+                ws.cell(row=row, column=3 + wi).alignment = CENTER_AL
+                week_sums[wi]       += wv
+                grand_week_sums[wi] += wv
+
+            # Cols K-O: day letters
+            for di, dv in enumerate(camper["days"]):
+                ws.cell(row=row, column=11 + di, value=dv).font     = PLAIN_FONT
+                ws.cell(row=row, column=11 + di).alignment = CENTER_AL
+
+            # Col P: Age
+            ws.cell(row=row, column=16, value=camper["age"]).font   = PLAIN_FONT
+            ws.cell(row=row, column=16).alignment = CENTER_AL
+
+            # Col Q: Grade
+            ws.cell(row=row, column=17, value=camper["grade"] or None).font = PLAIN_FONT
+            ws.cell(row=row, column=17).alignment = CENTER_AL
+
+            # Col R: Driver
+            ws.cell(row=row, column=18, value=drv).font             = PLAIN_FONT
+            ws.cell(row=row, column=18).alignment = LEFT_AL
+
+            row += 1
+
+        # --- SUM row: week totals + "[Driver] Total" label ------------------
+        for wi, ws_val in enumerate(week_sums):
+            ws.cell(row=row, column=3 + wi, value=ws_val).font = PLAIN_FONT
+            ws.cell(row=row, column=3 + wi).alignment = CENTER_AL
+        drv_total_cell = ws.cell(row=row, column=18, value=f"{drv} Total")
+        drv_total_cell.font = BOLD_FONT
+        drv_total_cell.alignment = LEFT_AL
+        row += 1
+
+        # --- COUNT row: driver label + count --------------------------------
+        drv_lbl_cell = ws.cell(row=row, column=17, value=drv)
+        drv_lbl_cell.font = BOLD_FONT
+        drv_lbl_cell.alignment = LEFT_AL
+        count_cell = ws.cell(row=row, column=18, value=count)
+        count_cell.font = PLAIN_FONT
+        count_cell.alignment = CENTER_AL
+        row += 1
+
+    # ----- Grand totals -----------------------------------------------------
+    # GRAND COUNT row
+    grand_lbl = ws.cell(row=row, column=17, value="Grand")
+    grand_lbl.font = BOLD_FONT
+    grand_lbl.alignment = LEFT_AL
+    grand_cnt = ws.cell(row=row, column=18, value=grand_count)
+    grand_cnt.font = PLAIN_FONT
+    grand_cnt.alignment = CENTER_AL
+    row += 1
+
+    # GRAND SUM row
+    for wi, gs in enumerate(grand_week_sums):
+        ws.cell(row=row, column=3 + wi, value=gs).font = PLAIN_FONT
+        ws.cell(row=row, column=3 + wi).alignment = CENTER_AL
+    grand_total_cell = ws.cell(row=row, column=18, value="Grand Total")
+    grand_total_cell.font = BOLD_FONT
+    grand_total_cell.alignment = LEFT_AL
+
+    # ----- Column widths ----------------------------------------------------
+    ws.column_dimensions["A"].width = 22    # Child
+    ws.column_dimensions["B"].width = 18    # Bunk
+    for wi in range(8):                      # #1-#8
+        ws.column_dimensions[get_column_letter(3 + wi)].width = 4.5
+    for di in range(5):                      # M T W R F
+        ws.column_dimensions[get_column_letter(11 + di)].width = 3
+    ws.column_dimensions["P"].width = 5     # Age
+    ws.column_dimensions["Q"].width = 13    # Grade (also holds driver count labels)
+    ws.column_dimensions["R"].width = 16    # Driver
+
+    # ----- Print settings ---------------------------------------------------
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.scale       = 95
+    ws.print_title_rows       = "1:2"
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
 def process_report(file_bytes: bytes, report_type: str,
                    config: dict, job_id: str, output_dir: str) -> dict:
 
-    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend")
+    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend", "driver_totals")
     if report_type not in supported:
         return {
             "success": False,
@@ -1279,6 +1560,33 @@ def process_report(file_bytes: bytes, report_type: str,
         return {
             "success":  True,
             "message":  f"Processed {len(campers)} campers successfully.",
+            "filename": out_filename,
+            "rows":     len(campers),
+        }
+
+    # ---- Driver Totals ----
+    if report_type == "driver_totals":
+        try:
+            campers = parse_driver_csv(file_bytes)
+        except Exception as e:
+            return {"success": False, "message": f"Could not parse file: {e}"}
+        # Filter to campers who have a driver assigned
+        campers = [c for c in campers if c.get("driver")]
+        if not campers:
+            return {"success": False, "message": "No campers with a driver assignment found in file."}
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Sheet1"
+        build_driver_totals_sheet(ws, campers, report_date)
+
+        out_filename = f"Driver Totals {report_date.strftime('%m%d%Y')}.xlsx"
+        out_path = os.path.join(output_dir, out_filename)
+        wb.save(out_path)
+
+        return {
+            "success":  True,
+            "message":  f"Processed {len(campers)} campers across drivers successfully.",
             "filename": out_filename,
             "rows":     len(campers),
         }

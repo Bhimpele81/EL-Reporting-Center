@@ -601,6 +601,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <button class="rtype-btn" data-rtype="am_extend">AM Extend</button>
         <button class="rtype-btn" data-rtype="pm_extend">PM Extend</button>
         <button class="rtype-btn" data-rtype="pm_grp_extend">PM GRP Extend</button>
+        <button class="rtype-btn" data-rtype="driver_totals">Driver Totals</button>
     </div>
   </div>
 
