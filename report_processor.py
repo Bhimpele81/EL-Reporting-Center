@@ -1238,6 +1238,8 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
         c = ws.cell(row=2, column=ci, value=lbl)
         c.font = F_HDR; c.fill = HDR_FILL; c.alignment = CTR; c.border = T_ALL
 
+    from openpyxl.worksheet.pagebreak import Break
+
     # ---- Data rows (grouped) ----
     r = 3
     current_grp = None
@@ -1254,6 +1256,8 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
         if camper["grp"] != current_grp:
             if current_grp is not None:
                 _flush_subtotal()
+                # Insert page break after the subtotal row so each group prints on its own page
+                ws.row_breaks.append(Break(id=r))
                 r += 1
             current_grp = camper["grp"]
             group_count = 0
