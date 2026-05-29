@@ -1226,12 +1226,12 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     LEFT = Alignment(horizontal="left",   vertical="center")
 
     # ---- Row 1: Week label ----
-    ws.row_dimensions[1].height = 19.25
+    ws.row_dimensions[1].height = 23.5
     c = ws.cell(row=1, column=2, value="Week:")
     c.font = F_WK; c.alignment = CTR
 
     # ---- Row 2: Header ----
-    ws.row_dimensions[2].height = 19.25
+    ws.row_dimensions[2].height = 23.5
     for ci, lbl in enumerate(
         ["Grp", "BUNK", "CAMPER", "Pick Up", "Mon", "Tue", "Wed", "Thu", "Fri", "Days"], 1
     ):
@@ -1249,7 +1249,7 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     def _flush_subtotal():
         nonlocal group_start, group_count
         if group_count:
-            ws.row_dimensions[r].height = 19.25
+            ws.row_dimensions[r].height = 23.5
             ws.cell(row=r, column=1, value=group_count)
 
     for camper in campers:
@@ -1262,7 +1262,7 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
             current_grp = camper["grp"]
             group_count = 0
 
-        ws.row_dimensions[r].height = 19.25
+        ws.row_dimensions[r].height = 23.5
         t = camper["time"]
         time_str = (f"{t.hour}:{t.minute:02d}" if t.minute else str(t.hour)) if t else None
 
