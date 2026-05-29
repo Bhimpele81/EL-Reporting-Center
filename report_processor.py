@@ -1283,12 +1283,17 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
         _flush_subtotal()
 
     # ---- Column widths ----
-    ws.column_dimensions["A"].width = 3.93
-    ws.column_dimensions["B"].width = 11.60
-    ws.column_dimensions["C"].width = 16.86
-    ws.column_dimensions["D"].width = 6.66
-    ws.column_dimensions["E"].width = 9.53
-    ws.column_dimensions["J"].width = 9.07
+    # Scaled to fill landscape Letter page (10.5" content width)
+    ws.column_dimensions["A"].width = 6.0    # Grp
+    ws.column_dimensions["B"].width = 18.5   # BUNK
+    ws.column_dimensions["C"].width = 27.0   # CAMPER
+    ws.column_dimensions["D"].width = 10.5   # Pick Up
+    ws.column_dimensions["E"].width = 15.0   # Mon
+    ws.column_dimensions["F"].width = 13.5   # Tue
+    ws.column_dimensions["G"].width = 13.5   # Wed
+    ws.column_dimensions["H"].width = 13.5   # Thu
+    ws.column_dimensions["I"].width = 13.5   # Fri
+    ws.column_dimensions["J"].width = 14.5   # Days
 
     # ---- Print settings ----
     ws.page_setup.orientation = "landscape"
