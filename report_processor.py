@@ -1162,18 +1162,22 @@ def parse_pm_grp_extend(file_bytes: bytes, config: dict) -> list:
     lowest bunk number in each group — so no hardcoded mappings are needed.
     Returns campers sorted by group order, bunk number, then name.
     """
-    # Build number → grp AND track the minimum bunk number per group
-    num_to_grp: dict[int, str] = {}
+    # Build number → grp, name → grp, AND track the minimum bunk number per group
+    num_to_grp:  dict[int, str] = {}
+    name_to_grp: dict[str, str] = {}   # fallback for bunks with no leading number
     grp_min_bunk: dict[str, int] = {}
 
     for camp in config.get("camps", []):
         for bunk in camp.get("bunks", []):
-            grp = bunk.get("grp", "").strip()
-            num = bunk.get("number")
+            grp  = bunk.get("grp", "").strip()
+            num  = bunk.get("number")
+            name = bunk.get("name", "").strip().lower()
             if grp and num is not None:
                 num_to_grp[num] = grp
                 if grp not in grp_min_bunk or num < grp_min_bunk[grp]:
                     grp_min_bunk[grp] = num
+            if grp and name:
+                name_to_grp[name] = grp
 
     # Dynamic group order — sorted by the first bunk number in each group
     grp_idx = {g: i for i, g in enumerate(
@@ -1187,13 +1191,17 @@ def parse_pm_grp_extend(file_bytes: bytes, config: dict) -> list:
     campers = parse_extend(file_bytes, period="pm")
     for c in campers:
         m = re.match(r'^(\d+)', c["bunk"].strip())
-        bunk_num = int(m.group(1)) if m else 999
-        c["bunk_num"] = bunk_num
+        bunk_num = int(m.group(1)) if m else None
+        c["bunk_num"] = bunk_num if bunk_num is not None else 999
         if bunk_num in _GENDER_SPLIT_BUNKS:
             g = c.get("gender", "").lower()
             c["grp"] = "Up1" if ("girl" in g or "female" in g or g == "f") else "Up2"
-        else:
+        elif bunk_num is not None:
+            # Numeric bunk — look up by number
             c["grp"] = num_to_grp.get(bunk_num, "Unknown")
+        else:
+            # No leading number (e.g. "FT CITs") — look up by name
+            c["grp"] = name_to_grp.get(c["bunk"].strip().lower(), "Unknown")
 
     campers.sort(key=lambda c: (grp_idx.get(c["grp"], 99), c["bunk_num"], c["name"].lower()))
     return campers
