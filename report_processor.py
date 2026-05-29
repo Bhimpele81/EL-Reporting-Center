@@ -1218,9 +1218,9 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     HDR_FILL = PatternFill("solid", fgColor="6A1330")
     FONT_NAME = "Aptos Narrow"
 
-    F_HDR  = Font(name=FONT_NAME, bold=True,  size=11, color=WHITE)
-    F_DATA = Font(name=FONT_NAME, bold=False, size=11)
-    F_WK   = Font(name=FONT_NAME, bold=False, size=11)
+    F_HDR  = Font(name=FONT_NAME, bold=True,  size=16, color=WHITE)
+    F_DATA = Font(name=FONT_NAME, bold=False, size=16)
+    F_WK   = Font(name=FONT_NAME, bold=False, size=16)
 
     CTR  = Alignment(horizontal="center", vertical="center")
     LEFT = Alignment(horizontal="left",   vertical="center")
