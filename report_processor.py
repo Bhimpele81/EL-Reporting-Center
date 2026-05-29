@@ -990,11 +990,12 @@ def parse_extend(file_bytes: bytes, period: str = "am") -> list:
         last  = str(row[1]).strip()
         first = str(row[2]).strip()
         bunk  = str(row[3]).strip()
-        mon   = str(row[5]).strip() if len(row) > 5 else ""
-        tue   = str(row[6]).strip() if len(row) > 6 else ""
-        wed   = str(row[7]).strip() if len(row) > 7 else ""
-        thu   = str(row[8]).strip() if len(row) > 8 else ""
-        fri   = str(row[9]).strip() if len(row) > 9 else ""
+        mon    = str(row[5]).strip() if len(row) > 5 else ""
+        tue    = str(row[6]).strip() if len(row) > 6 else ""
+        wed    = str(row[7]).strip() if len(row) > 7 else ""
+        thu    = str(row[8]).strip() if len(row) > 8 else ""
+        fri    = str(row[9]).strip() if len(row) > 9 else ""
+        gender = str(row[10]).strip() if len(row) > 10 else ""
 
         # Extract time from enrollment string
         # AM: use start time (before dash); PM: use end/pickup time (after dash)
@@ -1022,6 +1023,7 @@ def parse_extend(file_bytes: bytes, period: str = "am") -> list:
             "bunk":      bunk,
             "time":      start_time,
             "days_wk":   days_wk,
+            "gender":    gender,
         })
 
     # Sort alphabetically by name
@@ -1178,12 +1180,20 @@ def parse_pm_grp_extend(file_bytes: bytes, config: dict) -> list:
         sorted(grp_min_bunk.keys(), key=lambda g: grp_min_bunk[g])
     )}
 
+    # Bunks whose group depends on gender rather than bunk_config
+    # Girls → Up1, Boys → Up2
+    _GENDER_SPLIT_BUNKS = {30, 31}
+
     campers = parse_extend(file_bytes, period="pm")
     for c in campers:
         m = re.match(r'^(\d+)', c["bunk"].strip())
         bunk_num = int(m.group(1)) if m else 999
         c["bunk_num"] = bunk_num
-        c["grp"] = num_to_grp.get(bunk_num, "Unknown")
+        if bunk_num in _GENDER_SPLIT_BUNKS:
+            g = c.get("gender", "").lower()
+            c["grp"] = "Up1" if ("girl" in g or "female" in g or g == "f") else "Up2"
+        else:
+            c["grp"] = num_to_grp.get(bunk_num, "Unknown")
 
     campers.sort(key=lambda c: (grp_idx.get(c["grp"], 99), c["bunk_num"], c["name"].lower()))
     return campers
