@@ -933,7 +933,7 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
 # AM / PM Extend parser + builder
 # ---------------------------------------------------------------------------
 
-_EXT_TIME_RE    = re.compile(r"Hours\s+(\d+(?::\d+)?)\s*[-–]", re.IGNORECASE)
+_EXT_TIME_RE    = re.compile(r"(?:Hours|Drop-off)\s+(\d+(?::\d+)?)\s*[-–]", re.IGNORECASE)
 _PM_EXT_TIME_RE = re.compile(r"Pick-up\s+\d+(?::\d+)?\s*[^\d\s]\s*(\d+(?::\d+)?)", re.IGNORECASE)
 
 
@@ -973,7 +973,8 @@ def parse_extend(file_bytes: bytes, period: str = "am") -> list:
         rows = list(csv.reader(io.StringIO(content)))
 
     if period == "am":
-        keywords = ["am extended"]
+        # "AM Extended Hours drop-off" (legacy) or bare "Drop-off" (current)
+        keywords = ["am extended", "drop-off"]
     else:
         # "PM Extended Hours Pick-up" (legacy) or bare "Pick-up" (current)
         keywords = ["pm extended", "pick-up"]
