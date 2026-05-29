@@ -1298,6 +1298,16 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.print_title_rows = "1:2"
 
+    # ---- Margins (inches) ----
+    ws.page_margins.top    = 0.5
+    ws.page_margins.bottom = 0.5
+    ws.page_margins.left   = 0.25
+    ws.page_margins.right  = 0.25
+    ws.page_margins.header = 0.3
+    ws.page_margins.footer = 0.3
+    ws.print_options.horizontalCentered = True
+    ws.print_options.verticalCentered   = False
+
 
 # ---------------------------------------------------------------------------
 # Driver Totals builder
