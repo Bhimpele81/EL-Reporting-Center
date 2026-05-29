@@ -972,13 +972,18 @@ def parse_extend(file_bytes: bytes, period: str = "am") -> list:
         content = file_bytes.decode("utf-8-sig", errors="replace")
         rows = list(csv.reader(io.StringIO(content)))
 
-    keyword = "am extended" if period == "am" else "pm extended"
+    if period == "am":
+        keywords = ["am extended"]
+    else:
+        # "PM Extended Hours Pick-up" (legacy) or bare "Pick-up" (current)
+        keywords = ["pm extended", "pick-up"]
     campers = []
     for row in rows[1:]:
         if len(row) < 4 or not str(row[0]).strip().isdigit():
             continue
         enrollment = str(row[4]).strip() if len(row) > 4 else ""
-        if keyword not in enrollment.lower():
+        enroll_lower = enrollment.lower()
+        if not any(kw in enroll_lower for kw in keywords):
             continue
 
         last  = str(row[1]).strip()
