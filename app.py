@@ -109,7 +109,7 @@ jobs_lock = threading.Lock()
 # Background job runner
 # ---------------------------------------------------------------------------
 
-def run_job(job_id: str, file_bytes: bytes, report_type: str) -> None:
+def run_job(job_id: str, file_bytes: bytes, report_type: str, week_num: int = None) -> None:
     def log(msg: str, level: str = "info") -> None:
         with jobs_lock:
             jobs[job_id]["progress"].append({"msg": msg, "level": level})
@@ -122,7 +122,8 @@ def run_job(job_id: str, file_bytes: bytes, report_type: str) -> None:
         config = load_bunk_config(CONFIG_PATH)
 
         log(f"Processing report type: {report_type}…")
-        result = process_report(file_bytes, report_type, config, job_id, OUTPUT_DIR)
+        result = process_report(file_bytes, report_type, config, job_id, OUTPUT_DIR,
+                                week_num=week_num)
 
         if result["success"]:
             log(result["message"], "ok")
@@ -213,12 +214,24 @@ def api_process():
         return jsonify({"error": "No report type selected."}), 400
 
     file_bytes = excel_file.read()
-    job_id = uuid.uuid4().hex[:8]
+    job_id     = uuid.uuid4().hex[:8]
+
+    week_num = None
+    if report_type == "driver_totals":
+        try:
+            week_num = int(request.form.get("week_num", 0))
+            if week_num < 1 or week_num > 8:
+                week_num = None
+        except (TypeError, ValueError):
+            week_num = None
 
     with jobs_lock:
         jobs[job_id] = {"status": "queued", "progress": []}
 
-    thread = threading.Thread(target=run_job, args=(job_id, file_bytes, report_type), daemon=True)
+    thread = threading.Thread(target=run_job,
+                              args=(job_id, file_bytes, report_type),
+                              kwargs={"week_num": week_num},
+                              daemon=True)
     thread.start()
 
     return jsonify({"job_id": job_id})
@@ -464,6 +477,10 @@ label.lbl{display:block;font-size:.75rem;font-weight:600;color:var(--brand-dark)
 .empty-state{text-align:center;padding:3rem 2rem;color:#bbb}
 .empty-state .empty-icon{font-size:2.5rem;margin-bottom:.75rem}
 .empty-state p{font-size:.9rem;line-height:1.6}
+/* Week selector buttons */
+.week-btn{padding:.55rem 1.1rem;border:1.5px solid var(--border);border-radius:8px;background:#fff;color:#888;font-family:'Roboto Slab',serif;font-size:.78rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap}
+.week-btn.active{background:var(--gold);border-color:var(--gold);color:#1a1018}
+.week-btn:hover:not(.active){border-color:var(--gold);color:var(--gold)}
 /* Responsive */
 @media(max-width:640px){
 .tab span:not(.tab-badge){display:none}
@@ -602,6 +619,27 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <button class="rtype-btn" data-rtype="pm_extend">PM Extend</button>
         <button class="rtype-btn" data-rtype="pm_grp_extend">PM GRP Extend</button>
         <button class="rtype-btn" data-rtype="driver_totals">Driver Totals</button>
+    </div>
+  </div>
+
+  <!-- Week selector — only visible when Driver Totals is selected -->
+  <div class="card" id="week-card" style="display:none">
+    <div class="card-hd">
+      <span class="card-num">★</span>
+      <div>
+        <div class="card-title">Select Camp Week</div>
+        <div class="card-hint">Names attending the selected week will be highlighted yellow</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.25rem">
+      <button class="week-btn active" data-week="1">Week 1</button>
+      <button class="week-btn" data-week="2">Week 2</button>
+      <button class="week-btn" data-week="3">Week 3</button>
+      <button class="week-btn" data-week="4">Week 4</button>
+      <button class="week-btn" data-week="5">Week 5</button>
+      <button class="week-btn" data-week="6">Week 6</button>
+      <button class="week-btn" data-week="7">Week 7</button>
+      <button class="week-btn" data-week="8">Week 8</button>
     </div>
   </div>
 
@@ -758,6 +796,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 // ─────────────────────────────────────────────
 let excelFile = null;
 let selectedReportType = 'bunk_snapshot';
+let selectedWeek = 1;
 let currentJobId = null;
 let pollTimer = null;
 let lastLineCount = 0;
@@ -768,7 +807,18 @@ document.querySelectorAll('.rtype-btn').forEach(btn => {
     document.querySelectorAll('.rtype-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     selectedReportType = btn.dataset.rtype;
+    document.getElementById('week-card').style.display =
+      selectedReportType === 'driver_totals' ? '' : 'none';
     updateRunBtn();
+  });
+});
+
+// Week selector buttons
+document.querySelectorAll('.week-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.week-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedWeek = parseInt(btn.dataset.week, 10);
   });
 });
 
@@ -820,6 +870,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
   const fd = new FormData();
   fd.append('excel_file', excelFile);
   fd.append('report_type', selectedReportType);
+  if (selectedReportType === 'driver_totals') fd.append('week_num', selectedWeek);
 
   try {
     const res  = await fetch('/api/process', {method: 'POST', body: fd});

@@ -1322,7 +1322,7 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
 # Driver Totals builder
 # ---------------------------------------------------------------------------
 
-def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
+def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: int = None) -> None:
     """
     Build the Driver Totals sheet.
 
@@ -1342,9 +1342,10 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
     BOLD_FONT     = Font(name="Calibri", bold=True,  size=12)
     CENTER_AL     = Alignment(horizontal="center", vertical="center")
     LEFT_AL       = Alignment(horizontal="left",   vertical="center")
-    ROW_ALT_FILL  = PatternFill("solid", fgColor="EEEEEE")  # light gray alternating rows
-    AGE_WARN_FILL = PatternFill("solid", fgColor="92D050")  # green for age < 8
-    BUNK_WARN_FILL = PatternFill("solid", fgColor="FFC000") # orange for bunks 1-7
+    ROW_ALT_FILL   = PatternFill("solid", fgColor="EEEEEE")  # light gray alternating rows
+    AGE_WARN_FILL  = PatternFill("solid", fgColor="92D050")  # green for age < 8
+    BUNK_WARN_FILL = PatternFill("solid", fgColor="FFC000")  # orange for bunks 1-7
+    NAME_WEEK_FILL = PatternFill("solid", fgColor="FFFF00")  # yellow: attending this week
 
     def _set(r, c, val=None, font=None, align=None, fill=None):
         cell = ws.cell(row=r, column=c, value=val)
@@ -1429,7 +1430,15 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
             bunk_num  = int(m.group()) if (m := __import__('re').match(r'\d+', str(bunk_val or ""))) else None
             bunk_fill = BUNK_WARN_FILL if (bunk_num is not None and 1 <= bunk_num <= 7) else fill
 
-            _set(row, COL_CHILD, camper["name"],     font=PLAIN_FONT, align=LEFT_AL,   fill=fill)
+            # Highlight name yellow if this camper has a 1 in the selected week column
+            attending_this_week = (
+                week_num is not None
+                and 1 <= week_num <= len(camper["weeks"])
+                and camper["weeks"][week_num - 1] == 1
+            )
+            name_fill = NAME_WEEK_FILL if attending_this_week else fill
+
+            _set(row, COL_CHILD, camper["name"],     font=PLAIN_FONT, align=LEFT_AL,   fill=name_fill)
             _set(row, COL_STOP,  camper.get("stop"), font=PLAIN_FONT, align=CENTER_AL, fill=fill)
             _set(row, COL_BUNK,  bunk_val,           font=PLAIN_FONT, align=CENTER_AL, fill=bunk_fill)
 
@@ -1519,7 +1528,8 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
 # ---------------------------------------------------------------------------
 
 def process_report(file_bytes: bytes, report_type: str,
-                   config: dict, job_id: str, output_dir: str) -> dict:
+                   config: dict, job_id: str, output_dir: str,
+                   week_num: int = None) -> dict:
 
     supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend", "driver_totals")
     if report_type not in supported:
@@ -1678,7 +1688,7 @@ def process_report(file_bytes: bytes, report_type: str,
         wb = Workbook()
         ws = wb.active
         ws.title = "Sheet1"
-        build_driver_totals_sheet(ws, campers, report_date)
+        build_driver_totals_sheet(ws, campers, report_date, week_num=week_num)
 
         out_filename = f"Driver Totals {report_date.strftime('%m%d%Y')}.xlsx"
         out_path = os.path.join(output_dir, out_filename)
