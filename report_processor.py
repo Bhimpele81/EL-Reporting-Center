@@ -1338,12 +1338,13 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
     """
     from openpyxl.worksheet.pagebreak import Break
 
-    PLAIN_FONT   = Font(name="Calibri", bold=False, size=11)
-    BOLD_FONT    = Font(name="Calibri", bold=True,  size=11)
-    CENTER_AL    = Alignment(horizontal="center", vertical="center")
-    LEFT_AL      = Alignment(horizontal="left",   vertical="center")
-    ROW_ALT_FILL = PatternFill("solid", fgColor="EEEEEE")   # light gray alternating rows
-    AGE_WARN_FILL = PatternFill("solid", fgColor="FFFF00")  # yellow for age < 8
+    PLAIN_FONT    = Font(name="Calibri", bold=False, size=12)
+    BOLD_FONT     = Font(name="Calibri", bold=True,  size=12)
+    CENTER_AL     = Alignment(horizontal="center", vertical="center")
+    LEFT_AL       = Alignment(horizontal="left",   vertical="center")
+    ROW_ALT_FILL  = PatternFill("solid", fgColor="EEEEEE")  # light gray alternating rows
+    AGE_WARN_FILL = PatternFill("solid", fgColor="92D050")  # green for age < 8
+    BUNK_WARN_FILL = PatternFill("solid", fgColor="FFC000") # orange for bunks 1-7
 
     def _set(r, c, val=None, font=None, align=None, fill=None):
         cell = ws.cell(row=r, column=c, value=val)
@@ -1424,9 +1425,13 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
                 for col in range(1, TOTAL_COLS + 1):
                     ws.cell(row=row, column=col).fill = fill
 
-            _set(row, COL_CHILD,  camper["name"],         font=PLAIN_FONT, align=LEFT_AL,   fill=fill)
-            _set(row, COL_STOP,   camper.get("stop"),     font=PLAIN_FONT, align=CENTER_AL, fill=fill)
-            _set(row, COL_BUNK,   camper["bunk"],         font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+            bunk_val  = camper["bunk"]
+            bunk_num  = int(m.group()) if (m := __import__('re').match(r'\d+', str(bunk_val or ""))) else None
+            bunk_fill = BUNK_WARN_FILL if (bunk_num is not None and 1 <= bunk_num <= 7) else fill
+
+            _set(row, COL_CHILD, camper["name"],     font=PLAIN_FONT, align=LEFT_AL,   fill=fill)
+            _set(row, COL_STOP,  camper.get("stop"), font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+            _set(row, COL_BUNK,  bunk_val,           font=PLAIN_FONT, align=CENTER_AL, fill=bunk_fill)
 
             for wi, wv in enumerate(camper["weeks"]):
                 _set(row, COL_WK1 + wi, wv, font=PLAIN_FONT, align=CENTER_AL, fill=fill)
@@ -1447,7 +1452,7 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
         # --- SUM row: week totals + "[Driver] Total" label ------------------
         for wi, wsum in enumerate(week_sums):
             _set(row, COL_WK1 + wi, wsum, font=PLAIN_FONT, align=CENTER_AL)
-        _set(row, COL_DRIVER, f"{drv} Total", font=BOLD_FONT, align=LEFT_AL)
+        _set(row, COL_DRIVER, "Total", font=BOLD_FONT, align=LEFT_AL)
         row += 1
 
         # --- COUNT row: driver label + count --------------------------------
@@ -1501,6 +1506,12 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
     ws.page_setup.orientation = "landscape"
     ws.page_setup.scale       = 95
     ws.print_title_rows       = "1:2"
+    ws.page_margins.top    = 0.25
+    ws.page_margins.bottom = 0.25
+    ws.page_margins.left   = 0.25
+    ws.page_margins.right  = 0.25
+    ws.page_margins.header = 0.15
+    ws.page_margins.footer = 0.15
 
 
 # ---------------------------------------------------------------------------
