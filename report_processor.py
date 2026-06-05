@@ -1343,6 +1343,7 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
     CENTER_AL    = Alignment(horizontal="center", vertical="center")
     LEFT_AL      = Alignment(horizontal="left",   vertical="center")
     ROW_ALT_FILL = PatternFill("solid", fgColor="EEEEEE")   # light gray alternating rows
+    AGE_WARN_FILL = PatternFill("solid", fgColor="FFFF00")  # yellow for age < 8
 
     def _set(r, c, val=None, font=None, align=None, fill=None):
         cell = ws.cell(row=r, column=c, value=val)
@@ -1435,7 +1436,9 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date) -> None:
             for di, dv in enumerate(camper["days"]):
                 _set(row, COL_DAY1 + di, dv, font=PLAIN_FONT, align=CENTER_AL, fill=fill)
 
-            _set(row, COL_AGE,    camper["age"],          font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+            age_val  = camper["age"]
+            age_fill = AGE_WARN_FILL if (age_val is not None and age_val < 8) else fill
+            _set(row, COL_AGE, age_val, font=PLAIN_FONT, align=CENTER_AL, fill=age_fill)
             _set(row, COL_GRADE,  camper["grade"] or None,font=PLAIN_FONT, align=CENTER_AL, fill=fill)
             _set(row, COL_DRIVER, drv,                    font=PLAIN_FONT, align=LEFT_AL,   fill=fill)
 
