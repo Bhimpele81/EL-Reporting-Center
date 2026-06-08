@@ -1388,7 +1388,8 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
         "Age", "Grade", "Driver",
     ]
     for ci, h in enumerate(col_headers, start=1):
-        _set(2, ci, h, font=BOLD_FONT, align=LEFT_AL if ci == 1 else CENTER_AL)
+        hdr_fill = NAME_WEEK_FILL if (week_num is not None and ci == COL_WK1 + week_num - 1) else None
+        _set(2, ci, h, font=BOLD_FONT, align=LEFT_AL if ci == 1 else CENTER_AL, fill=hdr_fill)
 
     # ----- Group and sort campers -------------------------------------------
     driver_groups: dict[str, list] = {}
@@ -1443,7 +1444,9 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
             _set(row, COL_BUNK,  bunk_val,           font=PLAIN_FONT, align=CENTER_AL, fill=bunk_fill)
 
             for wi, wv in enumerate(camper["weeks"]):
-                _set(row, COL_WK1 + wi, wv, font=PLAIN_FONT, align=CENTER_AL, fill=fill)
+                is_selected_week = (week_num is not None and wi == week_num - 1)
+                wk_fill = NAME_WEEK_FILL if (is_selected_week and wv == 1) else fill
+                _set(row, COL_WK1 + wi, wv, font=PLAIN_FONT, align=CENTER_AL, fill=wk_fill)
                 week_sums[wi]       += wv
                 grand_week_sums[wi] += wv
 
