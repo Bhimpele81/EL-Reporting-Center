@@ -9,6 +9,7 @@ import os
 import json
 import uuid
 import threading
+import urllib.request
 import boto3
 from botocore.exceptions import ClientError
 from flask import Flask, request, jsonify, send_file, render_template_string
@@ -301,6 +302,34 @@ def api_recent():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/weather")
+def api_weather():
+    """5-day forecast for Warrington, PA via Open-Meteo (no API key required)."""
+    try:
+        url = (
+            "https://api.open-meteo.com/v1/forecast"
+            "?latitude=40.2479&longitude=-75.1330"
+            "&daily=temperature_2m_max,temperature_2m_min,weathercode"
+            "&temperature_unit=fahrenheit"
+            "&timezone=America%2FNew_York"
+            "&forecast_days=5"
+        )
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            data = json.loads(resp.read())
+        daily = data["daily"]
+        days  = []
+        for i in range(5):
+            days.append({
+                "date":    daily["time"][i],
+                "high":    round(daily["temperature_2m_max"][i]),
+                "low":     round(daily["temperature_2m_min"][i]),
+                "code":    daily["weathercode"][i],
+            })
+        return jsonify({"days": days})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/health")
 @app.route("/healthz")
 def health():
@@ -477,6 +506,13 @@ label.lbl{display:block;font-size:.75rem;font-weight:600;color:var(--brand-dark)
 .empty-state{text-align:center;padding:3rem 2rem;color:#bbb}
 .empty-state .empty-icon{font-size:2.5rem;margin-bottom:.75rem}
 .empty-state p{font-size:.9rem;line-height:1.6}
+/* Weather tile */
+.wx-day{flex:1;min-width:80px;background:var(--mist);border:1px solid var(--border);border-radius:10px;padding:.65rem .5rem;text-align:center;display:flex;flex-direction:column;gap:.25rem;align-items:center}
+.wx-dow{font-size:.7rem;font-weight:700;color:var(--brand);letter-spacing:.06em;text-transform:uppercase}
+.wx-icon{font-size:1.6rem;line-height:1}
+.wx-hi{font-size:.95rem;font-weight:700;color:var(--ink)}
+.wx-lo{font-size:.78rem;color:#999}
+.wx-desc{font-size:.65rem;color:#aaa;margin-top:.1rem}
 /* Week selector buttons */
 .week-btn{padding:.55rem 1.1rem;border:1.5px solid var(--border);border-radius:8px;background:#fff;color:#888;font-family:'Roboto Slab',serif;font-size:.78rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap}
 .week-btn.active{background:var(--gold);border-color:var(--gold);color:#1a1018}
@@ -687,7 +723,20 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <span id="error-msg"></span>
   </div>
 
-  <div class="card" id="calendar-card" style="margin-top:2.5rem">
+  <!-- ===== WEATHER TILE ===== -->
+  <div class="card" id="weather-card" style="margin-top:2.5rem">
+    <div class="card-hd" style="margin-bottom:.75rem">
+      <span class="card-num">🌤</span>
+      <div>
+        <div class="card-title">5-Day Forecast — Warrington, PA</div>
+      </div>
+    </div>
+    <div id="weather-body" style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <div style="color:#bbb;font-size:.82rem">Loading forecast…</div>
+    </div>
+  </div>
+
+  <div class="card" id="calendar-card" style="margin-top:1.1rem">
     <div class="card-hd">
       <span class="card-num">📅</span>
       <div>
@@ -1109,9 +1158,60 @@ async function loadRecent() {
   }
 }
 
+// ─────────────────────────────────────────────
+// Weather tile
+// ─────────────────────────────────────────────
+const WX_ICONS = {
+  0:'☀️', 1:'🌤️', 2:'⛅', 3:'☁️',
+  45:'🌫️', 48:'🌫️',
+  51:'🌦️', 53:'🌦️', 55:'🌧️',
+  61:'🌧️', 63:'🌧️', 65:'🌧️',
+  71:'🌨️', 73:'🌨️', 75:'❄️',
+  77:'🌨️',
+  80:'🌦️', 81:'🌦️', 82:'🌧️',
+  85:'🌨️', 86:'❄️',
+  95:'⛈️', 96:'⛈️', 99:'⛈️',
+};
+const WX_DESC = {
+  0:'Clear', 1:'Mostly clear', 2:'Partly cloudy', 3:'Overcast',
+  45:'Fog', 48:'Icy fog',
+  51:'Light drizzle', 53:'Drizzle', 55:'Heavy drizzle',
+  61:'Light rain', 63:'Rain', 65:'Heavy rain',
+  71:'Light snow', 73:'Snow', 75:'Heavy snow', 77:'Snow grains',
+  80:'Showers', 81:'Showers', 82:'Heavy showers',
+  85:'Snow showers', 86:'Heavy snow showers',
+  95:'Thunderstorm', 96:'T-storm / hail', 99:'T-storm / hail',
+};
+const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+async function loadWeather() {
+  const body = document.getElementById('weather-body');
+  try {
+    const res  = await fetch('/api/weather');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    body.innerHTML = data.days.map(d => {
+      const dt   = new Date(d.date + 'T12:00:00');
+      const dow  = DAYS_SHORT[dt.getDay()];
+      const icon = WX_ICONS[d.code] || '🌡️';
+      const desc = WX_DESC[d.code]  || '';
+      return `<div class="wx-day">
+        <div class="wx-dow">${dow}</div>
+        <div class="wx-icon">${icon}</div>
+        <div class="wx-hi">${d.high}°</div>
+        <div class="wx-lo">${d.low}°</div>
+        <div class="wx-desc">${desc}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    body.innerHTML = `<div style="color:#aaa;font-size:.82rem">Forecast unavailable</div>`;
+  }
+}
+
 // Boot
 loadConfig();
 loadRecent();
+loadWeather();
 
 // ---- Pricing modal ----
 (function() {
