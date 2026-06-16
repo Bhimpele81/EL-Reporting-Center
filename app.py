@@ -120,7 +120,7 @@ def run_job(job_id: str, file_bytes: bytes, report_type: str, week_num: int = No
             jobs[job_id]["status"] = "running"
 
         log("Loading bunk configuration…")
-        config = load_bunk_config(CONFIG_PATH)
+        config = _s3_load_config() or load_bunk_config(CONFIG_PATH)
 
         log(f"Processing report type: {report_type}…")
         result = process_report(file_bytes, report_type, config, job_id, OUTPUT_DIR,
