@@ -779,7 +779,7 @@ def parse_group_attendance(file_bytes: bytes) -> list:
 
 
 def build_group_attendance_sheet(ws, campers: list, config: dict,
-                                  report_date=None, week_num: int = None) -> None:
+                                  report_date=None) -> None:
     """
     Build the Data1 sheet for Group Attendance.
 
@@ -829,8 +829,8 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
     F_NAME    = Font(name="Calibri", bold=True,  size=16)
     F_ENROLL  = Font(name="Calibri", bold=False, size=16)
     F_COUNT   = Font(name="Calibri", bold=True,  size=16)
-    F_WEEK_HDR = Font(name="Calibri", bold=True, size=14)
-    F_DATE_HDR = Font(name="Calibri", bold=True, size=10)
+    F_WEEK_HDR = Font(name="Calibri", bold=True,  size=24)
+    F_DATE_HDR = Font(name="Calibri", bold=True,  size=12)
     F_ABSENT   = Font(name="Calibri", bold=False, size=16, color="999999")
 
     BRAND_FILL = PatternFill("solid", fgColor=BRAND)
@@ -839,14 +839,10 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
     RIGHT_AL   = Alignment(horizontal="right",  vertical="center")
     VERT_CTR   = Alignment(horizontal="center", vertical="center", text_rotation=90)
 
-    # ---- Row 1: Week/date header ----
-    ws.row_dimensions[1].height = 22
-    if week_num and 1 <= week_num <= 8:
-        week_text = f"WEEK # {week_num} : {_WEEK_DATES[week_num - 1]}"
-    else:
-        week_text = ""
+    # ---- Row 1: Week/date header (pre-filled; user completes week # and dates in Excel) ----
+    ws.row_dimensions[1].height = 36
     ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=7)
-    c = ws.cell(row=1, column=2, value=week_text)
+    c = ws.cell(row=1, column=2, value="WEEK # :")
     c.font = F_WEEK_HDR; c.alignment = CTR
 
     date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
@@ -952,6 +948,7 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
 
     # ---- Footer: legend printed on every page ----
     ws.oddFooter.center.text = (
+        "&16"
         "✓ = Camper in Attendance      "
         "C = Camper Confirmed Absent      "
         "O = Camper Not Present"
@@ -1638,7 +1635,7 @@ def process_report(file_bytes: bytes, report_type: str,
         wb = Workbook()
         ws = wb.active
         ws.title = "Data1"
-        build_group_attendance_sheet(ws, campers, config, report_date, week_num=week_num)
+        build_group_attendance_sheet(ws, campers, config, report_date)
 
         out_filename = f"Group Attendance {report_date.strftime('%m%d%Y')}.xlsx"
         out_path = os.path.join(output_dir, out_filename)

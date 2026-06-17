@@ -218,7 +218,7 @@ def api_process():
     job_id     = uuid.uuid4().hex[:8]
 
     week_num = None
-    if report_type in ("driver_totals", "group_attendance"):
+    if report_type == "driver_totals":
         try:
             week_num = int(request.form.get("week_num", 0))
             if week_num < 1 or week_num > 8:
@@ -664,7 +664,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       <span class="card-num">★</span>
       <div>
         <div class="card-title">Select Camp Week</div>
-        <div class="card-hint">Select which week to run the report for</div>
+        <div class="card-hint">Names attending the selected week will be highlighted yellow</div>
       </div>
     </div>
     <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.25rem">
@@ -857,7 +857,7 @@ document.querySelectorAll('.rtype-btn').forEach(btn => {
     btn.classList.add('active');
     selectedReportType = btn.dataset.rtype;
     document.getElementById('week-card').style.display =
-      (selectedReportType === 'driver_totals' || selectedReportType === 'group_attendance') ? '' : 'none';
+      selectedReportType === 'driver_totals' ? '' : 'none';
     updateRunBtn();
   });
 });
@@ -919,7 +919,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
   const fd = new FormData();
   fd.append('excel_file', excelFile);
   fd.append('report_type', selectedReportType);
-  if (selectedReportType === 'driver_totals' || selectedReportType === 'group_attendance') fd.append('week_num', selectedWeek);
+  if (selectedReportType === 'driver_totals') fd.append('week_num', selectedWeek);
 
   try {
     const res  = await fetch('/api/process', {method: 'POST', body: fd});
