@@ -949,9 +949,9 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
     # ---- Footer: legend printed on every page ----
     # &20 / &12 switches font size inline: symbols large, words normal
     ws.oddFooter.center.text = (
-        "&32✓&12 = Camper in Attendance      "
-        "&32C&12 = Camper Confirmed Absent      "
-        "&32O&12 = Camper Not Present"
+        "&32✓&16 = Camper in Attendance      "
+        "&32C&16 = Camper Confirmed Absent      "
+        "&32O&16 = Camper Not Present"
     )
 
     # ---- Print settings ----
