@@ -946,13 +946,10 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
         ws.column_dimensions[col].width = 12
     ws.column_dimensions["H"].width = 10
 
-    # ---- Footer: legend printed on every page ----
-    # &20 / &12 switches font size inline: symbols large, words normal
-    ws.oddFooter.center.text = (
-        "&32✓&16 = Camper in Attendance      "
-        "&32C&16 = Camper Confirmed Absent      "
-        "&32O&16 = Camper Not Present"
-    )
+    # ---- Footer: legend printed on every page (spread across L/C/R) ----
+    ws.oddFooter.left.text   = "&32✓&16 = Camper in Attendance"
+    ws.oddFooter.center.text = "&32C&16 = Camper Confirmed Absent"
+    ws.oddFooter.right.text  = "&32O&16 = Camper Not Present"
 
     # ---- Print settings ----
     ws.print_title_rows = "1:2"          # repeat week header + column headers on every page
