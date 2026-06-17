@@ -1198,7 +1198,9 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
     ws.column_dimensions["B"].width = 9
     ws.column_dimensions["C"].width = 9
     if period == "pm":
-        ws.column_dimensions["D"].width = 6.27
+        # 10 signing columns (D–M, 2 per day) all the same width
+        for col_i in range(4, DAYS_COL):
+            ws.column_dimensions[get_column_letter(col_i)].width = 8.43
         ws.column_dimensions[get_column_letter(DAYS_COL)].width = 11.6
     else:
         for col in ["D", "E", "F", "G", "H", "I"]:
