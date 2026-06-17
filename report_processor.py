@@ -831,7 +831,7 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
     F_COUNT   = Font(name="Calibri", bold=True,  size=16)
     F_WEEK_HDR = Font(name="Calibri", bold=True,  size=24)
     F_DATE_HDR = Font(name="Calibri", bold=True,  size=12)
-    F_ABSENT   = Font(name="Calibri", bold=False, size=16, color="999999")
+    F_ABSENT   = Font(name="Calibri", bold=False, size=20, color="999999")
 
     BRAND_FILL = PatternFill("solid", fgColor=BRAND)
     ALT_FILL   = PatternFill("solid", fgColor="D9D9D9")
