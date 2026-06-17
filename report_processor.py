@@ -60,6 +60,12 @@ def get_ordered_bunks(config: dict) -> list:
     return bunks
 
 
+def _bunk_num(bunk_name) -> int:
+    """Extract leading integer from a bunk name for numeric sort; non-numeric bunks sort last."""
+    m = re.match(r'^(\d+)', str(bunk_name).strip())
+    return int(m.group(1)) if m else 9999
+
+
 # ---------------------------------------------------------------------------
 # Grade normalizer
 # ---------------------------------------------------------------------------
@@ -406,19 +412,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     for bk in bunk_groups:
         bunk_groups[bk].sort(key=lambda x: x["name"])
 
-    # Build the ordered list: bunks in config order, then unknown bunks
-    display_order = []
-    for bk in ordered_bunks:
-        if bk in bunk_groups:
-            display_order.append(bk)
-    for bk in sorted(bunk_groups.keys()):
-        if bk not in display_order:
-            display_order.append(bk)   # unknowns at bottom as "unassigned"
-
-    # Separate "unassigned" (not in config) from known bunks
-    unknown_bunks = [b for b in display_order if b not in bunk_lookup]
-    known_bunks   = [b for b in display_order if b in bunk_lookup]
-    display_order = unknown_bunks + known_bunks
+    display_order = sorted(bunk_groups.keys(), key=lambda bk: (_bunk_num(bk), bk))
 
     # ----- Write rows -------------------------------------------------------
     row = 3
@@ -798,10 +792,6 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
     if report_date is None:
         report_date = date.today()
 
-    def _bunk_num(bunk_name):
-        m = re.match(r'^(\d+)', str(bunk_name).strip())
-        return int(m.group(1)) if m else 9999
-
     campers_sorted = sorted(
         campers,
         key=lambda c: (_bunk_num(c["bunk"]), c["bunk"], c["name"])
@@ -1051,26 +1041,28 @@ def parse_extend(file_bytes: bytes, period: str = "am") -> list:
         start_time = _parse_ext_time(m.group(1)) if m else None
 
         # Days/Wk
+        # days_sched: full set of scheduled day letters (always populated).
+        # days_wk:    compact label, shown only for a partial week (blank when all 5).
         any_specified = any(d.lower() in ("yes", "no") for d in [mon, tue, wed, thu, fri])
         if any_specified:
-            days_wk = (
+            days_sched = (
                 ("M" if mon.lower() == "yes" else "") +
                 ("T" if tue.lower() == "yes" else "") +
                 ("W" if wed.lower() == "yes" else "") +
                 ("R" if thu.lower() == "yes" else "") +
                 ("F" if fri.lower() == "yes" else "")
             )
-            if days_wk == "MTWRF":
-                days_wk = ""
         else:
-            days_wk = ""
+            days_sched = "MTWRF"
+        days_wk = "" if days_sched == "MTWRF" else days_sched
 
         campers.append({
-            "name":      f"{last}, {first}",
-            "bunk":      bunk,
-            "time":      start_time,
-            "days_wk":   days_wk,
-            "gender":    gender,
+            "name":       f"{last}, {first}",
+            "bunk":       bunk,
+            "time":       start_time,
+            "days_wk":    days_wk,
+            "days_sched": days_sched,
+            "gender":     gender,
         })
 
     # Sort alphabetically by name
@@ -1260,30 +1252,39 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     grouped by Grp with a subtotal count row after each group.
     """
     _thin = Side(style="thin")
+    _med  = Side(style="medium")
     T_ALL = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
+    T_HDR = Border(left=_med,  right=_med,  top=_med,  bottom=_med)
 
     HDR_FILL = PatternFill("solid", fgColor="6A1330")
     FONT_NAME = "Aptos Narrow"
 
     F_HDR  = Font(name=FONT_NAME, bold=True,  size=16, color=WHITE)
     F_DATA = Font(name=FONT_NAME, bold=False, size=16)
+    F_NAME = Font(name=FONT_NAME, bold=False, size=18)        # larger camper names
+    F_X    = Font(name=FONT_NAME, bold=False, size=16, color="BBBBBB")  # lightly greyed X
     F_WK   = Font(name=FONT_NAME, bold=False, size=16)
 
     CTR  = Alignment(horizontal="center", vertical="center")
     LEFT = Alignment(horizontal="left",   vertical="center")
 
+    HDR_H  = 23.5   # week + column-header rows
+    DATA_H = 21.0   # data rows — sized so ~25 names fit per landscape page
+
+    _DAY_LETTERS = "MTWRF"   # day columns 5-9 → Mon..Fri
+
     # ---- Row 1: Week label ----
-    ws.row_dimensions[1].height = 23.5
+    ws.row_dimensions[1].height = HDR_H
     c = ws.cell(row=1, column=2, value="Week:")
     c.font = F_WK; c.alignment = CTR
 
     # ---- Row 2: Header ----
-    ws.row_dimensions[2].height = 23.5
+    ws.row_dimensions[2].height = HDR_H
     for ci, lbl in enumerate(
         ["Grp", "BUNK", "CAMPER", "Pick Up", "Mon", "Tue", "Wed", "Thu", "Fri", "Days"], 1
     ):
         c = ws.cell(row=2, column=ci, value=lbl)
-        c.font = F_HDR; c.fill = HDR_FILL; c.alignment = CTR; c.border = T_ALL
+        c.font = F_HDR; c.fill = HDR_FILL; c.alignment = CTR; c.border = T_HDR
 
     from openpyxl.worksheet.pagebreak import Break
 
@@ -1296,7 +1297,7 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     def _flush_subtotal():
         nonlocal group_start, group_count
         if group_count:
-            ws.row_dimensions[r].height = 23.5
+            ws.row_dimensions[r].height = DATA_H
             ws.cell(row=r, column=1, value=group_count)
 
     for camper in campers:
@@ -1309,22 +1310,29 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
             current_grp = camper["grp"]
             group_count = 0
 
-        ws.row_dimensions[r].height = 23.5
+        ws.row_dimensions[r].height = DATA_H
         t = camper["time"]
         time_str = (f"{t.hour}:{t.minute:02d}" if t.minute else str(t.hour)) if t else None
 
-        for col, val, align in [
-            (1,  camper["grp"],             CTR),
-            (2,  camper["bunk"],            CTR),
-            (3,  camper["name"],            LEFT),
-            (4,  time_str,                  CTR),
-            (10, camper["days_wk"] or None, CTR),
+        for col, val, align, font in [
+            (1,  camper["grp"],             CTR,  F_DATA),
+            (2,  camper["bunk"],            CTR,  F_DATA),
+            (3,  camper["name"],            LEFT, F_NAME),
+            (4,  time_str,                  CTR,  F_DATA),
+            (10, camper["days_wk"] or None, CTR,  F_DATA),
         ]:
             cell = ws.cell(row=r, column=col, value=val)
-            cell.font = F_DATA; cell.alignment = align; cell.border = T_ALL
+            cell.font = font; cell.alignment = align; cell.border = T_ALL
 
-        for ci in range(5, 10):
-            ws.cell(row=r, column=ci).border = T_ALL
+        # Day columns 5-9 (Mon-Fri): lightly greyed X when not scheduled that day
+        sched = camper.get("days_sched", "MTWRF")
+        for di, letter in enumerate(_DAY_LETTERS):
+            cell = ws.cell(row=r, column=5 + di)
+            cell.border = T_ALL
+            if letter not in sched:
+                cell.value = "X"
+                cell.font = F_X
+                cell.alignment = CTR
 
         r += 1
         group_count += 1
@@ -1360,9 +1368,13 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     ws.page_margins.left   = 0.25
     ws.page_margins.right  = 0.25
     ws.page_margins.header = 0.3
-    ws.page_margins.footer = 0.3
+    ws.page_margins.footer = 0.25
     ws.print_options.horizontalCentered = True
     ws.print_options.verticalCentered   = False
+
+    # ---- Footer: page "# of #" 0.25" from the bottom ----
+    ws.oddFooter.center.text  = "&12&P of &N"
+    ws.evenFooter.center.text = "&12&P of &N"
 
 
 # ---------------------------------------------------------------------------
