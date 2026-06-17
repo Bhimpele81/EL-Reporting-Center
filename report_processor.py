@@ -1290,39 +1290,34 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     grouped by Grp with a subtotal count row after each group.
     """
     _thin = Side(style="thin")
-    _med  = Side(style="medium")
     T_ALL = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
-    T_HDR = Border(left=_med,  right=_med,  top=_med,  bottom=_med)
 
     HDR_FILL = PatternFill("solid", fgColor="6A1330")
+    ALT_FILL = PatternFill("solid", fgColor="D9D9D9")   # every-other-row shading
     FONT_NAME = "Aptos Narrow"
 
-    F_HDR  = Font(name=FONT_NAME, bold=True,  size=16, color=WHITE)
-    F_DATA = Font(name=FONT_NAME, bold=False, size=16)
-    F_NAME = Font(name=FONT_NAME, bold=False, size=18)        # larger camper names
-    F_X    = Font(name=FONT_NAME, bold=False, size=16, color="BBBBBB")  # lightly greyed X
-    F_WK   = Font(name=FONT_NAME, bold=False, size=16)
+    F_HDR    = Font(name=FONT_NAME, bold=True,  size=16, color=WHITE)
+    F_DATA   = Font(name=FONT_NAME, bold=False, size=16)
+    F_WK     = Font(name=FONT_NAME, bold=False, size=16)
+    F_ABSENT = Font(name=FONT_NAME, bold=False, size=16, color="999999")  # lightly greyed C
 
     CTR  = Alignment(horizontal="center", vertical="center")
     LEFT = Alignment(horizontal="left",   vertical="center")
 
-    HDR_H  = 23.5   # week + column-header rows
-    DATA_H = 21.0   # data rows — sized so ~25 names fit per landscape page
-
     _DAY_LETTERS = "MTWRF"   # day columns 5-9 → Mon..Fri
 
     # ---- Row 1: Week label ----
-    ws.row_dimensions[1].height = HDR_H
+    ws.row_dimensions[1].height = 23.5
     c = ws.cell(row=1, column=2, value="Week:")
     c.font = F_WK; c.alignment = CTR
 
     # ---- Row 2: Header ----
-    ws.row_dimensions[2].height = HDR_H
+    ws.row_dimensions[2].height = 23.5
     for ci, lbl in enumerate(
         ["Grp", "BUNK", "CAMPER", "Pick Up", "Mon", "Tue", "Wed", "Thu", "Fri", "Days"], 1
     ):
         c = ws.cell(row=2, column=ci, value=lbl)
-        c.font = F_HDR; c.fill = HDR_FILL; c.alignment = CTR; c.border = T_HDR
+        c.font = F_HDR; c.fill = HDR_FILL; c.alignment = CTR; c.border = T_ALL
 
     from openpyxl.worksheet.pagebreak import Break
 
@@ -1335,7 +1330,7 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     def _flush_subtotal():
         nonlocal group_start, group_count
         if group_count:
-            ws.row_dimensions[r].height = DATA_H
+            ws.row_dimensions[r].height = 23.5
             ws.cell(row=r, column=1, value=group_count)
 
     for camper in campers:
@@ -1348,28 +1343,31 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
             current_grp = camper["grp"]
             group_count = 0
 
-        ws.row_dimensions[r].height = DATA_H
+        ws.row_dimensions[r].height = 23.5
+        af = ALT_FILL if (r % 2 == 0) else None
         t = camper["time"]
         time_str = (f"{t.hour}:{t.minute:02d}" if t.minute else str(t.hour)) if t else None
 
-        for col, val, align, font in [
-            (1,  camper["grp"],             CTR,  F_DATA),
-            (2,  camper["bunk"],            CTR,  F_DATA),
-            (3,  camper["name"],            LEFT, F_NAME),
-            (4,  time_str,                  CTR,  F_DATA),
-            (10, camper["days_wk"] or None, CTR,  F_DATA),
+        for col, val, align in [
+            (1,  camper["grp"],             CTR),
+            (2,  camper["bunk"],            CTR),
+            (3,  camper["name"],            LEFT),
+            (4,  time_str,                  CTR),
+            (10, camper["days_wk"] or None, CTR),
         ]:
             cell = ws.cell(row=r, column=col, value=val)
-            cell.font = font; cell.alignment = align; cell.border = T_ALL
+            cell.font = F_DATA; cell.alignment = align; cell.border = T_ALL
+            if af: cell.fill = af
 
-        # Day columns 5-9 (Mon-Fri): lightly greyed X when not scheduled that day
+        # Day columns 5-9 (Mon-Fri): lightly greyed C on days camper is not attending
         sched = camper.get("days_sched", "MTWRF")
         for di, letter in enumerate(_DAY_LETTERS):
             cell = ws.cell(row=r, column=5 + di)
             cell.border = T_ALL
+            if af: cell.fill = af
             if letter not in sched:
-                cell.value = "X"
-                cell.font = F_X
+                cell.value = "C"
+                cell.font = F_ABSENT
                 cell.alignment = CTR
 
         r += 1
@@ -1406,13 +1404,14 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     ws.page_margins.left   = 0.25
     ws.page_margins.right  = 0.25
     ws.page_margins.header = 0.3
-    ws.page_margins.footer = 0.25
+    ws.page_margins.footer = 0.3
     ws.print_options.horizontalCentered = True
     ws.print_options.verticalCentered   = False
 
-    # ---- Footer: page "# of #" 0.25" from the bottom ----
-    ws.oddFooter.center.text  = "&12&P of &N"
-    ws.evenFooter.center.text = "&12&P of &N"
+    # ---- Footer: ✓/C/O legend printed on every page (spread across L/C/R) ----
+    ws.oddFooter.left.text   = "&32✓&16 = Camper in Attendance"
+    ws.oddFooter.center.text = "&32C&16 = Camper Confirmed Absent"
+    ws.oddFooter.right.text  = "&32O&16 = Camper Not Present"
 
 
 # ---------------------------------------------------------------------------
