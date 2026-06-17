@@ -798,17 +798,24 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
     if report_date is None:
         report_date = date.today()
 
-    # Bunk sort order from config
+    # Bunk sort order from config — use normalized names to avoid exact-match failures
     bunk_order = {}
     for idx, bunk in enumerate(
         b for camp in config.get("camps", []) for b in camp.get("bunks", [])
     ):
-        bunk_order[bunk["name"]] = idx
+        bunk_order[_norm(bunk["name"])] = idx
 
-    campers_sorted = sorted(
-        campers,
-        key=lambda c: (bunk_order.get(c["bunk"], 9999), c["name"])
-    )
+    def _bunk_sort_key(c):
+        # Primary: config order (normalized match); secondary: leading bunk number;
+        # tertiary: full bunk name; quaternary: camper name
+        config_pos = bunk_order.get(_norm(c["bunk"]), None)
+        m = re.match(r'^(\d+)', str(c["bunk"]).strip())
+        num = int(m.group(1)) if m else 9999
+        if config_pos is not None:
+            return (0, config_pos, num, c["name"])
+        return (1, 9999, num, c["name"])
+
+    campers_sorted = sorted(campers, key=_bunk_sort_key)
 
     seen, groups = [], {}
     for c in campers_sorted:
