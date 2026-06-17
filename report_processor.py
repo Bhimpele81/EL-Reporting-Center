@@ -778,14 +778,15 @@ def parse_group_attendance(file_bytes: bytes) -> list:
     return campers
 
 
-def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
+def build_group_attendance_sheet(ws, campers: list, config: dict,
+                                  report_date=None, week_num: int = None) -> None:
     """
     Build the Data1 sheet for Group Attendance.
 
-    Column layout (no hidden helper column):
+    Column layout:
       A  – Bunk name  (merged + rotated 90° for entire bunk group)
       B  – Camper     (bold 16pt)
-      C  – MON        (blank signing cell)
+      C  – MON        (blank signing cell; pre-filled 'C' if camper absent that day)
       D  – TUES
       E  – WED
       F  – THURS
@@ -793,6 +794,9 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
       H  – Enrolled
     """
     from openpyxl.worksheet.pagebreak import Break
+
+    if report_date is None:
+        report_date = date.today()
 
     # Bunk sort order from config
     bunk_order = {}
@@ -818,23 +822,40 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
     _thin = Side(style="thin")
     _med  = Side(style="medium")
     T_ALL = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
-    T_BOT = Border(left=_thin, right=_thin,             bottom=_thin)
-    M_BOT = Border(                                      bottom=_med)
 
-    F_WH_LG  = Font(name="Calibri", bold=True,  size=16, color=WHITE)
-    F_WH_SM  = Font(name="Calibri", bold=True,  size=11, color=WHITE)
-    F_LABEL  = Font(name="Calibri", bold=True,  size=22)
-    F_NAME   = Font(name="Calibri", bold=True,  size=16)
-    F_ENROLL = Font(name="Calibri", bold=False, size=16)
-    F_COUNT  = Font(name="Calibri", bold=True,  size=16)
+    F_WH_LG   = Font(name="Calibri", bold=True,  size=16, color=WHITE)
+    F_WH_SM   = Font(name="Calibri", bold=True,  size=11, color=WHITE)
+    F_LABEL   = Font(name="Calibri", bold=True,  size=22)
+    F_NAME    = Font(name="Calibri", bold=True,  size=16)
+    F_ENROLL  = Font(name="Calibri", bold=False, size=16)
+    F_COUNT   = Font(name="Calibri", bold=True,  size=16)
+    F_WEEK_HDR = Font(name="Calibri", bold=True, size=14)
+    F_DATE_HDR = Font(name="Calibri", bold=True, size=10)
+    F_ABSENT   = Font(name="Calibri", bold=False, size=16, color="999999")
 
     BRAND_FILL = PatternFill("solid", fgColor=BRAND)
     ALT_FILL   = PatternFill("solid", fgColor="D9D9D9")
     CTR        = Alignment(horizontal="center", vertical="center")
+    RIGHT_AL   = Alignment(horizontal="right",  vertical="center")
     VERT_CTR   = Alignment(horizontal="center", vertical="center", text_rotation=90)
 
-    # ---- Row 1: header ----
-    ws.row_dimensions[1].height = 20
+    # ---- Row 1: Week/date header ----
+    ws.row_dimensions[1].height = 22
+    if week_num and 1 <= week_num <= 8:
+        week_text = f"WEEK # {week_num} : {_WEEK_DATES[week_num - 1]}"
+    else:
+        week_text = ""
+    ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=7)
+    c = ws.cell(row=1, column=2, value=week_text)
+    c.font = F_WEEK_HDR; c.alignment = CTR
+
+    date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
+                else report_date.strftime("%#m/%#d/%Y"))
+    c = ws.cell(row=1, column=8, value=f"Report Date: {date_str}")
+    c.font = F_DATE_HDR; c.alignment = RIGHT_AL
+
+    # ---- Row 2: column headers ----
+    ws.row_dimensions[2].height = 20
     hdr = [("A", None, ""),
            ("B", F_WH_LG, "Camper"),
            ("C", F_WH_SM, "MON"),
@@ -845,12 +866,14 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
            ("H", F_WH_SM, "Enrolled")]
     for col_letter, font, label in hdr:
         col_idx = ord(col_letter) - ord("A") + 1
-        c = ws.cell(row=1, column=col_idx, value=label or None)
+        c = ws.cell(row=2, column=col_idx, value=label or None)
         if font:
             c.font = font; c.fill = BRAND_FILL; c.alignment = CTR; c.border = T_ALL
 
+    _DAY_LETTERS = "MTWRF"  # maps day index 0-4 to letters used in enrolled string
+
     # ---- Data rows: one bunk per page ----
-    row = 2
+    row = 3
     total_count = 0
 
     for bk_idx, bk in enumerate(seen):
@@ -868,11 +891,18 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
             c.font = F_NAME; c.alignment = CTR; c.border = T_ALL
             if use_alt: c.fill = ALT_FILL
 
-            # Cols C–G: blank signing cells
-            for ci in range(3, 8):
-                c = ws.cell(row=row, column=ci)
-                c.border = T_ALL
-                if use_alt: c.fill = ALT_FILL
+            # Cols C–G: blank signing cells; pre-fill 'C' for days camper won't attend
+            enrolled = camper["enrolled"]   # e.g. "TWRF" or "" (all days)
+            for di, letter in enumerate(_DAY_LETTERS):
+                col = 3 + di   # C=3, D=4, E=5, F=6, G=7
+                if enrolled and letter not in enrolled:
+                    c = ws.cell(row=row, column=col, value="C")
+                    c.font = F_ABSENT; c.alignment = CTR; c.border = T_ALL
+                    if use_alt: c.fill = ALT_FILL
+                else:
+                    c = ws.cell(row=row, column=col)
+                    c.border = T_ALL
+                    if use_alt: c.fill = ALT_FILL
 
             # Col H: enrolled
             c = ws.cell(row=row, column=8, value=camper["enrolled"] or None)
@@ -920,8 +950,15 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
         ws.column_dimensions[col].width = 12
     ws.column_dimensions["H"].width = 10
 
+    # ---- Footer: legend printed on every page ----
+    ws.oddFooter.center.text = (
+        "✓ = Camper in Attendance      "
+        "C = Camper Confirmed Absent      "
+        "O = Camper Not Present"
+    )
+
     # ---- Print settings ----
-    ws.print_title_rows = "1:1"          # repeat header on every printed page
+    ws.print_title_rows = "1:2"          # repeat week header + column headers on every page
     ws.page_setup.orientation = "portrait"
     ws.page_setup.fitToPage   = True
     ws.page_setup.fitToWidth  = 1
@@ -935,6 +972,18 @@ def build_group_attendance_sheet(ws, campers: list, config: dict) -> None:
 
 _EXT_TIME_RE    = re.compile(r"(?:Hours|Drop-off)\s+(\d+(?::\d+)?)\s*[-–]", re.IGNORECASE)
 _PM_EXT_TIME_RE = re.compile(r"Pick-up\s+\d+(?::\d+)?\s*[^\d\s]\s*(\d+(?::\d+)?)", re.IGNORECASE)
+
+# Week date ranges for 2026 camp season (used by Group Attendance header)
+_WEEK_DATES = [
+    "June 23 - 27, 2026",
+    "June 30 - July 4, 2026",
+    "July 7 - 11, 2026",
+    "July 14 - 18, 2026",
+    "July 21 - 25, 2026",
+    "July 28 - Aug 1, 2026",
+    "Aug 4 - 8, 2026",
+    "Aug 11 - 15, 2026",
+]
 
 
 def _parse_ext_time(token: str) -> datetime.time:
@@ -1589,7 +1638,7 @@ def process_report(file_bytes: bytes, report_type: str,
         wb = Workbook()
         ws = wb.active
         ws.title = "Data1"
-        build_group_attendance_sheet(ws, campers, config)
+        build_group_attendance_sheet(ws, campers, config, report_date, week_num=week_num)
 
         out_filename = f"Group Attendance {report_date.strftime('%m%d%Y')}.xlsx"
         out_path = os.path.join(output_dir, out_filename)
