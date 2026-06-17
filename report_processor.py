@@ -832,6 +832,7 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
 
     F_WH_LG   = Font(name="Calibri", bold=True,  size=16, color=WHITE)
     F_WH_SM   = Font(name="Calibri", bold=True,  size=11, color=WHITE)
+    F_WH_DAY  = Font(name="Calibri", bold=True,  size=16, color=WHITE)
     F_LABEL   = Font(name="Calibri", bold=True,  size=22)
     F_NAME    = Font(name="Calibri", bold=True,  size=16)
     F_ENROLL  = Font(name="Calibri", bold=False, size=16)
@@ -860,13 +861,13 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
     # ---- Row 2: column headers ----
     ws.row_dimensions[2].height = 20
     hdr = [("A", None, ""),
-           ("B", F_WH_LG, "Camper"),
-           ("C", F_WH_SM, "MON"),
-           ("D", F_WH_SM, "TUES"),
-           ("E", F_WH_SM, "WED"),
-           ("F", F_WH_SM, "THURS"),
-           ("G", F_WH_SM, "FRI"),
-           ("H", F_WH_SM, "Enrolled")]
+           ("B", F_WH_LG,  "Camper"),
+           ("C", F_WH_DAY, "MON"),
+           ("D", F_WH_DAY, "TUES"),
+           ("E", F_WH_DAY, "WED"),
+           ("F", F_WH_DAY, "THURS"),
+           ("G", F_WH_DAY, "FRI"),
+           ("H", F_WH_SM,  "Enrolled")]
     for col_letter, font, label in hdr:
         col_idx = ord(col_letter) - ord("A") + 1
         c = ws.cell(row=2, column=col_idx, value=label or None)
@@ -965,6 +966,12 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
     ws.page_setup.fitToWidth  = 1
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
+
+    # ---- Margins (inches) ----
+    ws.page_margins.top    = 0.5
+    ws.page_margins.bottom = 0.5
+    ws.page_margins.left   = 0.25
+    ws.page_margins.right  = 0.25
 
 
 # ---------------------------------------------------------------------------
