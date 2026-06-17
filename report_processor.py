@@ -1082,6 +1082,10 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
     T_BOT_THIN = Border(bottom=_thin)
     T_BOT_MED  = Border(bottom=_med)
     T_ALL_THIN = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
+    # Full medium box around header cells (split for merged PM day pairs)
+    B_HDR_FULL = Border(left=_med, right=_med, top=_med, bottom=_med)
+    B_HDR_L    = Border(left=_med, top=_med, bottom=_med)
+    B_HDR_R    = Border(right=_med, top=_med, bottom=_med)
 
     if period == "pm":
         HDR_COLOR = "6A1330"
@@ -1100,11 +1104,14 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
     ALT_FILL = PatternFill("solid", fgColor=ALT_COLOR)
 
     F_HDR  = Font(name=FONT_NAME, bold=True,  size=11, color=WHITE)
-    F_NAME = Font(name=FONT_NAME, bold=False, size=11)
+    F_NAME = Font(name=FONT_NAME, bold=False, size=14)   # larger camper names
     F_BUNK = Font(name=FONT_NAME, bold=False, size=9)
     F_TIME = Font(name=FONT_NAME, bold=True,  size=11)
     F_DAYS = Font(name=FONT_NAME, bold=False, size=11)
     F_WEEK = Font(name=FONT_NAME, bold=True,  size=11)
+    F_X    = Font(name=FONT_NAME, bold=False, size=14, color="BBBBBB")  # lightly greyed X
+
+    DATA_H = 30.0   # taller data rows → ~25 names per page
 
     CTR  = Alignment(horizontal="center", vertical="center")
     WRAP = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -1118,10 +1125,10 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
     # ---- Row 2: header ----
     ws.row_dimensions[2].height = 44.35
 
-    def _hdr(col, val, align=CTR):
+    def _hdr(col, val, align=CTR, border=B_HDR_FULL):
         c = ws.cell(row=2, column=col, value=val)
         c.font = F_HDR; c.fill = HDR_FILL
-        c.alignment = align; c.border = T_BOT_MED
+        c.alignment = align; c.border = border
 
     _hdr(1, "CAMPER"); _hdr(2, "BUNK"); _hdr(3, "TIME")
     _hdr(DAYS_COL, "Days/Wk")
@@ -1136,8 +1143,8 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
         ]
         for c1, c2, lbl in day_pairs:
             ws.merge_cells(start_row=2, start_column=c1, end_row=2, end_column=c2)
-            _hdr(c1, lbl, WRAP)
-            ws.cell(row=2, column=c2).border = T_BOT_MED
+            _hdr(c1, lbl, WRAP, border=B_HDR_L)
+            ws.cell(row=2, column=c2).border = B_HDR_R
     else:
         for ci, lbl in [(4, "MON\nDate\nTime"), (5, "TUES\nDate\nTime"),
                         (6, "WED\nDate\nTime"), (7, "THURS\nDate\nTime"),
@@ -1147,7 +1154,7 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
     # ---- Data rows ----
     for i, camper in enumerate(campers):
         r = i + 3
-        ws.row_dimensions[r].height = 23.75
+        ws.row_dimensions[r].height = DATA_H
         af = ALT_FILL if (i % 2 == 1) else None
 
         def _set(col, val, font, align=CTR):
@@ -1166,6 +1173,24 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
             cell = ws.cell(row=r, column=ci)
             cell.border = T_ALL_THIN
             if af: cell.fill = af
+
+        # Lightly greyed X on days the camper is not scheduled
+        sched = camper.get("days_sched", "MTWRF")
+        if period == "pm":
+            day_cells = [(4, 5, "M"), (6, 7, "T"), (8, 9, "W"),
+                         (10, 11, "R"), (12, 13, "F")]
+            for c1, c2, letter in day_cells:
+                if letter not in sched:
+                    ws.merge_cells(start_row=r, start_column=c1, end_row=r, end_column=c2)
+                    cell = ws.cell(row=r, column=c1, value="X")
+                    cell.font = F_X; cell.alignment = CTR
+                    if af: cell.fill = af
+        else:
+            for di, letter in enumerate("MTWRF"):
+                if letter not in sched:
+                    cell = ws.cell(row=r, column=4 + di, value="X")
+                    cell.font = F_X; cell.alignment = CTR
+                    if af: cell.fill = af
 
         _set(DAYS_COL, camper["days_wk"] or None, F_DAYS)
 
@@ -1187,6 +1212,19 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.print_title_rows = "1:2"
+
+    # ---- Margins (inches) ----
+    ws.page_margins.top    = 0.5
+    ws.page_margins.bottom = 0.5
+    ws.page_margins.left   = 0.25
+    ws.page_margins.right  = 0.25
+    ws.page_margins.header = 0.3
+    ws.page_margins.footer = 0.25
+    ws.print_options.horizontalCentered = True
+
+    # ---- Footer: page "# of #" 0.25" from the bottom ----
+    ws.oddFooter.center.text  = "&12&P of &N"
+    ws.evenFooter.center.text = "&12&P of &N"
 
 
 # ---------------------------------------------------------------------------
