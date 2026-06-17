@@ -1179,15 +1179,22 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
             cell.border = T_ALL_THIN
             if af: cell.fill = af
 
-        # PM only: lightly greyed X on days the camper is not scheduled
+        # Lightly greyed X on days the camper is not scheduled
+        sched = camper.get("days_sched", "MTWRF")
         if is_pm:
-            sched = camper.get("days_sched", "MTWRF")
             day_cells = [(4, 5, "M"), (6, 7, "T"), (8, 9, "W"),
                          (10, 11, "R"), (12, 13, "F")]
             for c1, c2, letter in day_cells:
                 if letter not in sched:
                     ws.merge_cells(start_row=r, start_column=c1, end_row=r, end_column=c2)
                     cell = ws.cell(row=r, column=c1, value="X")
+                    cell.font = F_X; cell.alignment = CTR
+                    if af: cell.fill = af
+        else:
+            # AM: single column per day (D–H = cols 4–8)
+            for di, letter in enumerate("MTWRF"):
+                if letter not in sched:
+                    cell = ws.cell(row=r, column=4 + di, value="X")
                     cell.font = F_X; cell.alignment = CTR
                     if af: cell.fill = af
 
@@ -1214,9 +1221,22 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.print_title_rows = "1:2"
 
-    # ---- PM only: margins + page-number footer ----
+    # ---- Margins + page-number footer ----
     if is_pm:
         ws.page_margins.top    = 0.5
+        ws.page_margins.bottom = 0.5
+        ws.page_margins.left   = 0.25
+        ws.page_margins.right  = 0.25
+        ws.page_margins.header = 0.3
+        ws.page_margins.footer = 0.25
+        ws.print_options.horizontalCentered = True
+
+        # Footer: page "# of #" 0.25" from the bottom
+        ws.oddFooter.center.text  = "&12&P of &N"
+        ws.evenFooter.center.text = "&12&P of &N"
+    else:
+        # AM: top .75, bottom .5, left/right .25, footer .25" from bottom
+        ws.page_margins.top    = 0.75
         ws.page_margins.bottom = 0.5
         ws.page_margins.left   = 0.25
         ws.page_margins.right  = 0.25
