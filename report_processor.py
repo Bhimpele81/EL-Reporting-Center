@@ -1558,6 +1558,98 @@ def master_extend_campers(records: list, period: str) -> list:
     return out
 
 
+# ---------------------------------------------------------------------------
+# Word label sheet (Avery 5960) for a camp/group
+# ---------------------------------------------------------------------------
+
+_DAY_FULL = {"M": "Mon", "T": "Tue", "W": "Wed", "R": "Thu", "F": "Fri"}
+
+
+def _label_days_text(sched: str) -> str:
+    """Readable 'days attending' text from a schedule string like 'MWF'."""
+    sched = sched or "MTWRF"
+    if sched == "MTWRF":
+        return "Mon–Fri"
+    return ", ".join(_DAY_FULL[c] for c in "MTWRF" if c in sched)
+
+
+def build_group_labels_docx(records: list, config: dict, group_name: str = "Inter") -> tuple:
+    """
+    Build an Avery 5960 Word label sheet for all campers in a camp/group.
+    Each label: line 1 = bunk, line 2 = camper, line 3 = days attending camp.
+    Returns (docx_bytes, label_count).
+    """
+    import io as _io
+    from docx import Document
+    from docx.shared import Inches, Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.table import WD_ALIGN_VERTICAL
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    # Which bunks belong to the requested group?
+    bunk_camp = {}
+    for camp in config.get("camps", []):
+        cn = camp.get("name", "")
+        for b in camp.get("bunks", []):
+            bunk_camp[_norm(b.get("name", "")).lower()] = cn
+    gl = group_name.strip().lower()
+
+    def _in_group(bk):
+        cn = bunk_camp.get(_norm(bk).lower())
+        return bool(cn) and cn.strip().lower().startswith(gl)
+
+    labels = [r for r in records if _in_group(r["bunk"])]
+    labels.sort(key=lambda r: (_bunk_sort_key(r["bunk"]), r["name"].lower()))
+
+    doc = Document()
+    sec = doc.sections[0]
+    sec.page_width    = Inches(8.5)
+    sec.page_height   = Inches(11)
+    sec.top_margin    = Inches(0.5)
+    sec.bottom_margin = Inches(0.5)
+    sec.left_margin   = Inches(0.19)
+    sec.right_margin  = Inches(0.19)
+
+    COLS = 3
+    n = len(labels)
+    nrows = max(1, (n + COLS - 1) // COLS)
+    # 5 columns: label | spacer | label | spacer | label
+    col_w = [Inches(2.625), Inches(0.125), Inches(2.625), Inches(0.125), Inches(2.625)]
+    table = doc.add_table(rows=nrows, cols=5)
+    table.allow_autofit = False
+    tblPr = table._tbl.tblPr
+    layout = OxmlElement("w:tblLayout"); layout.set(qn("w:type"), "fixed"); tblPr.append(layout)
+
+    def _fill(cell, bunk, name, days):
+        cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+        for i, (text, sz, bold) in enumerate([(bunk, 10, True), (name, 11, True), (days, 9, False)]):
+            p = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            pf = p.paragraph_format
+            pf.space_before = Pt(0); pf.space_after = Pt(0); pf.line_spacing = 1.0
+            run = p.add_run(text or "")
+            run.font.size = Pt(sz); run.font.bold = bold
+
+    li = 0
+    for ri in range(nrows):
+        row = table.rows[ri]
+        trPr = row._tr.get_or_add_trPr()
+        trH = OxmlElement("w:trHeight"); trH.set(qn("w:val"), "1440"); trH.set(qn("w:hRule"), "exact")
+        trPr.append(trH)
+        for ci in range(5):
+            cell = row.cells[ci]
+            cell.width = col_w[ci]
+            if ci % 2 == 1:
+                continue   # spacer column
+            if li < n:
+                r = labels[li]; li += 1
+                _fill(cell, r["bunk"], r["name"], _label_days_text(r.get("days_sched")))
+
+    buf = _io.BytesIO(); doc.save(buf); buf.seek(0)
+    return buf.read(), n
+
+
 def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     """
     PM GRP EXTEND: landscape. Each group prints on its own page with the group
@@ -1909,7 +2001,7 @@ def process_report(file_bytes: bytes, report_type: str,
                    config: dict, job_id: str, output_dir: str,
                    week_num: int = None) -> dict:
 
-    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend", "driver_totals")
+    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend", "driver_totals", "inter_labels")
     if report_type not in supported:
         return {
             "success": False,
@@ -2101,4 +2193,27 @@ def process_report(file_bytes: bytes, report_type: str,
             "message":  f"Processed {len(campers)} campers across drivers successfully.",
             "filename": out_filename,
             "rows":     len(campers),
+        }
+
+    # ---- Inter Labels (Word / Avery 5960) ----
+    if report_type == "inter_labels":
+        if master is None:
+            return {"success": False, "message": "Inter Labels needs a master sheet. Upload the master report."}
+        try:
+            docx_bytes, count = build_group_labels_docx(master, config, group_name="Inter")
+        except Exception as e:
+            return {"success": False, "message": f"Could not build labels: {e}"}
+        if not count:
+            return {"success": False, "message": "No campers found in Group Inter."}
+
+        out_filename = f"Inter Labels {report_date.strftime('%m%d%Y')}.docx"
+        out_path = os.path.join(output_dir, out_filename)
+        with open(out_path, "wb") as f:
+            f.write(docx_bytes)
+
+        return {
+            "success":  True,
+            "message":  f"Created {count} labels for Group Inter.",
+            "filename": out_filename,
+            "rows":     count,
         }

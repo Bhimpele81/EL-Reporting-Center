@@ -370,6 +370,13 @@ def api_status(job_id: str):
     return jsonify(job)
 
 
+_XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+_DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+def _mime_for(filename: str) -> str:
+    return _DOCX_MIME if filename.lower().endswith(".docx") else _XLSX_MIME
+
+
 @app.route("/api/download/<job_id>")
 def api_download(job_id: str):
     with jobs_lock:
@@ -380,11 +387,12 @@ def api_download(job_id: str):
     buf = _s3_get_file(filename)
     if buf:
         return send_file(buf, as_attachment=True, download_name=filename,
-                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                         mimetype=_mime_for(filename))
     path = os.path.join(OUTPUT_DIR, filename)
     if not os.path.exists(path):
         return jsonify({"error": "Output file missing."}), 500
-    return send_file(path, as_attachment=True, download_name=filename)
+    return send_file(path, as_attachment=True, download_name=filename,
+                     mimetype=_mime_for(filename))
 
 
 @app.route("/api/files/<path:filename>")
@@ -393,11 +401,12 @@ def api_download_file(filename: str):
     buf = _s3_get_file(safe)
     if buf:
         return send_file(buf, as_attachment=True, download_name=safe,
-                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                         mimetype=_mime_for(safe))
     path = os.path.join(OUTPUT_DIR, safe)
     if not os.path.exists(path):
         return jsonify({"error": "File not found."}), 404
-    return send_file(path, as_attachment=True, download_name=safe)
+    return send_file(path, as_attachment=True, download_name=safe,
+                     mimetype=_mime_for(safe))
 
 
 @app.route("/api/recent")
@@ -778,6 +787,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <button class="rtype-btn" data-rtype="pm_extend">PM Extend</button>
         <button class="rtype-btn" data-rtype="pm_grp_extend">PM GRP Extend</button>
         <button class="rtype-btn" data-rtype="driver_totals">Driver Totals</button>
+        <button class="rtype-btn" data-rtype="inter_labels">Inter Labels (Word)</button>
     </div>
   </div>
 
@@ -843,7 +853,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   </div>
 
   <div class="action-bar" id="action-bar" style="display:none">
-    <a class="dl-btn" id="dl-link" href="#" download>⬇ Download Excel Report</a>
+    <a class="dl-btn" id="dl-link" href="#" download>⬇ Download Report</a>
   </div>
 
   <div id="error-card">
