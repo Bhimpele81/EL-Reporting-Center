@@ -93,7 +93,9 @@ def _s3_list_recent(limit: int = 10) -> list:
     if not _s3:
         return []
     resp = _s3.list_objects_v2(Bucket=S3_BUCKET)
-    objects = resp.get("Contents", [])
+    # Only show generated report files — not internal config/master storage
+    objects = [o for o in resp.get("Contents", [])
+               if o["Key"].lower().endswith((".xlsx", ".docx", ".zip"))]
     objects.sort(key=lambda o: o["LastModified"], reverse=True)
     return objects[:limit]
 
