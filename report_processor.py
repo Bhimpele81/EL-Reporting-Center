@@ -372,9 +372,9 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
 
     # ----- Local (larger) fonts for the Report sheet ------------------------
     # Defined locally so they don't change the Totals sheet's shared styles.
-    R_HEADER = Font(name="Calibri", bold=True, color=WHITE, size=12)
-    R_BODY   = Font(name="Calibri", size=14)
-    R_TOTAL  = Font(name="Calibri", bold=True, size=14)
+    R_HEADER = Font(name="Calibri", bold=True, color=WHITE, size=11)
+    R_BODY   = Font(name="Calibri", size=13)
+    R_TOTAL  = Font(name="Calibri", bold=True, size=13)
     R_BUNK   = Font(name="Calibri", bold=True, color="000000", size=20)  # black bunk name
 
     # Dark vertical separator (medium weight) drawn on a cell's left edge
@@ -545,6 +545,10 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     ws.page_margins.right  = 0.25
     ws.page_margins.top    = 0.5
     ws.page_margins.bottom = 0.5
+    ws.page_margins.footer = 0.25   # footer sits 0.25" above the bottom edge
+
+    # Center the table horizontally so left/right margins look equal
+    ws.print_options.horizontalCentered = True
 
     # ----- Footer: report date on every page --------------------------------
     date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
