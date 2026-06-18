@@ -1381,6 +1381,15 @@ def _looks_like_master(header: list) -> bool:
             and any("bunk" in h for h in hl))
 
 
+def is_master(file_bytes: bytes) -> bool:
+    """Quick check (header only) of whether a file is a master sheet."""
+    try:
+        rows = _read_rows(file_bytes)
+        return bool(rows) and _looks_like_master(rows[0])
+    except Exception:
+        return False
+
+
 def parse_master(file_bytes: bytes):
     """
     Parse the camp 'master' export (one row per camper) into rich records that

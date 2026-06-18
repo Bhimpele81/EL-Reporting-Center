@@ -6,15 +6,17 @@ Shares the same design system as Transport Pro.
 """
 
 import os
+import io
 import json
 import uuid
 import threading
 import urllib.request
+from datetime import datetime
 import boto3
 from botocore.exceptions import ClientError
 from flask import Flask, request, jsonify, send_file, render_template_string
 
-from report_processor import process_report, load_bunk_config, save_bunk_config
+from report_processor import process_report, load_bunk_config, save_bunk_config, is_master
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -94,12 +96,87 @@ def _s3_delete_old(keep: int = 10) -> None:
     if not _s3:
         return
     resp = _s3.list_objects_v2(Bucket=S3_BUCKET)
-    objects = sorted(resp.get("Contents", []), key=lambda o: o["LastModified"], reverse=True)
+    # Never sweep the saved config or master sheet when pruning old outputs
+    objects = sorted(
+        [o for o in resp.get("Contents", []) if o["Key"] not in _PROTECTED_KEYS],
+        key=lambda o: o["LastModified"], reverse=True,
+    )
     for obj in objects[keep:]:
         try:
             _s3.delete_object(Bucket=S3_BUCKET, Key=obj["Key"])
         except ClientError:
             pass
+
+
+# ---------------------------------------------------------------------------
+# Saved master sheet — uploaded once, reused for every report until replaced
+# ---------------------------------------------------------------------------
+
+MASTER_KEY        = "current_master.dat"
+MASTER_META_KEY   = "current_master_meta.json"
+LOCAL_MASTER      = os.path.join(UPLOAD_DIR, "current_master.dat")
+LOCAL_MASTER_META = os.path.join(UPLOAD_DIR, "current_master_meta.json")
+_PROTECTED_KEYS   = {"bunk_config.json", MASTER_KEY, MASTER_META_KEY}
+
+
+def _save_master(file_bytes: bytes, filename: str) -> dict:
+    """Persist the uploaded master sheet (S3 if configured, plus local copy)."""
+    meta = {
+        "filename":    filename or "master",
+        "uploaded_at": datetime.now().strftime("%-m/%-d/%Y %-I:%M %p")
+                       if os.name != "nt" else
+                       datetime.now().strftime("%#m/%#d/%Y %#I:%M %p"),
+        "size":        len(file_bytes),
+    }
+    try:
+        with open(LOCAL_MASTER, "wb") as f:
+            f.write(file_bytes)
+        with open(LOCAL_MASTER_META, "w") as f:
+            json.dump(meta, f)
+    except Exception:
+        pass
+    if _s3:
+        try:
+            _s3.put_object(Bucket=S3_BUCKET, Key=MASTER_KEY, Body=file_bytes)
+            _s3.put_object(Bucket=S3_BUCKET, Key=MASTER_META_KEY,
+                           Body=json.dumps(meta).encode("utf-8"),
+                           ContentType="application/json")
+        except ClientError:
+            pass
+    return meta
+
+
+def _load_master() -> bytes | None:
+    """Return the saved master sheet bytes, or None if none stored."""
+    if _s3:
+        buf = _s3_get_file(MASTER_KEY)
+        if buf:
+            return buf.read()
+    if os.path.exists(LOCAL_MASTER):
+        try:
+            with open(LOCAL_MASTER, "rb") as f:
+                return f.read()
+        except Exception:
+            pass
+    return None
+
+
+def _load_master_meta() -> dict | None:
+    """Return metadata about the saved master (filename, uploaded_at)."""
+    if _s3:
+        buf = _s3_get_file(MASTER_META_KEY)
+        if buf:
+            try:
+                return json.load(buf)
+            except Exception:
+                pass
+    if os.path.exists(LOCAL_MASTER_META):
+        try:
+            with open(LOCAL_MASTER_META) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
 
 # In-memory job store  {job_id: {status, progress, result}}
 jobs: dict = {}
@@ -204,17 +281,52 @@ def save_config():
 
 # --- Report processing ---
 
+@app.route("/api/master", methods=["GET"])
+def api_master():
+    """Report whether a master sheet is currently saved (for the UI)."""
+    meta = _load_master_meta()
+    if meta and _load_master() is not None:
+        return jsonify({"loaded": True, **meta})
+    return jsonify({"loaded": False})
+
+
+@app.route("/api/master", methods=["DELETE"])
+def api_master_clear():
+    """Forget the saved master sheet."""
+    for p in (LOCAL_MASTER, LOCAL_MASTER_META):
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+    if _s3:
+        for key in (MASTER_KEY, MASTER_META_KEY):
+            try:
+                _s3.delete_object(Bucket=S3_BUCKET, Key=key)
+            except ClientError:
+                pass
+    return jsonify({"loaded": False})
+
+
 @app.route("/api/process", methods=["POST"])
 def api_process():
     excel_file  = request.files.get("excel_file")
     report_type = request.form.get("report_type", "").strip()
 
-    if not excel_file:
-        return jsonify({"error": "No file uploaded."}), 400
     if not report_type:
         return jsonify({"error": "No report type selected."}), 400
 
-    file_bytes = excel_file.read()
+    # A new upload is used directly; if it's a master, save it for reuse.
+    # With no upload, fall back to the previously saved master sheet.
+    if excel_file and excel_file.filename:
+        file_bytes = excel_file.read()
+        if is_master(file_bytes):
+            _save_master(file_bytes, excel_file.filename)
+    else:
+        file_bytes = _load_master()
+        if not file_bytes:
+            return jsonify({"error": "No file uploaded and no saved master sheet found. "
+                                     "Upload a master sheet first."}), 400
+
     job_id     = uuid.uuid4().hex[:8]
 
     week_num = None
@@ -683,9 +795,14 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="card-hd">
       <span class="card-num">2</span>
       <div>
-        <div class="card-title">Upload Raw Excel File</div>
-        <div class="card-hint">Drop the raw report exported from your camp management system</div>
+        <div class="card-title">Upload Report File</div>
+        <div class="card-hint">Upload a master sheet once and every report reuses it — only upload again when the data changes. Original per-report exports still work too.</div>
       </div>
+    </div>
+    <div id="master-banner" style="display:none;align-items:center;gap:.6rem;padding:.6rem .85rem;background:#eef4fb;border:1px solid #b9d2ec;border-radius:8px;margin-bottom:.7rem;font-size:.83rem;color:#1A79BF;font-weight:500">
+      <span>📋</span>
+      <span id="master-banner-text" style="flex:1">—</span>
+      <button id="master-clear" style="cursor:pointer;font-size:.75rem;color:#777;background:#fff;border:1px solid #ccd;border-radius:6px;padding:.2rem .55rem">Clear</button>
     </div>
     <div class="drop-zone" id="drop-zone">
       <input type="file" id="excel-file" accept=".csv,.xlsx,.xls">
@@ -849,6 +966,32 @@ let selectedWeek = 1;
 let currentJobId = null;
 let pollTimer = null;
 let lastLineCount = 0;
+let masterLoaded = false;
+
+// Saved master sheet status
+async function loadMaster() {
+  try {
+    const res = await fetch('/api/master');
+    const d = await res.json();
+    masterLoaded = !!d.loaded;
+    const banner = document.getElementById('master-banner');
+    if (masterLoaded) {
+      document.getElementById('master-banner-text').innerHTML =
+        `Using saved master: <strong>${d.filename || 'master sheet'}</strong>` +
+        (d.uploaded_at ? ` &middot; uploaded ${d.uploaded_at}` : '') +
+        `. Reports use this unless you upload a new file.`;
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+  } catch(e) { masterLoaded = false; }
+  updateRunBtn();
+}
+
+document.getElementById('master-clear').addEventListener('click', async () => {
+  try { await fetch('/api/master', {method: 'DELETE'}); } catch(e) {}
+  loadMaster();
+});
 
 // Report type buttons
 document.querySelectorAll('.rtype-btn').forEach(btn => {
@@ -908,16 +1051,16 @@ function clearFile() {
 }
 
 function updateRunBtn() {
-  document.getElementById('run-btn').disabled = !(excelFile && selectedReportType);
+  document.getElementById('run-btn').disabled = !((excelFile || masterLoaded) && selectedReportType);
 }
 
 // Run button
 document.getElementById('run-btn').addEventListener('click', async () => {
-  if (!excelFile || !selectedReportType) return;
+  if (!(excelFile || masterLoaded) || !selectedReportType) return;
   startProcessing();
 
   const fd = new FormData();
-  fd.append('excel_file', excelFile);
+  if (excelFile) fd.append('excel_file', excelFile);   // omit to reuse saved master
   fd.append('report_type', selectedReportType);
   if (selectedReportType === 'driver_totals') fd.append('week_num', selectedWeek);
 
@@ -981,6 +1124,7 @@ async function pollStatus() {
       dlLink.href  = `/api/download/${currentJobId}`;
       document.getElementById('action-bar').style.display = 'flex';
       loadRecent();
+      loadMaster();   // a freshly uploaded master is now saved for reuse
     }
 
     if (data.status === 'error') {
@@ -1212,6 +1356,7 @@ async function loadWeather() {
 loadConfig();
 loadRecent();
 loadWeather();
+loadMaster();
 
 // ---- Pricing modal ----
 (function() {
