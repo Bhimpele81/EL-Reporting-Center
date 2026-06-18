@@ -725,13 +725,15 @@ def build_totals_sheet(ws, campers: list, config: dict,
     for row in range(1, max(left_last, rr) + 1):
         ws.row_dimensions[row].height = ROW_H
 
-    ws.column_dimensions["A"].width = 11   # Camp
-    ws.column_dimensions["B"].width = 18   # Bunk
-    ws.column_dimensions["C"].width = 8    # Total
-    ws.column_dimensions["D"].width = 2    # gap (narrowed)
-    ws.column_dimensions[get_column_letter(R_LABEL)].width = 17   # Label (narrowed)
+    # Wide enough that the table fills the full landscape width (so it reads
+    # as a horizontal page, not a square block centered with side whitespace)
+    ws.column_dimensions["A"].width = 13   # Camp
+    ws.column_dimensions["B"].width = 24   # Bunk
+    ws.column_dimensions["C"].width = 11   # Total
+    ws.column_dimensions["D"].width = 2    # gap
+    ws.column_dimensions[get_column_letter(R_LABEL)].width = 22   # Label
     for wi in range(8):
-        ws.column_dimensions[get_column_letter(R_W1 + wi)].width = 8
+        ws.column_dimensions[get_column_letter(R_W1 + wi)].width = 10.5
 
     # ---- Print settings: landscape, scaled to a SINGLE page ----------------
     ws.page_setup.orientation = "landscape"
