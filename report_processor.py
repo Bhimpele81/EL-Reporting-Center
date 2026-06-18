@@ -1664,18 +1664,19 @@ def build_group_labels_docx(records: list, config: dict, group_name: str = "Inte
     return _avery5960_docx(rows3), len(rows3)
 
 
-def build_jr_transport_labels_zip(records: list, config: dict) -> tuple:
+def build_jr_transport_labels_docx(records: list, config: dict) -> tuple:
     """
-    Junior-group transportation labels, split into three Avery 5960 sheets
-    (each a separate .docx in a zip, so each can print on its own label color):
+    Junior-group transportation labels in ONE Avery 5960 .docx, with each
+    group starting on a fresh page (so each set can print on its own label
+    color by page range):
 
       • Trans    — has 2-Way or PM-Only Transportation; line 3 = "Trans - <driver>"
       • Pm ext   — has a Drop-off enrollment;            line 3 = "Pm ext"
       • Car line — none of the above;                    line 3 = "Car line"
 
-    Returns (zip_bytes, {group: count}).
+    Returns (docx_bytes, {group: count}, {group: (first_page, last_page)}).
     """
-    import io as _io, zipfile
+    PER_PAGE = 30   # Avery 5960: 3 x 10
 
     in_group = _group_bunks(config, "Junior")
     juniors = sorted((r for r in records if in_group(r["bunk"])),
@@ -1692,19 +1693,21 @@ def build_jr_transport_labels_zip(records: list, config: dict) -> tuple:
         else:
             carline.append((r["bunk"], r["name"], "Car line"))
 
-    files = [
-        ("Jr Transportation - Trans.docx",    trans),
-        ("Jr Transportation - PM Ext.docx",   pmext),
-        ("Jr Transportation - Car Line.docx", carline),
-    ]
-    buf = _io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for fname, rows3 in files:
-            if rows3:
-                zf.writestr(fname, _avery5960_docx(rows3))
-    buf.seek(0)
+    groups = [("Trans", trans), ("Pm ext", pmext), ("Car line", carline)]
+    nonempty = [(name, rows) for name, rows in groups if rows]
+
+    flat, pages, page = [], {}, 1
+    for gi, (name, rows) in enumerate(nonempty):
+        npages = (len(rows) + PER_PAGE - 1) // PER_PAGE
+        pages[name] = (page, page + npages - 1)
+        page += npages
+        flat.extend(rows)
+        # pad to a full page so the NEXT group starts at the top of a new page
+        if gi < len(nonempty) - 1:
+            flat.extend([("", "", "")] * (npages * PER_PAGE - len(rows)))
+
     counts = {"Trans": len(trans), "Pm ext": len(pmext), "Car line": len(carline)}
-    return buf.read(), counts
+    return _avery5960_docx(flat), counts, pages
 
 
 def build_pm_grp_extend_sheet(ws, campers: list) -> None:
@@ -2276,28 +2279,34 @@ def process_report(file_bytes: bytes, report_type: str,
             "rows":     count,
         }
 
-    # ---- Jr. Transportation Labels (Word / Avery 5960, 3 sheets in a zip) ----
+    # ---- Jr. Transportation Labels (Word / Avery 5960, one file, grouped per page) ----
     if report_type == "jr_transport_labels":
         if master is None:
             return {"success": False, "message": "Jr. Transportation Labels needs a master sheet. Upload the master report."}
         try:
-            zip_bytes, counts = build_jr_transport_labels_zip(_week_filter(master), config)
+            docx_bytes, counts, pages = build_jr_transport_labels_docx(_week_filter(master), config)
         except Exception as e:
             return {"success": False, "message": f"Could not build labels: {e}"}
         total = sum(counts.values())
         if not total:
             return {"success": False, "message": "No Junior campers attending the selected week."}
 
-        out_filename = f"Jr Transportation Labels {report_date.strftime('%m%d%Y')}.zip"
+        out_filename = f"Jr Transportation Labels {report_date.strftime('%m%d%Y')}.docx"
         out_path = os.path.join(output_dir, out_filename)
         with open(out_path, "wb") as f:
-            f.write(zip_bytes)
+            f.write(docx_bytes)
+
+        def _rng(name):
+            pr = pages.get(name)
+            if not pr:
+                return f"{name} 0"
+            a, b = pr
+            return f"{name} {counts[name]} (page {a})" if a == b else f"{name} {counts[name]} (pages {a}-{b})"
+        ranges = ", ".join(_rng(n) for n in ("Trans", "Pm ext", "Car line") if counts[n])
 
         return {
             "success":  True,
-            "message":  (f"Created {total} Junior labels — Trans {counts['Trans']}, "
-                         f"Pm ext {counts['Pm ext']}, Car line {counts['Car line']} "
-                         f"(3 sheets in the zip)."),
+            "message":  f"Created {total} Junior labels — {ranges}. Each group starts on a new page.",
             "filename": out_filename,
             "rows":     total,
         }
