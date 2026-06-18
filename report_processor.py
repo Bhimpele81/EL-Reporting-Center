@@ -1285,18 +1285,20 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
 # PM GRP Extend helpers
 # ---------------------------------------------------------------------------
 
-def parse_pm_grp_extend(file_bytes: bytes, config: dict) -> list:
+def assign_pm_groups(campers: list, config: dict) -> list:
     """
-    Parse PM Extended data and annotate each camper with their group code.
-    Grp is resolved entirely from bunk_config.json (by bunk number).
-    Group order is derived dynamically from the config — sorted by the
-    lowest bunk number in each group — so no hardcoded mappings are needed.
-    Returns campers sorted by group order, bunk number, then name.
+    Annotate each (PM-extended) camper with their group code and return them
+    sorted by group order, bunk number, then name.
+
+    Grp is resolved from bunk_config.json (by bunk number), except bunks
+    30 & 31 (Part-time CITs) which split by gender: Girls → Up1, Boys → Up2.
+    If a camper has no gender (e.g. from a master sheet without that column),
+    fall back to the Maroon/Silver label in the bunk name.
     """
     # Build number → grp, name → grp, AND track the minimum bunk number per group
-    num_to_grp:  dict[int, str] = {}
-    name_to_grp: dict[str, str] = {}   # fallback for bunks with no leading number
-    grp_min_bunk: dict[str, int] = {}
+    num_to_grp:  dict = {}
+    name_to_grp: dict = {}   # fallback for bunks with no leading number
+    grp_min_bunk: dict = {}
 
     for camp in config.get("camps", []):
         for bunk in camp.get("bunks", []):
@@ -1316,17 +1318,25 @@ def parse_pm_grp_extend(file_bytes: bytes, config: dict) -> list:
     )}
 
     # Bunks whose group depends on gender rather than bunk_config
-    # Girls → Up1, Boys → Up2
     _GENDER_SPLIT_BUNKS = {30, 31}
 
-    campers = parse_extend(file_bytes, period="pm")
     for c in campers:
         m = re.match(r'^(\d+)', c["bunk"].strip())
         bunk_num = int(m.group(1)) if m else None
         c["bunk_num"] = bunk_num if bunk_num is not None else 999
         if bunk_num in _GENDER_SPLIT_BUNKS:
             g = c.get("gender", "").lower()
-            c["grp"] = "Up1" if ("girl" in g or "female" in g or g == "f") else "Up2"
+            bl = c["bunk"].lower()
+            if "girl" in g or "female" in g or g == "f":
+                c["grp"] = "Up1"
+            elif "boy" in g or "male" in g or g == "m":
+                c["grp"] = "Up2"
+            elif "maroon" in bl:      # gender missing — fall back to bunk label
+                c["grp"] = "Up1"
+            elif "silver" in bl:
+                c["grp"] = "Up2"
+            else:
+                c["grp"] = "Up2"
         elif bunk_num is not None:
             # Numeric bunk — look up by number
             c["grp"] = num_to_grp.get(bunk_num, "Unknown")
@@ -1336,6 +1346,159 @@ def parse_pm_grp_extend(file_bytes: bytes, config: dict) -> list:
 
     campers.sort(key=lambda c: (grp_idx.get(c["grp"], 99), c["bunk_num"], c["name"].lower()))
     return campers
+
+
+def parse_pm_grp_extend(file_bytes: bytes, config: dict) -> list:
+    """Parse PM Extended data and annotate each camper with their group code."""
+    campers = parse_extend(file_bytes, period="pm")
+    return assign_pm_groups(campers, config)
+
+
+# ---------------------------------------------------------------------------
+# Master sheet parser — one upload that every report can derive from
+# ---------------------------------------------------------------------------
+
+def _read_rows(file_bytes: bytes) -> list:
+    """Read CSV or XLSX bytes into a list of string rows."""
+    if file_bytes[:4] == b'PK\x03\x04':
+        from openpyxl import load_workbook as _lw
+        _wb = _lw(filename=io.BytesIO(file_bytes), read_only=True, data_only=True)
+        _ws = _wb.active
+        rows = [[str(c.value) if c.value is not None else "" for c in r]
+                for r in _ws.iter_rows()]
+        _wb.close()
+        return rows
+    content = file_bytes.decode("utf-8-sig", errors="replace")
+    return list(csv.reader(io.StringIO(content)))
+
+
+def _looks_like_master(header: list) -> bool:
+    """Identify the master sheet by its distinctive column headers."""
+    hl = [str(h).lower() for h in header]
+    joined = " | ".join(hl)
+    return ("enrollment extra" in joined
+            and any("session" in h for h in hl)
+            and any("bunk" in h for h in hl))
+
+
+def parse_master(file_bytes: bytes):
+    """
+    Parse the camp 'master' export (one row per camper) into rich records that
+    every report can derive from. Returns None if the file isn't a master.
+
+    Columns are matched by header name (year prefixes like '2026 >' are
+    ignored), so column order and extra columns don't matter.
+    """
+    rows = _read_rows(file_bytes)
+    if not rows or not _looks_like_master(rows[0]):
+        return None
+
+    header      = rows[0]
+    last_col    = _detect_col(header, ["last"],          1)
+    first_col   = _detect_col(header, ["first"],         2)
+    bunk_col    = _detect_col(header, ["bunk"],          3)
+    session_col = _detect_col(header, ["session"],       4)
+    age_col     = _detect_col(header, ["age"],           5)
+    grade_col   = _detect_col(header, ["grade"],         6)
+    mon_col     = _detect_col(header, ["monday"],        7)
+    tue_col     = _detect_col(header, ["tuesday"],       8)
+    wed_col     = _detect_col(header, ["wednesday"],     9)
+    thu_col     = _detect_col(header, ["thursday"],      10)
+    fri_col     = _detect_col(header, ["friday"],        11)
+    extra_col   = _detect_col(header, ["enrollment", "extra"], 12)
+    driver_col  = _detect_col(header, ["driver"],        13)
+    stop_col    = _detect_col(header, ["stop"],          None)
+    gender_col  = _detect_col(header, ["gender"],        None)
+    if gender_col is None:
+        gender_col = _detect_col(header, ["sex"],        None)
+
+    def _val(row, col):
+        return str(row[col]).strip() if (col is not None and col < len(row)) else ""
+
+    records = []
+    for row in rows[1:]:
+        if len(row) < 4 or not str(row[0]).strip().isdigit():
+            continue
+
+        last  = _val(row, last_col)
+        first = _val(row, first_col)
+        bunk  = _norm(_val(row, bunk_col))
+        sessions  = _val(row, session_col)
+        raw_age   = _val(row, age_col)
+        grade     = normalize_grade(_val(row, grade_col))
+        mon = _val(row, mon_col); tue = _val(row, tue_col); wed = _val(row, wed_col)
+        thu = _val(row, thu_col); fri = _val(row, fri_col)
+        extra   = _val(row, extra_col)
+        raw_drv = _val(row, driver_col)
+        driver  = "" if raw_drv.lower() in ("", "none", "nan", "n/a", "#n/a") else raw_drv
+        gender  = _val(row, gender_col)
+
+        try:
+            stop_val = int(float(_val(row, stop_col)))
+        except (ValueError, TypeError):
+            stop_val = None
+        try:
+            age_val = float(raw_age)
+        except (ValueError, TypeError):
+            age_val = raw_age if raw_age else None
+
+        # Weeks 1-8 from the session text
+        weeks = [0] * 8
+        for part in sessions.split(","):
+            m = WEEK_RE.search(part)
+            if m:
+                wk = int(m.group(1))
+                if 1 <= wk <= 8:
+                    weeks[wk - 1] = 1
+
+        # Day schedule from Mon-Fri columns (all blank → attends all 5 days)
+        any_day = any(d.lower() in ("yes", "no") for d in [mon, tue, wed, thu, fri])
+        if any_day:
+            day_m = "M" if mon.lower() == "yes" else None
+            day_t = "T" if tue.lower() == "yes" else None
+            day_w = "W" if wed.lower() == "yes" else None
+            day_r = "R" if thu.lower() == "yes" else None
+            day_f = "F" if fri.lower() == "yes" else None
+            days_sched = "".join(x for x in [day_m, day_t, day_w, day_r, day_f] if x)
+        else:
+            day_m, day_t, day_w, day_r, day_f = "M", "T", "W", "R", "F"
+            days_sched = "MTWRF"
+        partial = "" if days_sched == "MTWRF" else days_sched
+
+        # Extended hours from the 'Enrollment extra names' column:
+        #   "Drop-off ... AM" → AM drop-off time;  "Pick-up ... PM" → PM pickup time
+        am_m = _EXT_TIME_RE.search(extra)
+        pm_m = _PM_EXT_TIME_RE.search(extra)
+        am_time = _parse_ext_time(am_m.group(1)) if am_m else None
+        pm_time = _parse_ext_time(pm_m.group(1)) if pm_m else None
+
+        records.append({
+            "name":       f"{last}, {first}",
+            "bunk":       bunk,
+            "weeks":      weeks,
+            "days":       [day_m, day_t, day_w, day_r, day_f],
+            "enrolled":   partial,         # Group Attendance
+            "days_sched": days_sched,      # Extend C/X marks
+            "days_wk":    partial,         # Extend compact label
+            "age":        age_val,
+            "grade":      grade,
+            "driver":     driver,
+            "stop":       stop_val,
+            "gender":     gender,
+            "am_time":    am_time,
+            "pm_time":    pm_time,
+        })
+
+    return records
+
+
+def master_extend_campers(records: list, period: str) -> list:
+    """From master records, return campers enrolled in AM (drop-off) or PM
+    (pick-up) extended hours, with their pickup/dropoff time, sorted by name."""
+    key = "am_time" if period == "am" else "pm_time"
+    out = [{**r, "time": r[key]} for r in records if r.get(key) is not None]
+    out.sort(key=lambda c: c["name"].lower())
+    return out
 
 
 def build_pm_grp_extend_sheet(ws, campers: list) -> None:
@@ -1697,10 +1860,17 @@ def process_report(file_bytes: bytes, report_type: str,
     report_date = date.today()
     os.makedirs(output_dir, exist_ok=True)
 
+    # Auto-detect a master sheet. When present, every report is derived from it;
+    # otherwise each report falls back to its original per-report parser.
+    try:
+        master = parse_master(file_bytes)
+    except Exception:
+        master = None
+
     # ---- Bunk Snapshot ----
     if report_type == "bunk_snapshot":
         try:
-            campers = parse_raw_csv(file_bytes)
+            campers = master if master is not None else parse_raw_csv(file_bytes)
         except Exception as e:
             return {"success": False, "message": f"Could not parse file: {e}"}
         if not campers:
@@ -1730,7 +1900,7 @@ def process_report(file_bytes: bytes, report_type: str,
     # ---- Group Attendance ----
     if report_type == "group_attendance":
         try:
-            campers = parse_group_attendance(file_bytes)
+            campers = master if master is not None else parse_group_attendance(file_bytes)
         except Exception as e:
             return {"success": False, "message": f"Could not parse file: {e}"}
         if not campers:
@@ -1755,7 +1925,8 @@ def process_report(file_bytes: bytes, report_type: str,
     # ---- AM Extend ----
     if report_type == "am_extend":
         try:
-            campers = parse_extend(file_bytes, period="am")
+            campers = (master_extend_campers(master, "am") if master is not None
+                       else parse_extend(file_bytes, period="am"))
         except Exception as e:
             return {"success": False, "message": f"Could not parse file: {e}"}
         if not campers:
@@ -1780,7 +1951,8 @@ def process_report(file_bytes: bytes, report_type: str,
     # ---- PM Extend ----
     if report_type == "pm_extend":
         try:
-            campers = parse_extend(file_bytes, period="pm")
+            campers = (master_extend_campers(master, "pm") if master is not None
+                       else parse_extend(file_bytes, period="pm"))
         except Exception as e:
             return {"success": False, "message": f"Could not parse file: {e}"}
         if not campers:
@@ -1805,7 +1977,9 @@ def process_report(file_bytes: bytes, report_type: str,
     # ---- PM GRP Extend ----
     if report_type == "pm_grp_extend":
         try:
-            campers = parse_pm_grp_extend(file_bytes, config)
+            campers = (assign_pm_groups(master_extend_campers(master, "pm"), config)
+                       if master is not None
+                       else parse_pm_grp_extend(file_bytes, config))
         except Exception as e:
             return {"success": False, "message": f"Could not parse file: {e}"}
         if not campers:
@@ -1830,7 +2004,7 @@ def process_report(file_bytes: bytes, report_type: str,
     # ---- Driver Totals ----
     if report_type == "driver_totals":
         try:
-            campers = parse_driver_csv(file_bytes)
+            campers = master if master is not None else parse_driver_csv(file_bytes)
         except Exception as e:
             return {"success": False, "message": f"Could not parse file: {e}"}
         # Filter to campers who have a driver assigned
