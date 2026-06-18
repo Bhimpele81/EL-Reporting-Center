@@ -630,6 +630,11 @@ def build_totals_sheet(ws, campers: list, config: dict,
     R_END   = R_W1 + 7   # column M
 
     camp_names = [c["name"] for c in config["camps"]]
+
+    def _grp_label(cn):
+        # The Upper total excludes full-time CITs (their own group) — note it
+        return f"{cn} (w/o FT)" if cn.strip().lower().startswith("upper") else cn
+
     all_bunks_ordered, bunk_camp = [], {}
     for camp in config["camps"]:
         for b in sorted(camp["bunks"], key=lambda b: int(b.get("number") or 999)):
@@ -681,7 +686,7 @@ def build_totals_sheet(ws, campers: list, config: dict,
     for ci, cn in enumerate(camp_names):
         fill = ALT_FILL if ci % 2 else None
         ws.merge_cells(start_row=lr, start_column=L_CAMP, end_row=lr, end_column=L_BUNK)
-        _cell(ws, lr, L_CAMP, cn, font=T_BODY, fill=fill, align=LEFT, border=THIN_BORDER)
+        _cell(ws, lr, L_CAMP, _grp_label(cn), font=T_BODY, fill=fill, align=LEFT, border=THIN_BORDER)
         _cell(ws, lr, L_BUNK, None, fill=fill, border=THIN_BORDER)
         _cell(ws, lr, L_TOT, camp_count[cn], font=T_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
         lr += 1
@@ -697,7 +702,7 @@ def build_totals_sheet(ws, campers: list, config: dict,
     rr = 4
     for ci, cn in enumerate(camp_names):
         fill = ALT_FILL if ci % 2 else None
-        _cell(ws, rr, R_LABEL, cn, font=T_BODY, fill=fill, align=LEFT, border=THIN_BORDER)
+        _cell(ws, rr, R_LABEL, _grp_label(cn), font=T_BODY, fill=fill, align=LEFT, border=THIN_BORDER)
         for wi in range(8):
             _cell(ws, rr, R_W1 + wi, camp_weeks[cn][wi], font=T_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
         rr += 1
