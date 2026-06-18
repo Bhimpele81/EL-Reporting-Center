@@ -900,6 +900,39 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
 
     _DAY_LETTERS = "MTWRF"  # maps day index 0-4 to letters used in enrolled string
 
+    def _write_attend_row(r, label, enrolled):
+        ws.row_dimensions[r].height = 31.5
+        alt = (r % 2 == 0)
+        c = ws.cell(row=r, column=2, value=label)
+        c.font = F_NAME; c.alignment = CTR; c.border = T_ALL
+        if alt: c.fill = ALT_FILL
+        # Cols C–G: blank signing cells; pre-fill 'C' for days not attending
+        for di, letter in enumerate(_DAY_LETTERS):
+            col = 3 + di
+            if enrolled and letter not in enrolled:
+                c = ws.cell(row=r, column=col, value="C")
+                c.font = F_ABSENT; c.alignment = CTR; c.border = T_ALL
+            else:
+                c = ws.cell(row=r, column=col); c.border = T_ALL
+            if alt: c.fill = ALT_FILL
+        c = ws.cell(row=r, column=8, value=enrolled or None)
+        c.font = F_ENROLL; c.alignment = CTR; c.border = T_ALL
+        if alt: c.fill = ALT_FILL
+
+    # FT CITs assigned to a real bunk (via the "CIT Bunk" column) get an extra
+    # line on that bunk's page after the count — matched by bunk name (no #).
+    # CITs assigned to non-bunks (Arts & Crafts, Athletics, …) match nothing
+    # and so appear only on their own FT CITs page.
+    bunk_by_stripped = {_label_bunk(bk).lower(): bk for bk in seen}
+    cit_by_bunk = {}
+    for c in campers_sorted:
+        cb = (c.get("cit_bunk") or "").strip()
+        if not cb:
+            continue
+        target = bunk_by_stripped.get(cb.lower())
+        if target and target != c["bunk"]:
+            cit_by_bunk.setdefault(target, []).append(c)
+
     # ---- Data rows: one bunk per page ----
     row = 3
     total_count = 0
@@ -911,35 +944,10 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
         bk_start = row
 
         for camper in group:
-            ws.row_dimensions[row].height = 31.5
-            use_alt = (row % 2 == 0)
-
-            # Col B: camper name
-            c = ws.cell(row=row, column=2, value=camper["name"])
-            c.font = F_NAME; c.alignment = CTR; c.border = T_ALL
-            if use_alt: c.fill = ALT_FILL
-
-            # Cols C–G: blank signing cells; pre-fill 'C' for days camper won't attend
-            enrolled = camper["enrolled"]   # e.g. "TWRF" or "" (all days)
-            for di, letter in enumerate(_DAY_LETTERS):
-                col = 3 + di   # C=3, D=4, E=5, F=6, G=7
-                if enrolled and letter not in enrolled:
-                    c = ws.cell(row=row, column=col, value="C")
-                    c.font = F_ABSENT; c.alignment = CTR; c.border = T_ALL
-                    if use_alt: c.fill = ALT_FILL
-                else:
-                    c = ws.cell(row=row, column=col)
-                    c.border = T_ALL
-                    if use_alt: c.fill = ALT_FILL
-
-            # Col H: enrolled
-            c = ws.cell(row=row, column=8, value=camper["enrolled"] or None)
-            c.font = F_ENROLL; c.alignment = CTR; c.border = T_ALL
-            if use_alt: c.fill = ALT_FILL
-
+            _write_attend_row(row, camper["name"], camper["enrolled"])
             row += 1
 
-        # Subtotal row
+        # Subtotal row (count of assigned campers — CITs below are not counted)
         ws.row_dimensions[row].height = 31.5
         use_alt = (row % 2 == 0)
         c = ws.cell(row=row, column=2, value=count)
@@ -952,7 +960,13 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
         bk_end = row
         row += 1
 
-        # Merge col A for entire bunk group, rotate text 90°
+        # FT CITs assigned to this bunk — extra line(s) after the count
+        for cit in sorted(cit_by_bunk.get(bk, []), key=lambda x: x["name"].lower()):
+            _write_attend_row(row, f"{cit['name']} (CIT)", cit["enrolled"])
+            bk_end = row
+            row += 1
+
+        # Merge col A for the whole bunk block (incl. CIT lines), rotate 90°
         ws.merge_cells(start_row=bk_start, start_column=1,
                        end_row=bk_end,     end_column=1)
         c = ws.cell(row=bk_start, column=1, value=bk)
@@ -1468,6 +1482,7 @@ def parse_master(file_bytes: bytes):
     gender_col  = _detect_col(header, ["gender"],        None)
     if gender_col is None:
         gender_col = _detect_col(header, ["sex"],        None)
+    cit_bunk_col = _detect_col(header, ["cit", "bunk"],  None)   # FT CIT's assigned bunk
 
     def _val(row, col):
         return str(row[col]).strip() if (col is not None and col < len(row)) else ""
@@ -1550,6 +1565,7 @@ def parse_master(file_bytes: bytes):
             "am_time":    am_time,
             "pm_time":    pm_time,
             "extra":      extra,           # raw 'Enrollment extra names' text
+            "cit_bunk":   _val(row, cit_bunk_col),  # FT CIT's assigned bunk (name only)
         })
 
     return records
