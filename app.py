@@ -719,9 +719,9 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <p class="px-desc">Perfect for smaller camps or those just getting started with digital reporting.</p>
         <ul class="px-features">
           <li>20 reports per month</li>
-          <li>All 5 report types</li>
+          <li>All available report types</li>
           <li>Configurable bunks &amp; camps</li>
-          <li>Print-ready Excel output</li>
+          <li>Print-ready Excel/Word output</li>
           <li>Email support</li>
         </ul>
         <button class="px-cta" onclick="document.getElementById('pricing-overlay').classList.add('hidden')">Get Started</button>
@@ -733,9 +733,9 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <p class="px-desc">For active camps that run reports throughout the season on a regular basis.</p>
         <ul class="px-features">
           <li>50 reports per month</li>
-          <li>All 5 report types</li>
+          <li>All available report types</li>
           <li>Configurable bunks &amp; camps</li>
-          <li>Print-ready Excel output</li>
+          <li>Print-ready Excel/Word output</li>
           <li>Recent reports history</li>
           <li>Priority email support</li>
         </ul>
@@ -747,9 +747,9 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <p class="px-desc">Full access for camps that need unrestricted reporting all season long.</p>
         <ul class="px-features">
           <li>Unlimited reports</li>
-          <li>All 5 report types</li>
+          <li>All available report types</li>
           <li>Configurable bunks &amp; camps</li>
-          <li>Print-ready Excel output</li>
+          <li>Print-ready Excel/Word output</li>
           <li>Recent reports history</li>
           <li>Priority support &amp; onboarding</li>
         </ul>
