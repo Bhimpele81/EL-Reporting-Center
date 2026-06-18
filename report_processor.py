@@ -933,6 +933,11 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
         if target and target != c["bunk"]:
             cit_by_bunk.setdefault(target, []).append(c)
 
+    def _disp(c):
+        # FT CITs show their assigned area (master "CIT Bunk" column) in parens
+        area = (c.get("cit_bunk") or "").strip()
+        return f"{c['name']} ({area})" if area else c["name"]
+
     # ---- Data rows: one bunk per page ----
     row = 3
     total_count = 0
@@ -944,7 +949,7 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
         bk_start = row
 
         for camper in group:
-            _write_attend_row(row, camper["name"], camper["enrolled"])
+            _write_attend_row(row, _disp(camper), camper["enrolled"])
             row += 1
 
         # Subtotal row (count of assigned campers — CITs below are not counted)
@@ -962,7 +967,7 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
 
         # FT CITs assigned to this bunk — extra line(s) after the count
         for cit in sorted(cit_by_bunk.get(bk, []), key=lambda x: x["name"].lower()):
-            _write_attend_row(row, f"{cit['name']} (CIT)", cit["enrolled"])
+            _write_attend_row(row, _disp(cit), cit["enrolled"])
             bk_end = row
             row += 1
 
