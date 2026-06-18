@@ -1571,6 +1571,12 @@ def master_extend_campers(records: list, period: str) -> list:
 _DAY_FULL = {"M": "Mon", "T": "Tue", "W": "Wed", "R": "Thu", "F": "Fri"}
 
 
+def _label_bunk(bunk: str) -> str:
+    """Bunk name for labels with the leading number removed
+    (e.g. '01 Munchkins' -> 'Munchkins', '30 PT CITs - Maroon' -> 'PT CITs - Maroon')."""
+    return re.sub(r"^\s*\d+\s+", "", str(bunk)).strip()
+
+
 def _label_days_text(sched: str) -> str:
     """Readable 'days attending' text from a schedule string like 'MWF'.
     Full-week (Mon-Fri) campers get a blank line."""
@@ -1660,7 +1666,7 @@ def build_group_labels_docx(records: list, config: dict, group_name: str = "Inte
     in_group = _group_bunks(config, group_name)
     labels = sorted((r for r in records if in_group(r["bunk"])),
                     key=lambda r: (_bunk_sort_key(r["bunk"]), r["name"].lower()))
-    rows3 = [(r["bunk"], r["name"], _label_days_text(r.get("days_sched"))) for r in labels]
+    rows3 = [(_label_bunk(r["bunk"]), r["name"], _label_days_text(r.get("days_sched"))) for r in labels]
     return _avery5960_docx(rows3), len(rows3)
 
 
@@ -1685,13 +1691,14 @@ def build_jr_transport_labels_docx(records: list, config: dict) -> tuple:
     trans, pmext, carline = [], [], []
     for r in juniors:
         ex = (r.get("extra") or "").lower()
+        bk = _label_bunk(r["bunk"])
         if "2-way" in ex or "pm only trans" in ex:
             drv = (r.get("driver") or "").strip()
-            trans.append((r["bunk"], r["name"], f"Trans - {drv}" if drv else "Trans"))
+            trans.append((bk, r["name"], f"Trans - {drv}" if drv else "Trans"))
         elif "drop-off" in ex:
-            pmext.append((r["bunk"], r["name"], "Pm ext"))
+            pmext.append((bk, r["name"], "Pm ext"))
         else:
-            carline.append((r["bunk"], r["name"], "Car line"))
+            carline.append((bk, r["name"], "Car line"))
 
     groups = [("Trans", trans), ("Pm ext", pmext), ("Car line", carline)]
     nonempty = [(name, rows) for name, rows in groups if rows]
