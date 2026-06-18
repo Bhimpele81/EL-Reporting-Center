@@ -378,11 +378,13 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     R_TOTAL  = Font(name="Calibri", bold=True, size=14)
 
     # ----- Row 1: date header -----------------------------------------------
+    # Date sits in the narrow week column B, so left-align it to overflow into
+    # the empty cells to the right instead of being clipped.
     ws.row_dimensions[1].height = 20
     _cell(ws, 1, 1, "Report Date:", font=R_DATE, align=RIGHT)
     _cell(ws, 1, 2, report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
           else report_date.strftime("%#m/%#d/%Y"),
-          font=R_DATE, align=Alignment(horizontal="center", vertical="center"))
+          font=R_DATE, align=LEFT)
 
     # ----- Column layout (Bunk column removed) ------------------------------
     #   A(1)=Child   B-I(2-9)=#1-#8   J-N(10-14)=Days M T W R F
