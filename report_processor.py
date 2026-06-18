@@ -541,8 +541,10 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     ws.print_title_rows = None
 
     # ----- Margins (inches) -------------------------------------------------
-    ws.page_margins.left  = 0.25
-    ws.page_margins.right = 0.25
+    ws.page_margins.left   = 0.25
+    ws.page_margins.right  = 0.25
+    ws.page_margins.top    = 0.5
+    ws.page_margins.bottom = 0.5
 
     # ----- Footer: report date on every page --------------------------------
     date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
