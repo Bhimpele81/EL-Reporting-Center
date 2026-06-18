@@ -619,7 +619,7 @@ def build_totals_sheet(ws, campers: list, config: dict,
     T_BODY  = Font(name="Calibri", size=13)
     T_TOTAL = Font(name="Calibri", bold=True, size=13)
     T_DATE  = Font(name="Calibri", bold=True, size=12)
-    ROW_H   = 20
+    ROW_H   = 15
 
     #  LEFT column  : A=Camp  B=Bunk  C=Total  (Bunk Totals, then Group Totals below)
     #  GAP          : col D
@@ -733,16 +733,18 @@ def build_totals_sheet(ws, campers: list, config: dict,
     for wi in range(8):
         ws.column_dimensions[get_column_letter(R_W1 + wi)].width = 9
 
-    # ---- Print settings: landscape, fill width, flow down as needed --------
+    # ---- Print settings: landscape, scaled to a SINGLE page ----------------
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToPage   = True
     ws.page_setup.fitToWidth  = 1
-    ws.page_setup.fitToHeight = 0
+    ws.page_setup.fitToHeight = 1
     ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_options.horizontalCentered = True
+    ws.print_options.verticalCentered   = True
     ws.page_margins.left   = 0.25
     ws.page_margins.right  = 0.25
-    ws.page_margins.top    = 0.5
-    ws.page_margins.bottom = 0.5
+    ws.page_margins.top    = 0.4
+    ws.page_margins.bottom = 0.4
 
 
 # ---------------------------------------------------------------------------
