@@ -547,8 +547,8 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     # ----- Footer: report date on every page --------------------------------
     date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
                 else report_date.strftime("%#m/%#d/%Y"))
-    ws.oddFooter.left.text  = f"&12Report Date: {date_str}"
-    ws.evenFooter.left.text = f"&12Report Date: {date_str}"
+    ws.oddFooter.right.text  = f"&12Report Date: {date_str}"
+    ws.evenFooter.right.text = f"&12Report Date: {date_str}"
 
 
 # ---------------------------------------------------------------------------
