@@ -1888,192 +1888,153 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
     """
     from openpyxl.worksheet.pagebreak import Break
 
-    PLAIN_FONT    = Font(name="Calibri", bold=False, size=12)
-    BOLD_FONT     = Font(name="Calibri", bold=True,  size=12)
-    CENTER_AL     = Alignment(horizontal="center", vertical="center")
-    LEFT_AL       = Alignment(horizontal="left",   vertical="center")
-    ROW_ALT_FILL   = PatternFill("solid", fgColor="EEEEEE")  # light gray alternating rows
-    AGE_WARN_FILL  = PatternFill("solid", fgColor="92D050")  # green for age < 8
-    BUNK_WARN_FILL = PatternFill("solid", fgColor="FFC000")  # orange for bunks 1-7
-    NAME_WEEK_FILL = PatternFill("solid", fgColor="FFFF00")  # yellow: attending this week
+    F_DATA   = Font(name="Calibri", bold=False, size=16)
+    F_BOLD   = Font(name="Calibri", bold=True,  size=16)
+    F_HDR    = Font(name="Calibri", bold=True,  size=14)
+    F_BANNER = Font(name="Calibri", bold=True,  size=22, color="000000")  # driver name
+    CTR  = Alignment(horizontal="center", vertical="center")
+    LEFT = Alignment(horizontal="left",   vertical="center")
+    _thin  = Side(style="thin")
+    BORDER = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
+    HDR_FILL  = PatternFill("solid", fgColor="D9D9D9")
+    ALT_FILL  = PatternFill("solid", fgColor="EEEEEE")  # alternating rows
+    AGE_WARN  = PatternFill("solid", fgColor="92D050")  # green: age < 8
+    BUNK_WARN = PatternFill("solid", fgColor="FFC000")  # orange: bunks 1-7
+    WEEK_FILL = PatternFill("solid", fgColor="FFFF00")  # yellow: selected week
 
-    def _set(r, c, val=None, font=None, align=None, fill=None):
-        cell = ws.cell(row=r, column=c, value=val)
-        if font:  cell.font      = font
-        if align: cell.alignment = align
-        if fill:  cell.fill      = fill
+    # Column layout (18 cols A-R; Driver column removed — driver is a banner):
+    #   A=Child  B=Stp#  C=Bunk  D-K(4-11)=#1-#8  L-P(12-16)=M/T/W/R/F  Q=Age  R=Grade
+    COL_CHILD, COL_STOP, COL_BUNK = 1, 2, 3
+    COL_WK1  = 4
+    COL_DAY1 = 12
+    COL_AGE  = 17
+    COL_GRADE = 18
+    LAST_COL = 18
+    HEADERS = ["Child", "Stp#", "Bunk", "#1", "#2", "#3", "#4", "#5", "#6", "#7", "#8",
+               "M", "T", "W", "R", "F", "Age", "Grade"]
+
+    def _c(r, col, val, font=F_DATA, align=CTR, fill=None, border=True):
+        cell = ws.cell(row=r, column=col, value=val)
+        cell.font = font; cell.alignment = align
+        if border: cell.border = BORDER
+        if fill:   cell.fill = fill
         return cell
 
-    # ----- Row 1: date header -----------------------------------------------
-    # "Report Date:" sits in col A; the date value goes in col C (Bunk column)
-    # because col B (Stp#) is intentionally narrow and would clip the date.
-    date_lbl = ws.cell(row=1, column=1, value="Report Date:")
-    date_lbl.font = BOLD_FONT
-    date_lbl.alignment = Alignment(horizontal="right", vertical="center")
-    date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
-                else report_date.strftime("%#m/%#d/%Y"))
-    date_val = ws.cell(row=1, column=3, value=date_str)
-    date_val.font = BOLD_FONT
-    date_val.alignment = CENTER_AL
+    def _headers(hr):
+        ws.row_dimensions[hr].height = 22
+        for ci, h in enumerate(HEADERS, start=1):
+            wk_hl = bool(week_num and ci == COL_WK1 + week_num - 1)
+            _c(hr, ci, h, font=F_HDR, align=(LEFT if ci == COL_CHILD else CTR),
+               fill=(WEEK_FILL if wk_hl else HDR_FILL))
 
-    # Column layout (19 cols A-S):
-    #   A(1)=Child  B(2)=Stp#  C(3)=Bunk
-    #   D-K(4-11)=#1-#8   L-P(12-16)=M/T/W/R/F
-    #   Q(17)=Age  R(18)=Grade  S(19)=Driver
-    COL_CHILD  = 1
-    COL_STOP   = 2
-    COL_BUNK   = 3
-    COL_WK1    = 4    # weeks occupy cols 4-11
-    COL_DAY1   = 12   # days  occupy cols 12-16
-    COL_AGE    = 17
-    COL_GRADE  = 18
-    COL_DRIVER = 19
-    TOTAL_COLS = 19
-
-    # ----- Row 2: column headers --------------------------------------------
-    col_headers = [
-        "Child", "Stp#", "Bunk",
-        "#1", "#2", "#3", "#4", "#5", "#6", "#7", "#8",
-        "M", "T", "W", "R", "F",
-        "Age", "Grade", "Driver",
-    ]
-    for ci, h in enumerate(col_headers, start=1):
-        hdr_fill = NAME_WEEK_FILL if (week_num is not None and ci == COL_WK1 + week_num - 1) else None
-        _set(2, ci, h, font=BOLD_FONT, align=LEFT_AL if ci == 1 else CENTER_AL, fill=hdr_fill)
-
-    # ----- Group and sort campers -------------------------------------------
-    driver_groups: dict[str, list] = {}
+    # ----- Group + sort campers by driver -----------------------------------
+    driver_groups: dict = {}
     for camper in campers:
-        drv = camper["driver"] or "(No Driver)"
-        driver_groups.setdefault(drv, []).append(camper)
-
-    # Sort by stop # when available, fall back to alphabetical name
+        driver_groups.setdefault(camper["driver"] or "(No Driver)", []).append(camper)
     has_stops = any(c.get("stop") is not None for c in campers)
     for drv in driver_groups:
-        if has_stops:
-            driver_groups[drv].sort(
-                key=lambda x: (x["stop"] is None, x["stop"] or 0, x["name"].lower())
-            )
-        else:
-            driver_groups[drv].sort(key=lambda x: x["name"].lower())
-
+        driver_groups[drv].sort(
+            key=(lambda x: (x["stop"] is None, x["stop"] or 0, x["name"].lower()))
+            if has_stops else (lambda x: x["name"].lower()))
     sorted_drivers = sorted(driver_groups.keys())
 
-    # ----- Write rows -------------------------------------------------------
-    row = 3
+    row = 1
     grand_week_sums = [0] * 8
     grand_count = 0
 
-    for drv_idx, drv in enumerate(sorted_drivers):
-        group      = driver_groups[drv]
-        week_sums  = [0] * 8
-        count      = len(group)
+    for drv in sorted_drivers:
+        group = driver_groups[drv]
+        week_sums = [0] * 8
+        count = len(group)
         grand_count += count
 
-        for ci, camper in enumerate(group):
-            fill = ROW_ALT_FILL if (ci % 2 == 1) else None
+        # --- Driver banner (top of the page) ---
+        ws.row_dimensions[row].height = 28
+        bn = ws.cell(row=row, column=COL_CHILD, value=drv)
+        bn.font = F_BANNER; bn.alignment = LEFT
+        row += 1
+        _headers(row); row += 1
 
-            if fill:
-                for col in range(1, TOTAL_COLS + 1):
-                    ws.cell(row=row, column=col).fill = fill
+        for i, camper in enumerate(group):
+            ws.row_dimensions[row].height = 22
+            base = ALT_FILL if (i % 2 == 1) else None
 
-            bunk_val  = camper["bunk"]
-            bunk_num  = int(m.group()) if (m := __import__('re').match(r'\d+', str(bunk_val or ""))) else None
-            bunk_fill = BUNK_WARN_FILL if (bunk_num is not None and 1 <= bunk_num <= 7) else fill
+            bunk_val = camper["bunk"]
+            mm = re.match(r"\d+", str(bunk_val or ""))
+            bnum = int(mm.group()) if mm else None
+            bunk_fill = BUNK_WARN if (bnum is not None and 1 <= bnum <= 7) else base
+            attending = bool(week_num and 1 <= week_num <= len(camper["weeks"])
+                             and camper["weeks"][week_num - 1] == 1)
 
-            # Highlight name yellow if this camper has a 1 in the selected week column
-            attending_this_week = (
-                week_num is not None
-                and 1 <= week_num <= len(camper["weeks"])
-                and camper["weeks"][week_num - 1] == 1
-            )
-            name_fill = NAME_WEEK_FILL if attending_this_week else fill
-
-            _set(row, COL_CHILD, camper["name"],     font=PLAIN_FONT, align=LEFT_AL,   fill=name_fill)
-            _set(row, COL_STOP,  camper.get("stop"), font=PLAIN_FONT, align=CENTER_AL, fill=fill)
-            _set(row, COL_BUNK,  bunk_val,           font=PLAIN_FONT, align=CENTER_AL, fill=bunk_fill)
-
+            _c(row, COL_CHILD, camper["name"], align=LEFT, fill=(WEEK_FILL if attending else base))
+            _c(row, COL_STOP,  camper.get("stop"), fill=base)
+            _c(row, COL_BUNK,  bunk_val, fill=bunk_fill)
             for wi, wv in enumerate(camper["weeks"]):
-                is_selected_week = (week_num is not None and wi == week_num - 1)
-                wk_fill = NAME_WEEK_FILL if (is_selected_week and wv == 1) else fill
-                _set(row, COL_WK1 + wi, wv, font=PLAIN_FONT, align=CENTER_AL, fill=wk_fill)
-                week_sums[wi]       += wv
-                grand_week_sums[wi] += wv
-
+                wf = WEEK_FILL if (week_num and wi == week_num - 1 and wv == 1) else base
+                _c(row, COL_WK1 + wi, wv, fill=wf)
+                week_sums[wi] += wv; grand_week_sums[wi] += wv
             for di, dv in enumerate(camper["days"]):
-                _set(row, COL_DAY1 + di, dv, font=PLAIN_FONT, align=CENTER_AL, fill=fill)
-
-            age_val  = camper["age"]
-            age_fill = AGE_WARN_FILL if (age_val is not None and age_val < 8) else fill
-            _set(row, COL_AGE, age_val, font=PLAIN_FONT, align=CENTER_AL, fill=age_fill)
-            _set(row, COL_GRADE,  camper["grade"] or None,font=PLAIN_FONT, align=CENTER_AL, fill=fill)
-            _set(row, COL_DRIVER, drv,                    font=PLAIN_FONT, align=LEFT_AL,   fill=fill)
-
+                _c(row, COL_DAY1 + di, dv, fill=base)
+            age_val = camper["age"]
+            agew = AGE_WARN if (isinstance(age_val, (int, float)) and age_val < 8) else base
+            _c(row, COL_AGE, age_val, fill=agew)
+            _c(row, COL_GRADE, camper["grade"] or None, fill=base)
             row += 1
 
-        # --- SUM row: week totals + "[Driver] Total" label ------------------
+        # --- Week totals + camper count ---
+        ws.row_dimensions[row].height = 22
+        _c(row, COL_CHILD, "Week Totals", font=F_BOLD, align=LEFT)
         for wi, wsum in enumerate(week_sums):
-            _set(row, COL_WK1 + wi, wsum, font=PLAIN_FONT, align=CENTER_AL)
-        _set(row, COL_DRIVER, "Total", font=BOLD_FONT, align=LEFT_AL)
+            _c(row, COL_WK1 + wi, wsum, font=F_BOLD)
+        row += 1
+        ws.row_dimensions[row].height = 22
+        _c(row, COL_CHILD, f"Total Campers: {count}", font=F_BOLD, align=LEFT, border=False)
         row += 1
 
-        # --- COUNT row: driver label + count --------------------------------
-        _set(row, COL_GRADE,  drv,   font=BOLD_FONT,  align=LEFT_AL)
-        _set(row, COL_DRIVER, count, font=PLAIN_FONT, align=CENTER_AL)
-        row += 1
+        ws.row_breaks.append(Break(id=row - 1))   # each driver on its own page
 
-        # Page break after every driver group (grand totals print on their own page)
-        ws.row_breaks.append(Break(id=row - 1))
-
-    # ----- Grand totals -----------------------------------------------------
-    # GRAND COUNT row
-    _set(row, COL_GRADE,  "Grand",       font=BOLD_FONT,  align=LEFT_AL)
-    _set(row, COL_DRIVER, grand_count,   font=PLAIN_FONT, align=CENTER_AL)
+    # ----- Grand totals (own page) ------------------------------------------
+    ws.row_dimensions[row].height = 28
+    gb = ws.cell(row=row, column=COL_CHILD, value="Grand Total — All Drivers")
+    gb.font = F_BANNER; gb.alignment = LEFT
     row += 1
-
-    # GRAND SUM row
+    _headers(row); row += 1
+    _c(row, COL_CHILD, "Week Totals", font=F_BOLD, align=LEFT)
     for wi, gs in enumerate(grand_week_sums):
-        _set(row, COL_WK1 + wi, gs, font=PLAIN_FONT, align=CENTER_AL)
-    _set(row, COL_DRIVER, "Grand Total", font=BOLD_FONT, align=LEFT_AL)
+        _c(row, COL_WK1 + wi, gs, font=F_BOLD)
+    row += 1
+    _c(row, COL_CHILD, f"Total Campers: {grand_count}", font=F_BOLD, align=LEFT, border=False)
 
-    last_row = row   # used for border pass below
+    # ----- Column widths (fill the landscape width) -------------------------
+    ws.column_dimensions["A"].width = 26   # Child
+    ws.column_dimensions["B"].width = 6    # Stp#
+    ws.column_dimensions["C"].width = 22   # Bunk
+    for wi in range(8):
+        ws.column_dimensions[get_column_letter(COL_WK1 + wi)].width = 6
+    for di in range(5):
+        ws.column_dimensions[get_column_letter(COL_DAY1 + di)].width = 5
+    ws.column_dimensions[get_column_letter(COL_AGE)].width   = 7
+    ws.column_dimensions[get_column_letter(COL_GRADE)].width = 9
 
-    # ----- Vertical separator borders ---------------------------------------
-    # Thin right border on: col B (Stp# | Bunk), col K (#8 | M),
-    # and col P (F | Age) — runs from the header row to the last data row.
-    _vert = Side(style="thin", color="000000")
-    for r in range(2, last_row + 1):
-        for col in (COL_STOP,           # right edge of Stp# col
-                    COL_WK1 + 7,        # right edge of #8 col  (col K)
-                    COL_DAY1 + 4):      # right edge of F col   (col P)
-            cell = ws.cell(row=r, column=col)
-            eb = cell.border
-            cell.border = Border(
-                left=eb.left, right=_vert, top=eb.top, bottom=eb.bottom
-            )
-
-    # ----- Column widths ----------------------------------------------------
-    ws.column_dimensions["A"].width = 20    # Child
-    ws.column_dimensions["B"].width = 4.5   # Stp#
-    ws.column_dimensions["C"].width = 18    # Bunk
-    for wi in range(8):                      # #1-#8  (cols D-K)
-        ws.column_dimensions[get_column_letter(COL_WK1 + wi)].width = 4.5
-    for di in range(5):                      # M T W R F  (cols L-P)
-        ws.column_dimensions[get_column_letter(COL_DAY1 + di)].width = 3
-    ws.column_dimensions["Q"].width = 5     # Age
-    ws.column_dimensions["R"].width = 10    # Grade (also holds driver count labels)
-    ws.column_dimensions["S"].width = 16    # Driver
-
-    # ----- Print settings ---------------------------------------------------
+    # ----- Print settings: landscape, fill width, each driver own page ------
     ws.page_setup.orientation = "landscape"
-    ws.page_setup.scale       = 95
-    ws.print_title_rows       = "1:2"
-    ws.page_margins.top    = 0.25
-    ws.page_margins.bottom = 0.25
+    ws.page_setup.fitToPage   = True
+    ws.page_setup.fitToWidth  = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_title_rows = None
+    ws.page_margins.top    = 0.3
+    ws.page_margins.bottom = 0.4
     ws.page_margins.left   = 0.25
     ws.page_margins.right  = 0.25
-    ws.page_margins.header = 0.15
-    ws.page_margins.footer = 0.15
+    ws.page_margins.header = 0.2
+    ws.page_margins.footer = 0.2
+
+    # Report date in the footer (bottom-right)
+    date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
+                else report_date.strftime("%#m/%#d/%Y"))
+    ws.oddFooter.right.text  = f"&12Report Date: {date_str}"
+    ws.evenFooter.right.text = f"&12Report Date: {date_str}"
 
 
 # ---------------------------------------------------------------------------
