@@ -613,158 +613,136 @@ def build_totals_sheet(ws, campers: list, config: dict,
     grand_total = sum(camp_count.values())
     grand_weeks = [sum(camp_weeks[c][wi] for c in camp_weeks) for wi in range(8)]
 
-    # ---- Layout constants --------------------------------------------------
-    #  LEFT block   : cols A-C  (Camp | Bunk | Count)
-    #  GAP          : col D
-    #  MIDDLE block : cols E-G  (Camp | Total | gap)
-    #  GAP          : col H
-    #  RIGHT block  : cols I-Q  (Group totals by week, #1-#8)
-    # Then a gap row, then Bunk Totals by Week block below
+    # ---- Larger local fonts + layout --------------------------------------
+    T_HDR   = Font(name="Calibri", bold=True, color=WHITE, size=14)
+    T_SUB   = Font(name="Calibri", bold=True, size=13)
+    T_BODY  = Font(name="Calibri", size=13)
+    T_TOTAL = Font(name="Calibri", bold=True, size=13)
+    T_DATE  = Font(name="Calibri", bold=True, size=12)
+    ROW_H   = 20
 
-    LEFT_C   = 1   # Camp col
-    LEFT_B   = 2   # Bunk col
-    LEFT_N   = 3   # Count col
-    MID_C    = 5   # Camp col
-    MID_T    = 6   # Group total
-    RT_LABEL = 9   # Right-section label col
-    RT_W1    = 10  # Right #1 .. #8
+    #  LEFT column  : A=Camp  B=Bunk  C=Total  (Bunk Totals, then Group Totals below)
+    #  GAP          : col D
+    #  RIGHT column : E=Label  F-M=#1..#8  (Group Totals by Week, then Bunk Totals by Week)
+    L_CAMP, L_BUNK, L_TOT = 1, 2, 3
+    R_LABEL = 5
+    R_W1    = 6
+    R_END   = R_W1 + 7   # column M
+
+    camp_names = [c["name"] for c in config["camps"]]
+    all_bunks_ordered, bunk_camp = [], {}
+    for camp in config["camps"]:
+        for b in sorted(camp["bunks"], key=lambda b: int(b.get("number") or 999)):
+            all_bunks_ordered.append(b["name"])
+            bunk_camp[b["name"]] = camp["name"]
+
+    def _section_hdr(r, c1, c2, text):
+        ws.merge_cells(start_row=r, start_column=c1, end_row=r, end_column=c2)
+        cc = ws.cell(row=r, column=c1, value=text)
+        cc.font = T_HDR; cc.fill = BRAND_FILL; cc.alignment = CENTER; cc.border = THIN_BORDER
+        for c in range(c1 + 1, c2 + 1):
+            ws.cell(row=r, column=c).fill = BRAND_FILL
+            ws.cell(row=r, column=c).border = THIN_BORDER
+
+    def _week_subhdr(r):
+        _cell(ws, r, R_LABEL, None, fill=LGREY_FILL, border=THIN_BORDER)
+        for wi in range(8):
+            _cell(ws, r, R_W1 + wi, f"#{wi+1}",
+                  font=T_SUB, fill=LGREY_FILL, align=CENTER, border=THIN_BORDER)
 
     # ----- Row 1: date ------------------------------------------------------
-    _cell(ws, 1, 1, "Report Date", font=SUBHDR_FONT)
+    _cell(ws, 1, 1, "Report Date", font=T_DATE)
     _cell(ws, 1, 2, report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
-          else report_date.strftime("%#m/%#d/%Y"),
-          font=BODY_FONT)
+          else report_date.strftime("%#m/%#d/%Y"), font=T_DATE)
 
-    # ----- Row 2: section headers -------------------------------------------
-    _cell(ws, 2, LEFT_C, "Bunk Totals",          font=HEADER_FONT, fill=BRAND_FILL, align=CENTER, border=THIN_BORDER)
-    _cell(ws, 2, MID_C,  "Group Totals",          font=HEADER_FONT, fill=BRAND_FILL, align=CENTER, border=THIN_BORDER)
-    _cell(ws, 2, RT_LABEL, "Group Totals by Week",font=HEADER_FONT, fill=BRAND_FILL, align=CENTER, border=THIN_BORDER)
+    # ===== LEFT COLUMN: Bunk Totals =====
+    _section_hdr(2, L_CAMP, L_TOT, "Bunk Totals")
+    for ci, h in [(L_CAMP, "Camp"), (L_BUNK, "Bunk"), (L_TOT, "Total")]:
+        _cell(ws, 3, ci, h, font=T_SUB, fill=LGREY_FILL, align=CENTER, border=THIN_BORDER)
+    lr = 4
+    for bi, bk in enumerate(all_bunks_ordered):
+        fill = ALT_FILL if bi % 2 else None
+        _cell(ws, lr, L_CAMP, bunk_camp.get(bk, ""), font=T_BODY, fill=fill, align=LEFT, border=THIN_BORDER)
+        _cell(ws, lr, L_BUNK, bk, font=T_BODY, fill=fill, align=LEFT, border=THIN_BORDER)
+        _cell(ws, lr, L_TOT, bunk_count.get(bk, 0), font=T_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
+        lr += 1
+    _cell(ws, lr, L_CAMP, "TOTAL", font=T_TOTAL, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
+    _cell(ws, lr, L_BUNK, None,    font=T_TOTAL, fill=TOTAL_FILL, border=THIN_BORDER)
+    _cell(ws, lr, L_TOT, grand_total, font=T_TOTAL, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
+    lr += 2   # gap row
 
-    # Merge Bunk Totals header across 3 cols
-    ws.merge_cells(start_row=2, start_column=LEFT_C, end_row=2, end_column=LEFT_N)
-    ws.merge_cells(start_row=2, start_column=MID_C,  end_row=2, end_column=MID_T)
-    ws.merge_cells(start_row=2, start_column=RT_LABEL, end_row=2, end_column=RT_W1+7)
+    # ===== LEFT COLUMN: Group Totals (under Bunk Totals) =====
+    _section_hdr(lr, L_CAMP, L_TOT, "Group Totals"); lr += 1
+    ws.merge_cells(start_row=lr, start_column=L_CAMP, end_row=lr, end_column=L_BUNK)
+    _cell(ws, lr, L_CAMP, "Camp",  font=T_SUB, fill=LGREY_FILL, align=CENTER, border=THIN_BORDER)
+    _cell(ws, lr, L_BUNK, None,    fill=LGREY_FILL, border=THIN_BORDER)
+    _cell(ws, lr, L_TOT,  "Total", font=T_SUB, fill=LGREY_FILL, align=CENTER, border=THIN_BORDER)
+    lr += 1
+    for ci, cn in enumerate(camp_names):
+        fill = ALT_FILL if ci % 2 else None
+        ws.merge_cells(start_row=lr, start_column=L_CAMP, end_row=lr, end_column=L_BUNK)
+        _cell(ws, lr, L_CAMP, cn, font=T_BODY, fill=fill, align=LEFT, border=THIN_BORDER)
+        _cell(ws, lr, L_BUNK, None, fill=fill, border=THIN_BORDER)
+        _cell(ws, lr, L_TOT, camp_count[cn], font=T_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
+        lr += 1
+    ws.merge_cells(start_row=lr, start_column=L_CAMP, end_row=lr, end_column=L_BUNK)
+    _cell(ws, lr, L_CAMP, "Total", font=T_TOTAL, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
+    _cell(ws, lr, L_BUNK, None,    fill=TOTAL_FILL, border=THIN_BORDER)
+    _cell(ws, lr, L_TOT, grand_total, font=T_TOTAL, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
+    left_last = lr
 
-    # ----- Row 3: sub-headers -----------------------------------------------
-    for ci, h in enumerate(["Camp", "Bunk", "Total"], start=LEFT_C):
-        _cell(ws, 3, ci, h, font=SUBHDR_FONT, fill=LGREY_FILL, align=CENTER, border=THIN_BORDER)
-    _cell(ws, 3, MID_C, "Camp",  font=SUBHDR_FONT, fill=LGREY_FILL, align=CENTER, border=THIN_BORDER)
-    _cell(ws, 3, MID_T, "Total", font=SUBHDR_FONT, fill=LGREY_FILL, align=CENTER, border=THIN_BORDER)
-
-    # Right section week headers in row 3
-    _cell(ws, 3, RT_LABEL, None, fill=LGREY_FILL, border=THIN_BORDER)
-    for wi in range(8):
-        _cell(ws, 3, RT_W1 + wi, f"#{wi+1}",
-              font=SUBHDR_FONT, fill=LGREY_FILL, align=CENTER, border=THIN_BORDER)
-
-    # ----- Data rows --------------------------------------------------------
-    data_row  = 4
-    mid_row   = 3    # separate pointer for middle section (starts at row 3 + 1 offset)
-    right_row = 4    # separate pointer for right section
-
-    # Right section: group totals by week
-    camp_names = [c["name"] for c in config["camps"]]
-    for ri, cn in enumerate(camp_names):
-        r = right_row + ri
-        _cell(ws, r, RT_LABEL, cn, font=BODY_FONT, fill=ALT_FILL if ri%2 else None, align=LEFT, border=THIN_BORDER)
+    # ===== RIGHT COLUMN: Group Totals by Week =====
+    _section_hdr(2, R_LABEL, R_END, "Group Totals by Week")
+    _week_subhdr(3)
+    rr = 4
+    for ci, cn in enumerate(camp_names):
+        fill = ALT_FILL if ci % 2 else None
+        _cell(ws, rr, R_LABEL, cn, font=T_BODY, fill=fill, align=LEFT, border=THIN_BORDER)
         for wi in range(8):
-            _cell(ws, r, RT_W1 + wi, camp_weeks[cn][wi],
-                  font=BODY_FONT, fill=ALT_FILL if ri%2 else None, align=CENTER, border=THIN_BORDER)
-
-    # Grand total row for right section
-    r_total = right_row + len(camp_names)
-    _cell(ws, r_total, RT_LABEL, "Total", font=TOTAL_FONT, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
+            _cell(ws, rr, R_W1 + wi, camp_weeks[cn][wi], font=T_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
+        rr += 1
+    _cell(ws, rr, R_LABEL, "Total", font=T_TOTAL, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
     for wi in range(8):
-        _cell(ws, r_total, RT_W1 + wi, grand_weeks[wi],
-              font=TOTAL_FONT, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
+        _cell(ws, rr, R_W1 + wi, grand_weeks[wi], font=T_TOTAL, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
+    rr += 2   # gap row
 
-    # Left section: per-bunk rows
-    for ci, camp in enumerate(config["camps"]):
-        cn = camp["name"]
-        for bi, bunk in enumerate(sorted(camp["bunks"], key=lambda b: int(b.get("number") or 999))):
-            bk = bunk["name"]
-            alt = (data_row % 2 == 0)
-            fill = ALT_FILL if alt else None
-            _cell(ws, data_row, LEFT_C, cn,  font=BODY_FONT, fill=fill, align=LEFT,   border=THIN_BORDER)
-            _cell(ws, data_row, LEFT_B, bk,  font=BODY_FONT, fill=fill, align=LEFT,   border=THIN_BORDER)
-            _cell(ws, data_row, LEFT_N, bunk_count.get(bk, 0),
-                  font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
-            data_row += 1
-
-    # Grand total row (left section)
-    _cell(ws, data_row, LEFT_C, "TOTAL", font=TOTAL_FONT, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
-    _cell(ws, data_row, LEFT_B, None,    font=TOTAL_FONT, fill=TOTAL_FILL, border=THIN_BORDER)
-    _cell(ws, data_row, LEFT_N, grand_total, font=TOTAL_FONT, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
-
-    # Middle section: consecutive rows (one per camp), independent of bunk rows
-    mid_row = 4
-    for ci, camp in enumerate(config["camps"]):
-        cn = camp["name"]
-        alt = (ci % 2 == 1)
-        fill = ALT_FILL if alt else None
-        _cell(ws, mid_row, MID_C, cn,            font=BODY_FONT,  fill=fill,       align=LEFT,   border=THIN_BORDER)
-        _cell(ws, mid_row, MID_T, camp_count[cn], font=BODY_FONT, fill=fill,       align=CENTER, border=THIN_BORDER)
-        mid_row += 1
-
-    # Grand total row (middle section)
-    _cell(ws, mid_row, MID_C, "Total",     font=TOTAL_FONT, fill=TOTAL_FILL, align=LEFT,   border=THIN_BORDER)
-    _cell(ws, mid_row, MID_T, grand_total, font=TOTAL_FONT, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
-
-    # ----- Bunk Totals by Week section (below right section gap) -----------
-    bunk_wk_start = r_total + 2
-    _cell(ws, bunk_wk_start, RT_LABEL, "Bunk Totals by Week",
-          font=HEADER_FONT, fill=BRAND_FILL, align=CENTER, border=THIN_BORDER)
-    ws.merge_cells(start_row=bunk_wk_start, start_column=RT_LABEL,
-                   end_row=bunk_wk_start, end_column=RT_W1+7)
-
-    # Sub-header
-    bwh = bunk_wk_start + 1
-    _cell(ws, bwh, RT_LABEL, None, fill=LGREY_FILL, border=THIN_BORDER)
-    for wi in range(8):
-        _cell(ws, bwh, RT_W1 + wi, f"#{wi+1}",
-              font=SUBHDR_FONT, fill=LGREY_FILL, align=CENTER, border=THIN_BORDER)
-
-    bwr = bwh + 1
-    all_bunks_ordered = []
-    for camp in config["camps"]:
-        all_bunks_ordered.extend([b["name"] for b in sorted(camp["bunks"], key=lambda b: int(b.get("number") or 999))])
-
+    # ===== RIGHT COLUMN: Bunk Totals by Week =====
+    _section_hdr(rr, R_LABEL, R_END, "Bunk Totals by Week"); rr += 1
+    _week_subhdr(rr); rr += 1
     for bi, bk in enumerate(all_bunks_ordered):
         if bk not in bunk_weeks:
             continue
-        alt = (bi % 2 == 1)
-        fill = ALT_FILL if alt else None
-        _cell(ws, bwr, RT_LABEL, bk, font=BODY_FONT, fill=fill, align=LEFT, border=THIN_BORDER)
+        fill = ALT_FILL if bi % 2 else None
+        _cell(ws, rr, R_LABEL, bk, font=T_BODY, fill=fill, align=LEFT, border=THIN_BORDER)
         for wi in range(8):
-            _cell(ws, bwr, RT_W1 + wi, bunk_weeks[bk][wi],
-                  font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
-        bwr += 1
-
-    # Grand total for bunk-by-week section
-    _cell(ws, bwr, RT_LABEL, "Total", font=TOTAL_FONT, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
+            _cell(ws, rr, R_W1 + wi, bunk_weeks[bk][wi], font=T_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
+        rr += 1
+    _cell(ws, rr, R_LABEL, "Total", font=T_TOTAL, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
     for wi in range(8):
-        _cell(ws, bwr, RT_W1 + wi, grand_weeks[wi],
-              font=TOTAL_FONT, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
+        _cell(ws, rr, R_W1 + wi, grand_weeks[wi], font=T_TOTAL, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
 
-    # ----- Column widths ----------------------------------------------------
-    ws.column_dimensions["A"].width = 10   # Camp
-    ws.column_dimensions["B"].width = 16   # Bunk
-    ws.column_dimensions["C"].width = 7    # Count
+    # ----- Row heights (taller) & column widths (wider, fill the page) ------
+    for row in range(1, max(left_last, rr) + 1):
+        ws.row_dimensions[row].height = ROW_H
+
+    ws.column_dimensions["A"].width = 12   # Camp
+    ws.column_dimensions["B"].width = 20   # Bunk
+    ws.column_dimensions["C"].width = 10   # Total
     ws.column_dimensions["D"].width = 3    # gap
-    ws.column_dimensions["E"].width = 10   # Camp
-    ws.column_dimensions["F"].width = 7    # Total
-    ws.column_dimensions["G"].width = 3    # gap
-    ws.column_dimensions["H"].width = 3    # gap
-    ws.column_dimensions["I"].width = 18   # Label
+    ws.column_dimensions[get_column_letter(R_LABEL)].width = 22   # Label
     for wi in range(8):
-        ws.column_dimensions[get_column_letter(RT_W1 + wi)].width = 6
+        ws.column_dimensions[get_column_letter(R_W1 + wi)].width = 9
 
-    # ---- Print settings: landscape, single page ----------------------------
+    # ---- Print settings: landscape, fill width, flow down as needed --------
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToPage   = True
     ws.page_setup.fitToWidth  = 1
-    ws.page_setup.fitToHeight = 1
+    ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_margins.left   = 0.25
+    ws.page_margins.right  = 0.25
+    ws.page_margins.top    = 0.5
+    ws.page_margins.bottom = 0.5
 
 
 # ---------------------------------------------------------------------------
