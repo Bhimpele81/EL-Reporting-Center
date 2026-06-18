@@ -12,6 +12,11 @@ import uuid
 import threading
 import urllib.request
 from datetime import datetime
+try:
+    from zoneinfo import ZoneInfo
+    _EASTERN = ZoneInfo("America/New_York")
+except Exception:
+    _EASTERN = None
 import boto3
 from botocore.exceptions import ClientError
 from flask import Flask, request, jsonify, send_file, render_template_string
@@ -125,11 +130,11 @@ _PROTECTED_KEYS   = {"bunk_config.json", MASTER_KEY, MASTER_META_KEY}
 
 def _save_master(file_bytes: bytes, filename: str) -> dict:
     """Persist the uploaded master sheet (S3 if configured, plus local copy)."""
+    now = datetime.now(_EASTERN) if _EASTERN else datetime.now()
+    fmt = "%#m/%#d/%Y %#I:%M %p %Z" if os.name == "nt" else "%-m/%-d/%Y %-I:%M %p %Z"
     meta = {
         "filename":    filename or "master",
-        "uploaded_at": datetime.now().strftime("%-m/%-d/%Y %-I:%M %p")
-                       if os.name != "nt" else
-                       datetime.now().strftime("%#m/%#d/%Y %#I:%M %p"),
+        "uploaded_at": now.strftime(fmt).strip(),
         "size":        len(file_bytes),
     }
     try:
