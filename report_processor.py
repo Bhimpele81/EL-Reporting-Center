@@ -367,12 +367,19 @@ def _cell(ws, row, col, value, font=None, fill=None, align=None, border=None):
 def build_report_sheet(ws, campers: list, bunk_lookup: dict,
                         ordered_bunks: list, report_date: date):
 
+    # ----- Local (larger) fonts for the Report sheet ------------------------
+    # Defined locally so they don't change the Totals sheet's shared styles.
+    R_DATE   = Font(name="Calibri", bold=True, size=12)
+    R_HEADER = Font(name="Calibri", bold=True, color=WHITE, size=12)
+    R_BODY   = Font(name="Calibri", size=14)
+    R_TOTAL  = Font(name="Calibri", bold=True, size=14)
+
     # ----- Row 1: date header -----------------------------------------------
-    ws.row_dimensions[1].height = 18
-    _cell(ws, 1, 1, "Report Date:", font=DATE_FONT, align=RIGHT)
+    ws.row_dimensions[1].height = 20
+    _cell(ws, 1, 1, "Report Date:", font=R_DATE, align=RIGHT)
     _cell(ws, 1, 2, report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
           else report_date.strftime("%#m/%#d/%Y"),
-          font=DATE_FONT, align=Alignment(horizontal="center", vertical="center"))
+          font=R_DATE, align=Alignment(horizontal="center", vertical="center"))
 
     # ----- Column layout (Bunk column removed) ------------------------------
     #   A(1)=Child   B-I(2-9)=#1-#8   J-N(10-14)=Days M T W R F
@@ -386,21 +393,23 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     COL_GRADE = 16
     LAST_COL  = 16
 
-    BUNK_TITLE_FONT = Font(name="Calibri", bold=True, color=WHITE, size=14)
+    BUNK_TITLE_FONT = Font(name="Calibri", bold=True, color=WHITE, size=18)
 
     def _write_col_headers(hr):
-        ws.row_dimensions[hr].height = 15
+        ws.row_dimensions[hr].height = 20
         for ci, h in [(COL_CHILD, "Child"),
                       (2, "#1"), (3, "#2"), (4, "#3"), (5, "#4"),
                       (6, "#5"), (7, "#6"), (8, "#7"), (9, "#8"),
                       (COL_AGE, "Age"), (COL_GRADE, "Grade")]:
             c = ws.cell(row=hr, column=ci, value=h)
-            c.font = HEADER_FONT; c.fill = BRAND_FILL
-            c.alignment = CENTER; c.border = THIN_BORDER
+            c.font = R_HEADER; c.fill = BRAND_FILL; c.alignment = CENTER
+            # No gridlines through the week columns (B-I)
+            if not (COL_WK1 <= ci <= COL_WK1 + 7):
+                c.border = THIN_BORDER
         ws.merge_cells(start_row=hr, start_column=COL_DAY1,
                        end_row=hr,   end_column=COL_DAY1 + 4)
         dcell = ws.cell(row=hr, column=COL_DAY1, value="Days")
-        dcell.font = HEADER_FONT; dcell.fill = BRAND_FILL
+        dcell.font = R_HEADER; dcell.fill = BRAND_FILL
         dcell.alignment = CENTER; dcell.border = THIN_BORDER
         for di in range(1, 5):
             ws.cell(row=hr, column=COL_DAY1 + di).border = THIN_BORDER
@@ -433,7 +442,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
         bt.alignment = CENTER; bt.border = THIN_BORDER
         for ci in range(2, LAST_COL + 1):
             ws.cell(row=row, column=ci).border = THIN_BORDER
-        ws.row_dimensions[row].height = 22
+        ws.row_dimensions[row].height = 28
         row += 1
 
         # --- Column headers (repeated under each bunk banner) ---
@@ -441,20 +450,22 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
         row += 1
 
         for ci, camper in enumerate(group):
+            ws.row_dimensions[row].height = 24
             alt = (ci % 2 == 1)
             fill = ALT_FILL if alt else None
 
-            _cell(ws, row, COL_CHILD, camper["name"], font=BODY_FONT, fill=fill, align=LEFT, border=THIN_BORDER)
+            _cell(ws, row, COL_CHILD, camper["name"], font=R_BODY, fill=fill, align=LEFT, border=THIN_BORDER)
             max_a_len = max(max_a_len, len(str(camper["name"] or "")))
 
+            # Week columns (B-I): no gridlines — value only (alt shading kept)
             for wi, wv in enumerate(camper["weeks"]):
                 _cell(ws, row, COL_WK1 + wi, wv,
-                      font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
+                      font=R_BODY, fill=fill, align=CENTER)
                 week_sums[wi] += wv
 
             for di, dv in enumerate(camper["days"]):
                 _cell(ws, row, COL_DAY1 + di, dv,
-                      font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
+                      font=R_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
 
             # Store age/grade as numbers — try float first to handle decimals
             age_val = camper["age"]
@@ -464,16 +475,18 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
             try: grade_val = int(float(str(grade_val).strip()))
             except (ValueError, TypeError): grade_val = None
 
-            _cell(ws, row, COL_AGE,   age_val,   font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
-            _cell(ws, row, COL_GRADE, grade_val, font=BODY_FONT, fill=fill, align=CENTER, border=THIN_BORDER)
+            _cell(ws, row, COL_AGE,   age_val,   font=R_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
+            _cell(ws, row, COL_GRADE, grade_val, font=R_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
             row += 1
 
         # --- Subtotal row: total count under the names in column A ---
+        ws.row_dimensions[row].height = 24
         _cell(ws, row, COL_CHILD, f"Total:   {len(group)}",
-              font=TOTAL_FONT, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
+              font=R_TOTAL, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
+        # Week-sum cells (B-I): no gridlines, fill only
         for wi, wsum in enumerate(week_sums):
             _cell(ws, row, COL_WK1 + wi, wsum,
-                  font=TOTAL_FONT, fill=TOTAL_FILL, align=CENTER, border=THIN_BORDER)
+                  font=R_TOTAL, fill=TOTAL_FILL, align=CENTER)
         for di in range(5):
             _cell(ws, row, COL_DAY1 + di, None, fill=TOTAL_FILL, border=THIN_BORDER)
         _cell(ws, row, COL_AGE,   None, fill=TOTAL_FILL, border=THIN_BORDER)
@@ -484,15 +497,15 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
         if bk_idx < len(display_order) - 1:
             ws.row_breaks.append(Break(id=row - 1))
 
-    # ----- Column widths ----------------------------------------------------
+    # ----- Column widths (wider to use the freed-up space) ------------------
     last_row = row - 1
-    ws.column_dimensions["A"].width = max(12, int(max_a_len * 0.95))
+    ws.column_dimensions["A"].width = max(20, int(max_a_len * 1.15))
     for col_letter in [get_column_letter(c) for c in range(COL_WK1, COL_WK1 + 8)]:
-        ws.column_dimensions[col_letter].width = 5   # #1-#8
+        ws.column_dimensions[col_letter].width = 8   # #1-#8
     for col_letter in [get_column_letter(c) for c in range(COL_DAY1, COL_DAY1 + 5)]:
-        ws.column_dimensions[col_letter].width = 4   # M T W R F
-    ws.column_dimensions[get_column_letter(COL_AGE)].width   = 6
-    ws.column_dimensions[get_column_letter(COL_GRADE)].width = 6
+        ws.column_dimensions[col_letter].width = 6   # M T W R F
+    ws.column_dimensions[get_column_letter(COL_AGE)].width   = 8
+    ws.column_dimensions[get_column_letter(COL_GRADE)].width = 8
 
     # ----- Suppress green error indicators in Age/Grade --------------------
     # openpyxl 3.1.x has no IgnoredErrors helper — inject XML directly
@@ -510,6 +523,10 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
             err.set("formulaRange", "1")
         except Exception:
             pass
+
+    # Hide default gridlines; structure comes from the drawn borders, leaving
+    # the week columns (B-I, which have no borders) clean.
+    ws.sheet_view.showGridLines = False
 
     # Freeze the date row
     ws.freeze_panes = "A2"
