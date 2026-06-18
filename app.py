@@ -112,6 +112,10 @@ def _s3_delete_old(keep: int = 10) -> None:
 # Saved master sheet — uploaded once, reused for every report until replaced
 # ---------------------------------------------------------------------------
 
+# Reports that take a camp-week selection
+WEEK_AWARE_REPORTS = {"driver_totals", "group_attendance",
+                      "am_extend", "pm_extend", "pm_grp_extend"}
+
 MASTER_KEY        = "current_master.dat"
 MASTER_META_KEY   = "current_master_meta.json"
 LOCAL_MASTER      = os.path.join(UPLOAD_DIR, "current_master.dat")
@@ -329,8 +333,10 @@ def api_process():
 
     job_id     = uuid.uuid4().hex[:8]
 
+    # Week-specific reports: Driver Totals highlights the week; the others
+    # filter campers to those enrolled in the selected week.
     week_num = None
-    if report_type == "driver_totals":
+    if report_type in WEEK_AWARE_REPORTS:
         try:
             week_num = int(request.form.get("week_num", 0))
             if week_num < 1 or week_num > 8:
@@ -776,7 +782,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       <span class="card-num">★</span>
       <div>
         <div class="card-title">Select Camp Week</div>
-        <div class="card-hint">Names attending the selected week will be highlighted yellow</div>
+        <div class="card-hint">Only campers enrolled in the selected week are included. (Driver Totals instead highlights that week's campers in yellow.)</div>
       </div>
     </div>
     <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.25rem">
@@ -993,6 +999,9 @@ document.getElementById('master-clear').addEventListener('click', async () => {
   loadMaster();
 });
 
+// Reports that use a camp-week selection
+const WEEK_AWARE = ['driver_totals','group_attendance','am_extend','pm_extend','pm_grp_extend'];
+
 // Report type buttons
 document.querySelectorAll('.rtype-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1000,7 +1009,7 @@ document.querySelectorAll('.rtype-btn').forEach(btn => {
     btn.classList.add('active');
     selectedReportType = btn.dataset.rtype;
     document.getElementById('week-card').style.display =
-      selectedReportType === 'driver_totals' ? '' : 'none';
+      WEEK_AWARE.includes(selectedReportType) ? '' : 'none';
     updateRunBtn();
   });
 });
@@ -1062,7 +1071,7 @@ document.getElementById('run-btn').addEventListener('click', async () => {
   const fd = new FormData();
   if (excelFile) fd.append('excel_file', excelFile);   // omit to reuse saved master
   fd.append('report_type', selectedReportType);
-  if (selectedReportType === 'driver_totals') fd.append('week_num', selectedWeek);
+  if (WEEK_AWARE.includes(selectedReportType)) fd.append('week_num', selectedWeek);
 
   try {
     const res  = await fetch('/api/process', {method: 'POST', body: fd});

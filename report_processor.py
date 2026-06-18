@@ -1876,6 +1876,16 @@ def process_report(file_bytes: bytes, report_type: str,
     except Exception:
         master = None
 
+    def _week_filter(campers):
+        """For week-specific reports off the master, keep only campers enrolled
+        in the selected week. (Old per-report exports carry no week info, so the
+        filter only applies when running from a master.)"""
+        if master is not None and week_num and 1 <= week_num <= 8:
+            return [c for c in campers
+                    if c.get("weeks") and len(c["weeks"]) >= week_num
+                    and c["weeks"][week_num - 1]]
+        return campers
+
     # ---- Bunk Snapshot ----
     if report_type == "bunk_snapshot":
         try:
@@ -1912,6 +1922,7 @@ def process_report(file_bytes: bytes, report_type: str,
             campers = master if master is not None else parse_group_attendance(file_bytes)
         except Exception as e:
             return {"success": False, "message": f"Could not parse file: {e}"}
+        campers = _week_filter(campers)
         if not campers:
             return {"success": False, "message": "No camper data found in file. Check the file format."}
 
@@ -1938,6 +1949,7 @@ def process_report(file_bytes: bytes, report_type: str,
                        else parse_extend(file_bytes, period="am"))
         except Exception as e:
             return {"success": False, "message": f"Could not parse file: {e}"}
+        campers = _week_filter(campers)
         if not campers:
             return {"success": False, "message": "No AM Extended campers found in file."}
 
@@ -1964,6 +1976,7 @@ def process_report(file_bytes: bytes, report_type: str,
                        else parse_extend(file_bytes, period="pm"))
         except Exception as e:
             return {"success": False, "message": f"Could not parse file: {e}"}
+        campers = _week_filter(campers)
         if not campers:
             return {"success": False, "message": "No PM Extended campers found in file."}
 
@@ -1986,7 +1999,7 @@ def process_report(file_bytes: bytes, report_type: str,
     # ---- PM GRP Extend ----
     if report_type == "pm_grp_extend":
         try:
-            campers = (assign_pm_groups(master_extend_campers(master, "pm"), config)
+            campers = (assign_pm_groups(_week_filter(master_extend_campers(master, "pm")), config)
                        if master is not None
                        else parse_pm_grp_extend(file_bytes, config))
         except Exception as e:
