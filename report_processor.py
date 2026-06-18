@@ -614,12 +614,12 @@ def build_totals_sheet(ws, campers: list, config: dict,
     grand_weeks = [sum(camp_weeks[c][wi] for c in camp_weeks) for wi in range(8)]
 
     # ---- Larger local fonts + layout --------------------------------------
-    T_HDR   = Font(name="Calibri", bold=True, color=WHITE, size=13)
-    T_SUB   = Font(name="Calibri", bold=True, size=12)
-    T_BODY  = Font(name="Calibri", size=12)
-    T_TOTAL = Font(name="Calibri", bold=True, size=12)
-    T_DATE  = Font(name="Calibri", bold=True, size=11)
-    ROW_H   = 14
+    T_HDR   = Font(name="Calibri", bold=True, color=WHITE, size=14)
+    T_SUB   = Font(name="Calibri", bold=True, size=13)
+    T_BODY  = Font(name="Calibri", size=13)
+    T_TOTAL = Font(name="Calibri", bold=True, size=13)
+    T_DATE  = Font(name="Calibri", bold=True, size=12)
+    ROW_H   = 17
 
     #  LEFT column  : A=Camp  B=Bunk  C=Total  (Bunk Totals, then Group Totals below)
     #  GAP          : col D
@@ -725,18 +725,17 @@ def build_totals_sheet(ws, campers: list, config: dict,
     for row in range(1, max(left_last, rr) + 1):
         ws.row_dimensions[row].height = ROW_H
 
-    # Wide enough that the table fills the full landscape width (so it reads
-    # as a horizontal page, not a square block centered with side whitespace)
-    ws.column_dimensions["A"].width = 13   # Camp
-    ws.column_dimensions["B"].width = 24   # Bunk
-    ws.column_dimensions["C"].width = 11   # Total
+    # Sized to fill a portrait (tall) page top-to-bottom and edge-to-edge
+    ws.column_dimensions["A"].width = 10   # Camp
+    ws.column_dimensions["B"].width = 19   # Bunk
+    ws.column_dimensions["C"].width = 8    # Total
     ws.column_dimensions["D"].width = 2    # gap
-    ws.column_dimensions[get_column_letter(R_LABEL)].width = 22   # Label
+    ws.column_dimensions[get_column_letter(R_LABEL)].width = 19   # Label
     for wi in range(8):
-        ws.column_dimensions[get_column_letter(R_W1 + wi)].width = 10.5
+        ws.column_dimensions[get_column_letter(R_W1 + wi)].width = 6
 
-    # ---- Print settings: landscape, scaled to a SINGLE page ----------------
-    ws.page_setup.orientation = "landscape"
+    # ---- Print settings: portrait (tall), scaled to a SINGLE page ----------
+    ws.page_setup.orientation = "portrait"
     ws.page_setup.fitToPage   = True
     ws.page_setup.fitToWidth  = 1
     ws.page_setup.fitToHeight = 1
