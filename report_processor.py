@@ -1920,6 +1920,7 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
         return cell
 
     banner_rows = []
+    skip_border_rows = set()   # banner + legend rows excluded from separators
 
     def _headers(hr):
         ws.row_dimensions[hr].height = 22
@@ -1927,6 +1928,21 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
             wk_hl = bool(week_num and ci == COL_WK1 + week_num - 1)
             _c(hr, ci, h, font=F_HDR, align=(LEFT if ci == COL_CHILD else CTR),
                fill=(WEEK_FILL if wk_hl else None))
+
+    def _legend(r):
+        """Color key footer under the Age/Grade columns. Returns next free row."""
+        wrap = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        ws.row_dimensions[r].height = 22
+        ws.merge_cells(start_row=r, start_column=COL_DAY1, end_row=r, end_column=COL_GRADE)
+        g = ws.cell(row=r, column=COL_DAY1, value="Booster Required")
+        g.font = F_BOLD; g.alignment = wrap; g.fill = AGE_WARN
+        ws.row_dimensions[r + 1].height = 34
+        ws.merge_cells(start_row=r + 1, start_column=COL_DAY1, end_row=r + 1, end_column=COL_GRADE)
+        o = ws.cell(row=r + 1, column=COL_DAY1,
+                    value="Must Walk Camper to Jr Pavilion/Preschool Building in AM")
+        o.font = F_BOLD; o.alignment = wrap; o.fill = BUNK_WARN
+        skip_border_rows.update({r, r + 1})
+        return r + 2
 
     # ----- Group + sort campers by driver -----------------------------------
     driver_groups: dict = {}
@@ -1993,6 +2009,9 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
         _c(row, COL_CHILD, f"Total Campers: {count}", font=F_BOLD, align=LEFT)
         row += 1
 
+        # Color-key legend (footer) on each driver's page
+        row = _legend(row)
+
         ws.row_breaks.append(Break(id=row - 1))   # each driver on its own page
 
     # ----- Grand totals (own page) ------------------------------------------
@@ -2010,9 +2029,9 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
 
     # ----- Vertical separators (no full grid): right of Stp#, #8, and F -----
     _vert = Side(style="thin", color="000000")
-    banner_set = set(banner_rows)
+    skip = set(banner_rows) | skip_border_rows
     for r in range(1, row + 1):
-        if r in banner_set:
+        if r in skip:
             continue
         for col in (COL_STOP, COL_WK1 + 7, COL_DAY1 + 4):
             ws.cell(row=r, column=col).border = Border(right=_vert)

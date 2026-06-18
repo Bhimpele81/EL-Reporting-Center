@@ -1015,7 +1015,7 @@ async function loadMaster() {
       document.getElementById('master-banner-text').innerHTML =
         `Using saved master: <strong>${d.filename || 'master sheet'}</strong>` +
         (d.uploaded_at ? ` &middot; uploaded ${d.uploaded_at}` : '') +
-        `. Reports use this unless you upload a new file.`;
+        `. Reports and Labels will use this data until an updated file is uploaded.`;
       banner.style.display = 'flex';
     } else {
       banner.style.display = 'none';
