@@ -66,6 +66,27 @@ def _bunk_num(bunk_name) -> int:
     return int(m.group(1)) if m else 9999
 
 
+def _bunk_sort_key(bunk_name):
+    """Group/print order for bunks:
+       0) numbered bunks (incl. PT CITs) by number
+       1) FT CITs (after PT CITs)
+       2) any other named bunk
+       3) Staff Transport, then unassigned (blank) — always last.
+    """
+    b  = str(bunk_name).strip()
+    bl = b.lower()
+    m  = re.match(r'^(\d+)', b)
+    if m:
+        return (0, int(m.group(1)), bl)
+    if "ft cit" in bl:
+        return (1, 0, bl)
+    if not b:
+        return (3, 1, bl)            # unassigned / blank bunk — very last
+    if "staff transport" in bl:
+        return (3, 0, bl)            # Staff Transport — last group
+    return (2, 0, bl)
+
+
 # ---------------------------------------------------------------------------
 # Grade normalizer
 # ---------------------------------------------------------------------------
@@ -424,7 +445,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     for bk in bunk_groups:
         bunk_groups[bk].sort(key=lambda x: x["name"])
 
-    display_order = sorted(bunk_groups.keys(), key=lambda bk: (_bunk_num(bk), bk))
+    display_order = sorted(bunk_groups.keys(), key=_bunk_sort_key)
 
     # ----- Write rows -------------------------------------------------------
     # No global date row (date is in the footer); bunk blocks start at row 1.
@@ -830,7 +851,7 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
 
     campers_sorted = sorted(
         campers,
-        key=lambda c: (_bunk_num(c["bunk"]), c["bunk"], c["name"])
+        key=lambda c: (_bunk_sort_key(c["bunk"]), c["name"])
     )
 
     seen, groups = [], {}
@@ -984,10 +1005,13 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
     ws.sheet_properties.pageSetUpPr.fitToPage = True
 
     # ---- Margins (inches) ----
+    # Larger bottom margin so the big 32pt legend footer never overlaps the
+    # last data row on multi-page reports.
     ws.page_margins.top    = 0.5
-    ws.page_margins.bottom = 0.5
+    ws.page_margins.bottom = 0.9
     ws.page_margins.left   = 0.25
     ws.page_margins.right  = 0.25
+    ws.page_margins.footer = 0.3
 
 
 # ---------------------------------------------------------------------------
