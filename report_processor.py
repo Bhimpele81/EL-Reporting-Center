@@ -1113,7 +1113,7 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
     F_TIME = Font(name=FONT_NAME, bold=True,  size=11)
     F_DAYS = Font(name=FONT_NAME, bold=False, size=11)
     F_WEEK = Font(name=FONT_NAME, bold=True,  size=11)
-    F_X    = Font(name=FONT_NAME, bold=False, size=14, color="BBBBBB")  # lightly greyed X
+    F_X    = Font(name=FONT_NAME, bold=False, size=14, color="808080")  # greyed X (visible on shaded rows)
 
     DATA_H = 30.0 if is_pm else 23.75   # taller PM rows → ~25 names per page
     HDR_BORDER = B_HDR_FULL if is_pm else T_BOT_MED
