@@ -2034,7 +2034,7 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
     for r in range(1, row + 1):
         if r in skip:
             continue
-        for col in (COL_STOP, COL_WK1 + 7, COL_DAY1 + 4):
+        for col in (COL_STOP, COL_BUNK, COL_WK1 + 7, COL_DAY1 + 4):
             ws.cell(row=r, column=col).border = Border(right=_vert)
 
     # ----- Column widths (fill the landscape width) -------------------------
@@ -2042,9 +2042,9 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
     ws.column_dimensions["B"].width = 6    # Stp#
     ws.column_dimensions["C"].width = 22   # Bunk
     for wi in range(8):
-        ws.column_dimensions[get_column_letter(COL_WK1 + wi)].width = 6
+        ws.column_dimensions[get_column_letter(COL_WK1 + wi)].width = 7
     for di in range(5):
-        ws.column_dimensions[get_column_letter(COL_DAY1 + di)].width = 5
+        ws.column_dimensions[get_column_letter(COL_DAY1 + di)].width = 3.5
     ws.column_dimensions[get_column_letter(COL_AGE)].width   = 7
     ws.column_dimensions[get_column_letter(COL_GRADE)].width = 9
 
