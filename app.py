@@ -119,7 +119,8 @@ def _s3_delete_old(keep: int = 10) -> None:
 
 # Reports that take a camp-week selection
 WEEK_AWARE_REPORTS = {"driver_totals", "group_attendance",
-                      "am_extend", "pm_extend", "pm_grp_extend", "inter_labels"}
+                      "am_extend", "pm_extend", "pm_grp_extend",
+                      "inter_labels", "jr_transport_labels"}
 
 MASTER_KEY        = "current_master.dat"
 MASTER_META_KEY   = "current_master_meta.json"
@@ -374,7 +375,12 @@ _XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 _DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 def _mime_for(filename: str) -> str:
-    return _DOCX_MIME if filename.lower().endswith(".docx") else _XLSX_MIME
+    fn = filename.lower()
+    if fn.endswith(".docx"):
+        return _DOCX_MIME
+    if fn.endswith(".zip"):
+        return "application/zip"
+    return _XLSX_MIME
 
 
 @app.route("/api/download/<job_id>")
@@ -794,6 +800,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="rtype-section-hd labels">🏷️ Labels <span style="font-weight:500;text-transform:none;opacity:.7">(Word · Avery 5960)</span></div>
     <div class="report-types">
         <button class="rtype-btn" data-rtype="inter_labels">Inter</button>
+        <button class="rtype-btn" data-rtype="jr_transport_labels">Jr. Transportation</button>
     </div>
   </div>
 
@@ -1021,7 +1028,7 @@ document.getElementById('master-clear').addEventListener('click', async () => {
 });
 
 // Reports that use a camp-week selection
-const WEEK_AWARE = ['driver_totals','group_attendance','am_extend','pm_extend','pm_grp_extend','inter_labels'];
+const WEEK_AWARE = ['driver_totals','group_attendance','am_extend','pm_extend','pm_grp_extend','inter_labels','jr_transport_labels'];
 
 // Report type buttons
 document.querySelectorAll('.rtype-btn').forEach(btn => {

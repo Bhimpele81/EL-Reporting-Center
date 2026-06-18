@@ -1549,6 +1549,7 @@ def parse_master(file_bytes: bytes):
             "gender":     gender,
             "am_time":    am_time,
             "pm_time":    pm_time,
+            "extra":      extra,           # raw 'Enrollment extra names' text
         })
 
     return records
@@ -1579,12 +1580,9 @@ def _label_days_text(sched: str) -> str:
     return ", ".join(_DAY_FULL[c] for c in "MTWRF" if c in sched)
 
 
-def build_group_labels_docx(records: list, config: dict, group_name: str = "Inter") -> tuple:
-    """
-    Build an Avery 5960 Word label sheet for all campers in a camp/group.
-    Each label: line 1 = bunk, line 2 = camper, line 3 = days attending camp.
-    Returns (docx_bytes, label_count).
-    """
+def _avery5960_docx(rows3: list) -> bytes:
+    """Render a list of (line1, line2, line3) tuples onto an Avery 5960 sheet
+    (3 x 10, 2.625" x 1"). Returns the .docx bytes."""
     import io as _io
     from docx import Document
     from docx.shared import Inches, Pt
@@ -1592,21 +1590,6 @@ def build_group_labels_docx(records: list, config: dict, group_name: str = "Inte
     from docx.enum.table import WD_ALIGN_VERTICAL
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
-
-    # Which bunks belong to the requested group?
-    bunk_camp = {}
-    for camp in config.get("camps", []):
-        cn = camp.get("name", "")
-        for b in camp.get("bunks", []):
-            bunk_camp[_norm(b.get("name", "")).lower()] = cn
-    gl = group_name.strip().lower()
-
-    def _in_group(bk):
-        cn = bunk_camp.get(_norm(bk).lower())
-        return bool(cn) and cn.strip().lower().startswith(gl)
-
-    labels = [r for r in records if _in_group(r["bunk"])]
-    labels.sort(key=lambda r: (_bunk_sort_key(r["bunk"]), r["name"].lower()))
 
     doc = Document()
     sec = doc.sections[0]
@@ -1618,18 +1601,17 @@ def build_group_labels_docx(records: list, config: dict, group_name: str = "Inte
     sec.right_margin  = Inches(0.19)
 
     COLS = 3
-    n = len(labels)
+    n = len(rows3)
     nrows = max(1, (n + COLS - 1) // COLS)
-    # 5 columns: label | spacer | label | spacer | label
     col_w = [Inches(2.625), Inches(0.125), Inches(2.625), Inches(0.125), Inches(2.625)]
     table = doc.add_table(rows=nrows, cols=5)
     table.allow_autofit = False
-    tblPr = table._tbl.tblPr
-    layout = OxmlElement("w:tblLayout"); layout.set(qn("w:type"), "fixed"); tblPr.append(layout)
+    layout = OxmlElement("w:tblLayout"); layout.set(qn("w:type"), "fixed")
+    table._tbl.tblPr.append(layout)
 
-    def _fill(cell, bunk, name, days):
+    def _fill(cell, l1, l2, l3):
         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-        for i, (text, sz, bold) in enumerate([(bunk, 10, True), (name, 14, True), (days, 9, False)]):
+        for i, (text, sz, bold) in enumerate([(l1, 10, True), (l2, 14, True), (l3, 10, False)]):
             p = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             pf = p.paragraph_format
@@ -1649,11 +1631,80 @@ def build_group_labels_docx(records: list, config: dict, group_name: str = "Inte
             if ci % 2 == 1:
                 continue   # spacer column
             if li < n:
-                r = labels[li]; li += 1
-                _fill(cell, r["bunk"], r["name"], _label_days_text(r.get("days_sched")))
+                _fill(cell, *rows3[li]); li += 1
 
     buf = _io.BytesIO(); doc.save(buf); buf.seek(0)
-    return buf.read(), n
+    return buf.read()
+
+
+def _group_bunks(config: dict, group_name: str):
+    """Return a predicate: does this bunk belong to the named camp/group?"""
+    bunk_camp = {}
+    for camp in config.get("camps", []):
+        cn = camp.get("name", "")
+        for b in camp.get("bunks", []):
+            bunk_camp[_norm(b.get("name", "")).lower()] = cn
+    gl = group_name.strip().lower()
+
+    def _in_group(bk):
+        cn = bunk_camp.get(_norm(bk).lower())
+        return bool(cn) and cn.strip().lower().startswith(gl)
+    return _in_group
+
+
+def build_group_labels_docx(records: list, config: dict, group_name: str = "Inter") -> tuple:
+    """
+    Avery 5960 labels for all campers in a camp/group.
+    Each label: bunk / camper / days attending. Returns (docx_bytes, count).
+    """
+    in_group = _group_bunks(config, group_name)
+    labels = sorted((r for r in records if in_group(r["bunk"])),
+                    key=lambda r: (_bunk_sort_key(r["bunk"]), r["name"].lower()))
+    rows3 = [(r["bunk"], r["name"], _label_days_text(r.get("days_sched"))) for r in labels]
+    return _avery5960_docx(rows3), len(rows3)
+
+
+def build_jr_transport_labels_zip(records: list, config: dict) -> tuple:
+    """
+    Junior-group transportation labels, split into three Avery 5960 sheets
+    (each a separate .docx in a zip, so each can print on its own label color):
+
+      • Trans    — has 2-Way or PM-Only Transportation; line 3 = "Trans - <driver>"
+      • Pm ext   — has a Drop-off enrollment;            line 3 = "Pm ext"
+      • Car line — none of the above;                    line 3 = "Car line"
+
+    Returns (zip_bytes, {group: count}).
+    """
+    import io as _io, zipfile
+
+    in_group = _group_bunks(config, "Junior")
+    juniors = sorted((r for r in records if in_group(r["bunk"])),
+                     key=lambda r: (_bunk_sort_key(r["bunk"]), r["name"].lower()))
+
+    trans, pmext, carline = [], [], []
+    for r in juniors:
+        ex = (r.get("extra") or "").lower()
+        if "2-way" in ex or "pm only trans" in ex:
+            drv = (r.get("driver") or "").strip()
+            trans.append((r["bunk"], r["name"], f"Trans - {drv}" if drv else "Trans"))
+        elif "drop-off" in ex:
+            pmext.append((r["bunk"], r["name"], "Pm ext"))
+        else:
+            carline.append((r["bunk"], r["name"], "Car line"))
+
+    files = [
+        ("Jr Transportation - Trans.docx",    trans),
+        ("Jr Transportation - PM Ext.docx",   pmext),
+        ("Jr Transportation - Car Line.docx", carline),
+    ]
+    buf = _io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for fname, rows3 in files:
+            if rows3:
+                zf.writestr(fname, _avery5960_docx(rows3))
+    buf.seek(0)
+    counts = {"Trans": len(trans), "Pm ext": len(pmext), "Car line": len(carline)}
+    return buf.read(), counts
 
 
 def build_pm_grp_extend_sheet(ws, campers: list) -> None:
@@ -2007,7 +2058,7 @@ def process_report(file_bytes: bytes, report_type: str,
                    config: dict, job_id: str, output_dir: str,
                    week_num: int = None) -> dict:
 
-    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend", "driver_totals", "inter_labels")
+    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend", "driver_totals", "inter_labels", "jr_transport_labels")
     if report_type not in supported:
         return {
             "success": False,
@@ -2223,4 +2274,30 @@ def process_report(file_bytes: bytes, report_type: str,
             "message":  f"Created {count} labels for Group Inter.",
             "filename": out_filename,
             "rows":     count,
+        }
+
+    # ---- Jr. Transportation Labels (Word / Avery 5960, 3 sheets in a zip) ----
+    if report_type == "jr_transport_labels":
+        if master is None:
+            return {"success": False, "message": "Jr. Transportation Labels needs a master sheet. Upload the master report."}
+        try:
+            zip_bytes, counts = build_jr_transport_labels_zip(_week_filter(master), config)
+        except Exception as e:
+            return {"success": False, "message": f"Could not build labels: {e}"}
+        total = sum(counts.values())
+        if not total:
+            return {"success": False, "message": "No Junior campers attending the selected week."}
+
+        out_filename = f"Jr Transportation Labels {report_date.strftime('%m%d%Y')}.zip"
+        out_path = os.path.join(output_dir, out_filename)
+        with open(out_path, "wb") as f:
+            f.write(zip_bytes)
+
+        return {
+            "success":  True,
+            "message":  (f"Created {total} Junior labels — Trans {counts['Trans']}, "
+                         f"Pm ext {counts['Pm ext']}, Car line {counts['Car line']} "
+                         f"(3 sheets in the zip)."),
+            "filename": out_filename,
+            "rows":     total,
         }
