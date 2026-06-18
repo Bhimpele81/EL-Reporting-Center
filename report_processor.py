@@ -2298,7 +2298,7 @@ def process_report(file_bytes: bytes, report_type: str,
         if not total:
             return {"success": False, "message": "No Junior campers attending the selected week."}
 
-        out_filename = f"Jr Transportation Labels {report_date.strftime('%m%d%Y')}.docx"
+        out_filename = f"Junior Labels {report_date.strftime('%m%d%Y')}.docx"
         out_path = os.path.join(output_dir, out_filename)
         with open(out_path, "wb") as f:
             f.write(docx_bytes)

@@ -800,7 +800,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="rtype-section-hd labels">🏷️ Labels <span style="font-weight:500;text-transform:none;opacity:.7">(Word · Avery 5960)</span></div>
     <div class="report-types">
         <button class="rtype-btn" data-rtype="inter_labels">Inter</button>
-        <button class="rtype-btn" data-rtype="jr_transport_labels">Jr. Transportation</button>
+        <button class="rtype-btn" data-rtype="jr_transport_labels">Junior</button>
     </div>
   </div>
 
