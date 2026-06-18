@@ -892,7 +892,7 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
 
     date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
                 else report_date.strftime("%#m/%#d/%Y"))
-    c = ws.cell(row=1, column=8, value=f"Report Date: {date_str}")
+    c = ws.cell(row=1, column=8, value=f"Printed: {date_str}")
     c.font = F_DATE_HDR; c.alignment = RIGHT_AL
 
     # ---- Row 2: column headers ----
