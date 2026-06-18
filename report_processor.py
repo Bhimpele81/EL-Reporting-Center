@@ -1468,6 +1468,7 @@ def parse_master(file_bytes: bytes):
         return str(row[col]).strip() if (col is not None and col < len(row)) else ""
 
     records = []
+    seen = set()   # de-duplicate campers listed more than once (same name + bunk)
     for row in rows[1:]:
         if len(row) < 4 or not str(row[0]).strip().isdigit():
             continue
@@ -1475,6 +1476,10 @@ def parse_master(file_bytes: bytes):
         last  = _val(row, last_col)
         first = _val(row, first_col)
         bunk  = _norm(_val(row, bunk_col))
+        dup_key = (f"{last}, {first}".strip().lower(), bunk.lower())
+        if dup_key in seen:
+            continue   # already have this camper — skip the duplicate row
+        seen.add(dup_key)
         sessions  = _val(row, session_col)
         raw_age   = _val(row, age_col)
         grade     = normalize_grade(_val(row, grade_col))
