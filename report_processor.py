@@ -1892,6 +1892,7 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
     F_BOLD   = Font(name="Calibri", bold=True,  size=16)
     F_HDR    = Font(name="Calibri", bold=True,  size=14)
     F_BANNER = Font(name="Calibri", bold=True,  size=22, color="000000")  # driver name
+    F_LEG    = Font(name="Calibri", bold=False, size=11)                  # legend key
     CTR  = Alignment(horizontal="center", vertical="center")
     LEFT = Alignment(horizontal="left",   vertical="center")
     _thin  = Side(style="thin")
@@ -1935,12 +1936,12 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
         ws.row_dimensions[r].height = 22
         ws.merge_cells(start_row=r, start_column=COL_DAY1, end_row=r, end_column=COL_GRADE)
         g = ws.cell(row=r, column=COL_DAY1, value="Booster Required")
-        g.font = F_BOLD; g.alignment = wrap; g.fill = AGE_WARN
+        g.font = F_LEG; g.alignment = wrap; g.fill = AGE_WARN
         ws.row_dimensions[r + 1].height = 34
         ws.merge_cells(start_row=r + 1, start_column=COL_DAY1, end_row=r + 1, end_column=COL_GRADE)
         o = ws.cell(row=r + 1, column=COL_DAY1,
                     value="Must Walk Camper to Jr Pavilion/Preschool Building in AM")
-        o.font = F_BOLD; o.alignment = wrap; o.fill = BUNK_WARN
+        o.font = F_LEG; o.alignment = wrap; o.fill = BUNK_WARN
         skip_border_rows.update({r, r + 1})
         return r + 2
 
