@@ -119,7 +119,7 @@ def _s3_delete_old(keep: int = 10) -> None:
 
 # Reports that take a camp-week selection
 WEEK_AWARE_REPORTS = {"driver_totals", "group_attendance",
-                      "am_extend", "pm_extend", "pm_grp_extend"}
+                      "am_extend", "pm_extend", "pm_grp_extend", "inter_labels"}
 
 MASTER_KEY        = "current_master.dat"
 MASTER_META_KEY   = "current_master_meta.json"
@@ -1015,7 +1015,7 @@ document.getElementById('master-clear').addEventListener('click', async () => {
 });
 
 // Reports that use a camp-week selection
-const WEEK_AWARE = ['driver_totals','group_attendance','am_extend','pm_extend','pm_grp_extend'];
+const WEEK_AWARE = ['driver_totals','group_attendance','am_extend','pm_extend','pm_grp_extend','inter_labels'];
 
 // Report type buttons
 document.querySelectorAll('.rtype-btn').forEach(btn => {

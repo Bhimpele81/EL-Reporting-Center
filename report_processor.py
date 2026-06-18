@@ -2200,11 +2200,12 @@ def process_report(file_bytes: bytes, report_type: str,
         if master is None:
             return {"success": False, "message": "Inter Labels needs a master sheet. Upload the master report."}
         try:
-            docx_bytes, count = build_group_labels_docx(master, config, group_name="Inter")
+            # Week-dependent: only campers attending the selected week get a label
+            docx_bytes, count = build_group_labels_docx(_week_filter(master), config, group_name="Inter")
         except Exception as e:
             return {"success": False, "message": f"Could not build labels: {e}"}
         if not count:
-            return {"success": False, "message": "No campers found in Group Inter."}
+            return {"success": False, "message": "No Group Inter campers attending the selected week."}
 
         out_filename = f"Inter Labels {report_date.strftime('%m%d%Y')}.docx"
         out_path = os.path.join(output_dir, out_filename)
