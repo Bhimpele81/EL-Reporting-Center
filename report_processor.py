@@ -372,25 +372,20 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
 
     # ----- Local (larger) fonts for the Report sheet ------------------------
     # Defined locally so they don't change the Totals sheet's shared styles.
-    R_DATE   = Font(name="Calibri", bold=True, size=12)
     R_HEADER = Font(name="Calibri", bold=True, color=WHITE, size=12)
     R_BODY   = Font(name="Calibri", size=14)
     R_TOTAL  = Font(name="Calibri", bold=True, size=14)
+    R_BUNK   = Font(name="Calibri", bold=True, color="000000", size=20)  # black bunk name
 
-    # ----- Row 1: date header -----------------------------------------------
-    # Date sits in the narrow week column B, so left-align it to overflow into
-    # the empty cells to the right instead of being clipped.
-    ws.row_dimensions[1].height = 20
-    _cell(ws, 1, 1, "Report Date:", font=R_DATE, align=RIGHT)
-    _cell(ws, 1, 2, report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
-          else report_date.strftime("%#m/%#d/%Y"),
-          font=R_DATE, align=LEFT)
+    # Dark vertical separator (medium weight) drawn on a cell's left edge
+    SEP_LEFT = Border(left=Side(style="medium"))
 
     # ----- Column layout (Bunk column removed) ------------------------------
     #   A(1)=Child   B-I(2-9)=#1-#8   J-N(10-14)=Days M T W R F
     #   O(15)=Age    P(16)=Grade
-    # The bunk name is no longer a column; it prints as a banner row at the
-    # top of each bunk's block (each bunk starts on its own page).
+    # The bunk name prints as a large black title at the top-left of each
+    # bunk's block (each bunk starts on its own page). The report date is in
+    # the page footer.
     COL_CHILD = 1
     COL_WK1   = 2     # weeks occupy cols 2-9
     COL_DAY1  = 10    # days  occupy cols 10-14
@@ -398,26 +393,27 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     COL_GRADE = 16
     LAST_COL  = 16
 
-    BUNK_TITLE_FONT = Font(name="Calibri", bold=True, color=WHITE, size=18)
-
     def _write_col_headers(hr):
         ws.row_dimensions[hr].height = 16
+        # Child + weeks: maroon fill, no borders
         for ci, h in [(COL_CHILD, "Child"),
                       (2, "#1"), (3, "#2"), (4, "#3"), (5, "#4"),
-                      (6, "#5"), (7, "#6"), (8, "#7"), (9, "#8"),
-                      (COL_AGE, "Age"), (COL_GRADE, "Grade")]:
+                      (6, "#5"), (7, "#6"), (8, "#7"), (9, "#8")]:
             c = ws.cell(row=hr, column=ci, value=h)
             c.font = R_HEADER; c.fill = BRAND_FILL; c.alignment = CENTER
-            # No gridlines through the week columns (B-I)
-            if not (COL_WK1 <= ci <= COL_WK1 + 7):
-                c.border = THIN_BORDER
+        # Days header (merged) — dark separator on its left, no other borders
         ws.merge_cells(start_row=hr, start_column=COL_DAY1,
                        end_row=hr,   end_column=COL_DAY1 + 4)
         dcell = ws.cell(row=hr, column=COL_DAY1, value="Days")
         dcell.font = R_HEADER; dcell.fill = BRAND_FILL
-        dcell.alignment = CENTER; dcell.border = THIN_BORDER
+        dcell.alignment = CENTER; dcell.border = SEP_LEFT
         for di in range(1, 5):
-            ws.cell(row=hr, column=COL_DAY1 + di).border = THIN_BORDER
+            ws.cell(row=hr, column=COL_DAY1 + di).fill = BRAND_FILL
+        # Age / Grade headers — dark separator on each left
+        ac = ws.cell(row=hr, column=COL_AGE, value="Age")
+        ac.font = R_HEADER; ac.fill = BRAND_FILL; ac.alignment = CENTER; ac.border = SEP_LEFT
+        gc = ws.cell(row=hr, column=COL_GRADE, value="Grade")
+        gc.font = R_HEADER; gc.fill = BRAND_FILL; gc.alignment = CENTER; gc.border = SEP_LEFT
 
     # ----- Group campers by bunk -------------------------------------------
     bunk_groups = {}
@@ -431,26 +427,22 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     display_order = sorted(bunk_groups.keys(), key=lambda bk: (_bunk_num(bk), bk))
 
     # ----- Write rows -------------------------------------------------------
-    # Row 1 is the repeating date header; bunk blocks start at row 2.
+    # No global date row (date is in the footer); bunk blocks start at row 1.
     from openpyxl.worksheet.pagebreak import Break
-    row = 2
+    row = 1
     max_a_len = len("Total:   00")   # track widest column-A value for autofit
 
     for bk_idx, bunk_name in enumerate(display_order):
         group = bunk_groups[bunk_name]
         week_sums = [0] * 8
 
-        # --- Bunk banner row (top of each printed page) ---
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=LAST_COL)
+        # --- Bunk name (large black title, top-left, no fill/border) ---
         bt = ws.cell(row=row, column=1, value=bunk_name)
-        bt.font = BUNK_TITLE_FONT; bt.fill = BRAND_FILL
-        bt.alignment = CENTER; bt.border = THIN_BORDER
-        for ci in range(2, LAST_COL + 1):
-            ws.cell(row=row, column=ci).border = THIN_BORDER
-        ws.row_dimensions[row].height = 22
+        bt.font = R_BUNK; bt.alignment = LEFT
+        ws.row_dimensions[row].height = 26
         row += 1
 
-        # --- Column headers (repeated under each bunk banner) ---
+        # --- Column headers (under each bunk name) ---
         _write_col_headers(row)
         row += 1
 
@@ -459,18 +451,19 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
             alt = (ci % 2 == 1)
             fill = ALT_FILL if alt else None
 
-            _cell(ws, row, COL_CHILD, camper["name"], font=R_BODY, fill=fill, align=LEFT, border=THIN_BORDER)
+            # Child + weeks (A-I): no gridlines (alt shading carries the rows)
+            _cell(ws, row, COL_CHILD, camper["name"], font=R_BODY, fill=fill, align=LEFT)
             max_a_len = max(max_a_len, len(str(camper["name"] or "")))
 
-            # Week columns (B-I): no gridlines — value only (alt shading kept)
             for wi, wv in enumerate(camper["weeks"]):
                 _cell(ws, row, COL_WK1 + wi, wv,
                       font=R_BODY, fill=fill, align=CENTER)
                 week_sums[wi] += wv
 
+            # Days (J-N): no gridlines, except dark separator left of the block
             for di, dv in enumerate(camper["days"]):
-                _cell(ws, row, COL_DAY1 + di, dv,
-                      font=R_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
+                _cell(ws, row, COL_DAY1 + di, dv, font=R_BODY, fill=fill,
+                      align=CENTER, border=(SEP_LEFT if di == 0 else None))
 
             # Age as a number; grade as a number when numeric, else keep the
             # normalized text (K / PK / PS) so non-numeric grades still show.
@@ -483,22 +476,25 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
             except (ValueError, TypeError):
                 grade_val = gtext or None
 
-            _cell(ws, row, COL_AGE,   age_val,   font=R_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
-            _cell(ws, row, COL_GRADE, grade_val, font=R_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
+            # Age / Grade: dark separator on each left edge
+            _cell(ws, row, COL_AGE,   age_val,   font=R_BODY, fill=fill, align=CENTER, border=SEP_LEFT)
+            _cell(ws, row, COL_GRADE, grade_val, font=R_BODY, fill=fill, align=CENTER, border=SEP_LEFT)
             row += 1
 
         # --- Subtotal row: total count under the names in column A ---
         ws.row_dimensions[row].height = 18
         _cell(ws, row, COL_CHILD, f"Total:   {len(group)}",
-              font=R_TOTAL, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
+              font=R_TOTAL, fill=TOTAL_FILL, align=LEFT)
         # Week-sum cells (B-I): no gridlines, fill only
         for wi, wsum in enumerate(week_sums):
             _cell(ws, row, COL_WK1 + wi, wsum,
                   font=R_TOTAL, fill=TOTAL_FILL, align=CENTER)
+        # Days (J-N): no gridlines, dark separator left of the block
         for di in range(5):
-            _cell(ws, row, COL_DAY1 + di, None, fill=TOTAL_FILL, border=THIN_BORDER)
-        _cell(ws, row, COL_AGE,   None, fill=TOTAL_FILL, border=THIN_BORDER)
-        _cell(ws, row, COL_GRADE, None, fill=TOTAL_FILL, border=THIN_BORDER)
+            _cell(ws, row, COL_DAY1 + di, None, fill=TOTAL_FILL,
+                  border=(SEP_LEFT if di == 0 else None))
+        _cell(ws, row, COL_AGE,   None, fill=TOTAL_FILL, border=SEP_LEFT)
+        _cell(ws, row, COL_GRADE, None, fill=TOTAL_FILL, border=SEP_LEFT)
         row += 1
 
         # Page break after each bunk (except the last)
@@ -533,23 +529,26 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
             pass
 
     # Hide default gridlines; structure comes from the drawn borders, leaving
-    # the week columns (B-I, which have no borders) clean.
+    # the week and day columns (which have no borders) clean.
     ws.sheet_view.showGridLines = False
 
-    # Freeze the date row
-    ws.freeze_panes = "A2"
-
-    # ----- Print settings: landscape, fit to 1 page wide, date row repeats --
+    # ----- Print settings: landscape, fit to 1 page wide --------------------
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToPage   = True
     ws.page_setup.fitToWidth  = 1
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
-    ws.print_title_rows = "1:1"
+    ws.print_title_rows = None
 
     # ----- Margins (inches) -------------------------------------------------
     ws.page_margins.left  = 0.25
     ws.page_margins.right = 0.25
+
+    # ----- Footer: report date on every page --------------------------------
+    date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
+                else report_date.strftime("%#m/%#d/%Y"))
+    ws.oddFooter.left.text  = f"&12Report Date: {date_str}"
+    ws.evenFooter.left.text = f"&12Report Date: {date_str}"
 
 
 # ---------------------------------------------------------------------------
