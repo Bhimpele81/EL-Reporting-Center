@@ -1913,19 +1913,20 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
     HEADERS = ["Child", "Stp#", "Bunk", "#1", "#2", "#3", "#4", "#5", "#6", "#7", "#8",
                "M", "T", "W", "R", "F", "Age", "Grade"]
 
-    def _c(r, col, val, font=F_DATA, align=CTR, fill=None, border=True):
+    def _c(r, col, val, font=F_DATA, align=CTR, fill=None):
         cell = ws.cell(row=r, column=col, value=val)
         cell.font = font; cell.alignment = align
-        if border: cell.border = BORDER
-        if fill:   cell.fill = fill
+        if fill: cell.fill = fill
         return cell
+
+    banner_rows = []
 
     def _headers(hr):
         ws.row_dimensions[hr].height = 22
         for ci, h in enumerate(HEADERS, start=1):
             wk_hl = bool(week_num and ci == COL_WK1 + week_num - 1)
             _c(hr, ci, h, font=F_HDR, align=(LEFT if ci == COL_CHILD else CTR),
-               fill=(WEEK_FILL if wk_hl else HDR_FILL))
+               fill=(WEEK_FILL if wk_hl else None))
 
     # ----- Group + sort campers by driver -----------------------------------
     driver_groups: dict = {}
@@ -1952,6 +1953,7 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
         ws.row_dimensions[row].height = 28
         bn = ws.cell(row=row, column=COL_CHILD, value=drv)
         bn.font = F_BANNER; bn.alignment = LEFT
+        banner_rows.append(row)
         row += 1
         _headers(row); row += 1
 
@@ -1988,7 +1990,7 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
             _c(row, COL_WK1 + wi, wsum, font=F_BOLD)
         row += 1
         ws.row_dimensions[row].height = 22
-        _c(row, COL_CHILD, f"Total Campers: {count}", font=F_BOLD, align=LEFT, border=False)
+        _c(row, COL_CHILD, f"Total Campers: {count}", font=F_BOLD, align=LEFT)
         row += 1
 
         ws.row_breaks.append(Break(id=row - 1))   # each driver on its own page
@@ -1997,13 +1999,23 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
     ws.row_dimensions[row].height = 28
     gb = ws.cell(row=row, column=COL_CHILD, value="Grand Total — All Drivers")
     gb.font = F_BANNER; gb.alignment = LEFT
+    banner_rows.append(row)
     row += 1
     _headers(row); row += 1
     _c(row, COL_CHILD, "Week Totals", font=F_BOLD, align=LEFT)
     for wi, gs in enumerate(grand_week_sums):
         _c(row, COL_WK1 + wi, gs, font=F_BOLD)
     row += 1
-    _c(row, COL_CHILD, f"Total Campers: {grand_count}", font=F_BOLD, align=LEFT, border=False)
+    _c(row, COL_CHILD, f"Total Campers: {grand_count}", font=F_BOLD, align=LEFT)
+
+    # ----- Vertical separators (no full grid): right of Stp#, #8, and F -----
+    _vert = Side(style="thin", color="000000")
+    banner_set = set(banner_rows)
+    for r in range(1, row + 1):
+        if r in banner_set:
+            continue
+        for col in (COL_STOP, COL_WK1 + 7, COL_DAY1 + 4):
+            ws.cell(row=r, column=col).border = Border(right=_vert)
 
     # ----- Column widths (fill the landscape width) -------------------------
     ws.column_dimensions["A"].width = 26   # Child
