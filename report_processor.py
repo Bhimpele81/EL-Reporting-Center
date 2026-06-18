@@ -893,7 +893,8 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
     date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
                 else report_date.strftime("%#m/%#d/%Y"))
     c = ws.cell(row=1, column=8, value=f"Printed: {date_str}")
-    c.font = F_DATE_HDR; c.alignment = RIGHT_AL
+    c.font = Font(name="Calibri", bold=True, size=9)
+    c.alignment = Alignment(horizontal="right", vertical="center", wrap_text=True)
 
     # ---- Row 2: column headers ----
     ws.row_dimensions[2].height = 20
@@ -1175,7 +1176,7 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
     F_WEEK = Font(name=FONT_NAME, bold=True,  size=11)
     F_X    = Font(name=FONT_NAME, bold=False, size=14, color="808080")  # greyed X (visible on shaded rows)
     F_DAY  = Font(name=FONT_NAME, bold=True,  size=16, color=WHITE)      # AM: large day names
-    F_INSTR= Font(name=FONT_NAME, bold=False, italic=True, size=10, color=WHITE)
+    F_INSTR= Font(name=FONT_NAME, bold=True,  italic=True, size=12, color=WHITE)
 
     DATA_H = 30.0 if is_pm else 23.75   # taller PM rows → ~25 names per page
     HDR_BORDER = B_HDR_FULL if is_pm else T_BOT_MED
@@ -1195,22 +1196,29 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
         c.alignment = align; c.border = border
 
     if period == "pm":
-        # ---- Row 2: header (Time & Initial kept; Date line removed) ----
-        ws.row_dimensions[2].height = 34
-        _hdr(1, "CAMPER"); _hdr(2, "BUNK"); _hdr(3, "TIME")
-        _hdr(DAYS_COL, "Days/Wk")
-        day_pairs = [
-            (4, 5,  "MON\nTime     Initial"),
-            (6, 7,  "TUES\nTime     Initial"),
-            (8, 9,  "WED\nTime     Initial"),
-            (10, 11, "THURS\nTime     Initial"),
-            (12, 13, "FRI\nTime     Initial"),
-        ]
+        # ---- Two-row header: large day name (row 2) + Time/Initial (row 3) ----
+        ws.row_dimensions[2].height = 26
+        ws.row_dimensions[3].height = 16
+        # CAMPER / BUNK / TIME / Days/Wk span both header rows
+        for col, lbl in [(1, "CAMPER"), (2, "BUNK"), (3, "TIME"), (DAYS_COL, "Days/Wk")]:
+            ws.merge_cells(start_row=2, start_column=col, end_row=3, end_column=col)
+            cc = ws.cell(row=2, column=col, value=lbl)
+            cc.font = F_HDR; cc.fill = HDR_FILL; cc.alignment = CTR; cc.border = B_HDR_FULL
+            r3 = ws.cell(row=3, column=col); r3.fill = HDR_FILL; r3.border = B_HDR_FULL
+        day_pairs = [(4, 5, "MON"), (6, 7, "TUES"), (8, 9, "WED"),
+                     (10, 11, "THURS"), (12, 13, "FRI")]
         for c1, c2, lbl in day_pairs:
+            # Row 2: large day name across the day's two columns
             ws.merge_cells(start_row=2, start_column=c1, end_row=2, end_column=c2)
-            _hdr(c1, lbl, WRAP, border=B_HDR_L)
+            dn = ws.cell(row=2, column=c1, value=lbl)
+            dn.font = F_DAY; dn.fill = HDR_FILL; dn.alignment = CTR; dn.border = B_HDR_L
             ws.cell(row=2, column=c2).border = B_HDR_R
-        data_start = 3
+            # Row 3: Time | Initial sub-labels
+            t1 = ws.cell(row=3, column=c1, value="Time")
+            t1.font = F_HDR; t1.fill = HDR_FILL; t1.alignment = CTR; t1.border = B_HDR_L
+            t2 = ws.cell(row=3, column=c2, value="Initial")
+            t2.font = F_HDR; t2.fill = HDR_FILL; t2.alignment = CTR; t2.border = B_HDR_R
+        data_start = 4
     else:
         # ---- AM: two-row header — large day names (row 2) +
         #      a thin "Indicate arrival time each day" instruction (row 3) ----
@@ -1301,7 +1309,7 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
     ws.page_setup.fitToWidth  = 1
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
-    ws.print_title_rows = "1:2" if is_pm else "1:3"
+    ws.print_title_rows = "1:3"
 
     # ---- Margins + footers ----
     if is_pm:
@@ -1320,12 +1328,12 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
         ws.oddFooter.right.text   = "&8Printed: &D"
         ws.evenFooter.right.text  = "&8Printed: &D"
     else:
-        ws.page_margins.top    = 0.75
-        ws.page_margins.bottom = 0.5
+        ws.page_margins.top    = 0.7
+        ws.page_margins.bottom = 0.4
         ws.page_margins.left   = 0.25
         ws.page_margins.right  = 0.25
         ws.page_margins.header = 0.3
-        ws.page_margins.footer = 0.25
+        ws.page_margins.footer = 0.2
         ws.print_options.horizontalCentered = True
 
         # Small page number (center) + printed date (bottom-right), same size
@@ -1566,109 +1574,114 @@ def master_extend_campers(records: list, period: str) -> list:
 
 def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     """
-    PM GRP EXTEND: landscape, 10 cols (Grp|BUNK|CAMPER|Pick Up|Mon–Fri|Days),
-    grouped by Grp with a subtotal count row after each group.
+    PM GRP EXTEND: landscape. Each group prints on its own page with the group
+    name as a banner at the top, then BUNK | CAMPER | Pick Up | MON-FRI | Days,
+    and a camper total under the names.
     """
     _thin = Side(style="thin")
     T_ALL = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
 
-    HDR_FILL = PatternFill("solid", fgColor="6A1330")
-    ALT_FILL = PatternFill("solid", fgColor="D9D9D9")   # every-other-row shading
-    FONT_NAME = "Aptos Narrow"
+    HDR_FILL   = PatternFill("solid", fgColor="6A1330")
+    ALT_FILL   = PatternFill("solid", fgColor="D9D9D9")   # every-other-row shading
+    TOTAL_FILL = PatternFill("solid", fgColor="D9D9D9")
+    FONT_NAME  = "Aptos Narrow"
 
-    F_HDR    = Font(name=FONT_NAME, bold=True,  size=16, color=WHITE)
-    F_DATA   = Font(name=FONT_NAME, bold=False, size=16)
-    F_WK     = Font(name=FONT_NAME, bold=False, size=16)
-    F_ABSENT = Font(name=FONT_NAME, bold=False, size=16, color="999999")  # lightly greyed C
+    F_GRP    = Font(name=FONT_NAME, bold=True,  size=20, color="000000")  # group banner
+    F_HDR    = Font(name=FONT_NAME, bold=True,  size=13, color=WHITE)
+    F_DAYHDR = Font(name=FONT_NAME, bold=True,  size=16, color=WHITE)     # larger day names
+    F_BUNK   = Font(name=FONT_NAME, bold=False, size=12)                  # smaller bunk
+    F_DATA   = Font(name=FONT_NAME, bold=False, size=14)
+    F_ABSENT = Font(name=FONT_NAME, bold=False, size=14, color="999999")  # lightly greyed C
+    F_TOTAL  = Font(name=FONT_NAME, bold=True,  size=18)                  # larger total
 
     CTR  = Alignment(horizontal="center", vertical="center")
     LEFT = Alignment(horizontal="left",   vertical="center")
 
-    _DAY_LETTERS = "MTWRF"   # day columns 5-9 → Mon..Fri
-
-    # ---- Row 1: Week label ----
-    ws.row_dimensions[1].height = 23.5
-    c = ws.cell(row=1, column=2, value="Week:")
-    c.font = F_WK; c.alignment = CTR
-
-    # ---- Row 2: Header ----
-    ws.row_dimensions[2].height = 23.5
-    for ci, lbl in enumerate(
-        ["Grp", "BUNK", "CAMPER", "Pick Up", "Mon", "Tue", "Wed", "Thu", "Fri", "Days"], 1
-    ):
-        c = ws.cell(row=2, column=ci, value=lbl)
-        c.font = F_HDR; c.fill = HDR_FILL; c.alignment = CTR; c.border = T_ALL
+    COL_BUNK, COL_CAMPER, COL_PICKUP, COL_DAY1, COL_DAYS = 1, 2, 3, 4, 9
+    LAST_COL = 9
+    _DAY_LETTERS = "MTWRF"
+    DAY_LABELS   = ["MON", "TUES", "WED", "THURS", "FRI"]
+    BANNER_H, HDR_H, DATA_H = 26, 20, 26
 
     from openpyxl.worksheet.pagebreak import Break
 
-    # ---- Data rows (grouped) ----
-    r = 3
-    current_grp = None
-    group_start = r
-    group_count = 0
+    def _write_headers(hr):
+        ws.row_dimensions[hr].height = HDR_H
+        for ci, lbl in [(COL_BUNK, "BUNK"), (COL_CAMPER, "CAMPER"),
+                        (COL_PICKUP, "Pick Up"), (COL_DAYS, "Days")]:
+            c = ws.cell(row=hr, column=ci, value=lbl)
+            c.font = F_HDR; c.fill = HDR_FILL; c.alignment = CTR; c.border = T_ALL
+        for di, lbl in enumerate(DAY_LABELS):
+            c = ws.cell(row=hr, column=COL_DAY1 + di, value=lbl)
+            c.font = F_DAYHDR; c.fill = HDR_FILL; c.alignment = CTR; c.border = T_ALL
 
-    def _flush_subtotal():
-        nonlocal group_start, group_count
-        if group_count:
-            ws.row_dimensions[r].height = 23.5
-            ws.cell(row=r, column=1, value=group_count)
+    def _write_total(hr, count):
+        ws.row_dimensions[hr].height = DATA_H
+        for ci in range(1, LAST_COL + 1):
+            cell = ws.cell(row=hr, column=ci)
+            cell.border = T_ALL; cell.fill = TOTAL_FILL
+        tc = ws.cell(row=hr, column=COL_CAMPER, value=f"Total: {count}")
+        tc.font = F_TOTAL; tc.alignment = LEFT; tc.fill = TOTAL_FILL; tc.border = T_ALL
+
+    # ---- Data rows, grouped; each group on its own page ----
+    r = 1
+    current_grp = None
+    group_count = 0
 
     for camper in campers:
         if camper["grp"] != current_grp:
             if current_grp is not None:
-                _flush_subtotal()
-                # Insert page break after the subtotal row so each group prints on its own page
-                ws.row_breaks.append(Break(id=r))
+                _write_total(r, group_count)
+                ws.row_breaks.append(Break(id=r))   # page break after the total
                 r += 1
             current_grp = camper["grp"]
             group_count = 0
+            # Group banner (large black, top-left of the page)
+            ws.row_dimensions[r].height = BANNER_H
+            b = ws.cell(row=r, column=COL_BUNK, value=current_grp)
+            b.font = F_GRP; b.alignment = LEFT
+            r += 1
+            _write_headers(r)
+            r += 1
 
-        ws.row_dimensions[r].height = 23.5
-        af = ALT_FILL if (r % 2 == 0) else None
+        ws.row_dimensions[r].height = DATA_H
+        af = ALT_FILL if (group_count % 2 == 1) else None
         t = camper["time"]
         time_str = (f"{t.hour}:{t.minute:02d}" if t.minute else str(t.hour)) if t else None
 
-        for col, val, align in [
-            (1,  camper["grp"],             CTR),
-            (2,  camper["bunk"],            CTR),
-            (3,  camper["name"],            LEFT),
-            (4,  time_str,                  CTR),
-            (10, camper["days_wk"] or None, CTR),
+        for col, val, align, fnt in [
+            (COL_BUNK,   camper["bunk"],            CTR,  F_BUNK),
+            (COL_CAMPER, camper["name"],            LEFT, F_DATA),
+            (COL_PICKUP, time_str,                  CTR,  F_DATA),
+            (COL_DAYS,   camper["days_wk"] or None, CTR,  F_DATA),
         ]:
             cell = ws.cell(row=r, column=col, value=val)
-            cell.font = F_DATA; cell.alignment = align; cell.border = T_ALL
+            cell.font = fnt; cell.alignment = align; cell.border = T_ALL
             if af: cell.fill = af
 
-        # Day columns 5-9 (Mon-Fri): lightly greyed C on days camper is not attending
+        # Day columns (MON-FRI): lightly greyed C on days camper is not attending
         sched = camper.get("days_sched", "MTWRF")
         for di, letter in enumerate(_DAY_LETTERS):
-            cell = ws.cell(row=r, column=5 + di)
+            cell = ws.cell(row=r, column=COL_DAY1 + di)
             cell.border = T_ALL
             if af: cell.fill = af
             if letter not in sched:
-                cell.value = "C"
-                cell.font = F_ABSENT
-                cell.alignment = CTR
+                cell.value = "C"; cell.font = F_ABSENT; cell.alignment = CTR
 
         r += 1
         group_count += 1
 
-    # flush last group
+    # total for the last group
     if current_grp is not None:
-        _flush_subtotal()
+        _write_total(r, group_count)
 
     # ---- Column widths ----
-    # Scaled to fill landscape Letter page (10.5" content width)
-    ws.column_dimensions["A"].width = 6.0    # Grp
-    ws.column_dimensions["B"].width = 18.5   # BUNK
-    ws.column_dimensions["C"].width = 27.0   # CAMPER
-    ws.column_dimensions["D"].width = 10.5   # Pick Up
-    ws.column_dimensions["E"].width = 15.0   # Mon
-    ws.column_dimensions["F"].width = 13.5   # Tue
-    ws.column_dimensions["G"].width = 13.5   # Wed
-    ws.column_dimensions["H"].width = 13.5   # Thu
-    ws.column_dimensions["I"].width = 13.5   # Fri
-    ws.column_dimensions["J"].width = 14.5   # Days
+    ws.column_dimensions["A"].width = 14     # BUNK (smaller/narrower)
+    ws.column_dimensions["B"].width = 28     # CAMPER
+    ws.column_dimensions["C"].width = 11     # Pick Up
+    for col in ["D", "E", "F", "G", "H"]:
+        ws.column_dimensions[col].width = 13.5
+    ws.column_dimensions["I"].width = 14     # Days
 
     # ---- Print settings ----
     ws.page_setup.orientation = "landscape"
@@ -1676,11 +1689,11 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     ws.page_setup.fitToWidth  = 1
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
-    ws.print_title_rows = "1:2"
+    ws.print_title_rows = None
 
-    # ---- Margins (inches) ----
+    # ---- Margins: wider bottom so the big 32pt legend footer never overlaps -
     ws.page_margins.top    = 0.5
-    ws.page_margins.bottom = 0.5
+    ws.page_margins.bottom = 0.9
     ws.page_margins.left   = 0.25
     ws.page_margins.right  = 0.25
     ws.page_margins.header = 0.3
