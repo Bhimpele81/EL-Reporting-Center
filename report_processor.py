@@ -74,9 +74,12 @@ def normalize_grade(raw: str) -> str:
     g = str(raw).strip()
     if not g or g.lower() == "nan":
         return ""
-    if g.lower().startswith("pre"):
-        return "P"
-    if g.lower() == "k":
+    gl = g.lower()
+    if "pre-k" in gl or gl in ("prek", "pre k", "pk"):
+        return "PK"
+    if gl.startswith("pre"):          # Pre-School / Preschool
+        return "PS"
+    if gl in ("k", "kindergarten", "kg"):
         return "K"
     m = re.match(r"^(\d+)", g)
     if m:
@@ -396,7 +399,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     BUNK_TITLE_FONT = Font(name="Calibri", bold=True, color=WHITE, size=18)
 
     def _write_col_headers(hr):
-        ws.row_dimensions[hr].height = 20
+        ws.row_dimensions[hr].height = 16
         for ci, h in [(COL_CHILD, "Child"),
                       (2, "#1"), (3, "#2"), (4, "#3"), (5, "#4"),
                       (6, "#5"), (7, "#6"), (8, "#7"), (9, "#8"),
@@ -442,7 +445,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
         bt.alignment = CENTER; bt.border = THIN_BORDER
         for ci in range(2, LAST_COL + 1):
             ws.cell(row=row, column=ci).border = THIN_BORDER
-        ws.row_dimensions[row].height = 28
+        ws.row_dimensions[row].height = 22
         row += 1
 
         # --- Column headers (repeated under each bunk banner) ---
@@ -450,7 +453,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
         row += 1
 
         for ci, camper in enumerate(group):
-            ws.row_dimensions[row].height = 24
+            ws.row_dimensions[row].height = 18
             alt = (ci % 2 == 1)
             fill = ALT_FILL if alt else None
 
@@ -467,20 +470,23 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
                 _cell(ws, row, COL_DAY1 + di, dv,
                       font=R_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
 
-            # Store age/grade as numbers — try float first to handle decimals
+            # Age as a number; grade as a number when numeric, else keep the
+            # normalized text (K / PK / PS) so non-numeric grades still show.
             age_val = camper["age"]
             try: age_val = float(str(age_val).strip())
             except (ValueError, TypeError): age_val = None
-            grade_val = camper["grade"]
-            try: grade_val = int(float(str(grade_val).strip()))
-            except (ValueError, TypeError): grade_val = None
+            gtext = str(camper["grade"]).strip()
+            try:
+                grade_val = int(gtext)
+            except (ValueError, TypeError):
+                grade_val = gtext or None
 
             _cell(ws, row, COL_AGE,   age_val,   font=R_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
             _cell(ws, row, COL_GRADE, grade_val, font=R_BODY, fill=fill, align=CENTER, border=THIN_BORDER)
             row += 1
 
         # --- Subtotal row: total count under the names in column A ---
-        ws.row_dimensions[row].height = 24
+        ws.row_dimensions[row].height = 18
         _cell(ws, row, COL_CHILD, f"Total:   {len(group)}",
               font=R_TOTAL, fill=TOTAL_FILL, align=LEFT, border=THIN_BORDER)
         # Week-sum cells (B-I): no gridlines, fill only
@@ -538,6 +544,10 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.print_title_rows = "1:1"
+
+    # ----- Margins (inches) -------------------------------------------------
+    ws.page_margins.left  = 0.25
+    ws.page_margins.right = 0.25
 
 
 # ---------------------------------------------------------------------------
