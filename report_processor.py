@@ -1566,10 +1566,11 @@ _DAY_FULL = {"M": "Mon", "T": "Tue", "W": "Wed", "R": "Thu", "F": "Fri"}
 
 
 def _label_days_text(sched: str) -> str:
-    """Readable 'days attending' text from a schedule string like 'MWF'."""
+    """Readable 'days attending' text from a schedule string like 'MWF'.
+    Full-week (Mon-Fri) campers get a blank line."""
     sched = sched or "MTWRF"
     if sched == "MTWRF":
-        return "Mon–Fri"
+        return ""   # attends all week — leave blank
     return ", ".join(_DAY_FULL[c] for c in "MTWRF" if c in sched)
 
 
@@ -1623,7 +1624,7 @@ def build_group_labels_docx(records: list, config: dict, group_name: str = "Inte
 
     def _fill(cell, bunk, name, days):
         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-        for i, (text, sz, bold) in enumerate([(bunk, 10, True), (name, 11, True), (days, 9, False)]):
+        for i, (text, sz, bold) in enumerate([(bunk, 10, True), (name, 14, True), (days, 9, False)]):
             p = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             pf = p.paragraph_format
