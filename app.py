@@ -559,6 +559,8 @@ label.lbl{display:block;font-size:.75rem;font-weight:600;color:var(--brand-dark)
 .file-chosen .rm{margin-left:auto;cursor:pointer;font-size:.9rem;color:#999;background:none;border:none;padding:0 .2rem}
 /* Report type selector */
 .report-types{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:.5rem}
+.rtype-section-hd{font-size:.8rem;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.04em;margin:.3rem 0 .1rem}
+.rtype-section-hd.labels{margin-top:1rem;padding-top:.8rem;border-top:1px solid #eee}
 .rtype-btn{padding:.55rem 1.1rem;border:1.5px solid var(--border);border-radius:8px;background:#fff;color:#888;font-family:'Roboto Slab',serif;font-size:.78rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap}
 .rtype-btn.active{background:var(--brand);border-color:var(--brand);color:#fff}
 .rtype-btn:hover:not(.active){border-color:var(--brand-mid);color:var(--brand-mid)}
@@ -780,6 +782,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <div class="card-hint">Choose the type of report you are converting</div>
       </div>
     </div>
+    <div class="rtype-section-hd">📊 Reports</div>
     <div class="report-types" id="report-types">
         <button class="rtype-btn active" data-rtype="bunk_snapshot">Bunk Snapshot</button>
         <button class="rtype-btn" data-rtype="group_attendance">Group Attendance</button>
@@ -787,7 +790,10 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <button class="rtype-btn" data-rtype="pm_extend">PM Extend</button>
         <button class="rtype-btn" data-rtype="pm_grp_extend">PM GRP Extend</button>
         <button class="rtype-btn" data-rtype="driver_totals">Driver Totals</button>
-        <button class="rtype-btn" data-rtype="inter_labels">Inter Labels (Word)</button>
+    </div>
+    <div class="rtype-section-hd labels">🏷️ Labels <span style="font-weight:500;text-transform:none;opacity:.7">(Word · Avery 5960)</span></div>
+    <div class="report-types">
+        <button class="rtype-btn" data-rtype="inter_labels">Inter</button>
     </div>
   </div>
 
