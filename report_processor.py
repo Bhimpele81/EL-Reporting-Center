@@ -507,7 +507,7 @@ def build_report_sheet(ws, campers: list, bunk_lookup: dict,
     for col_letter in [get_column_letter(c) for c in range(COL_WK1, COL_WK1 + 8)]:
         ws.column_dimensions[col_letter].width = 8   # #1-#8
     for col_letter in [get_column_letter(c) for c in range(COL_DAY1, COL_DAY1 + 5)]:
-        ws.column_dimensions[col_letter].width = 6   # M T W R F
+        ws.column_dimensions[col_letter].width = 3.5   # M T W R F (tight together)
     ws.column_dimensions[get_column_letter(COL_AGE)].width   = 8
     ws.column_dimensions[get_column_letter(COL_GRADE)].width = 8
 
