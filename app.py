@@ -2974,6 +2974,14 @@ document.getElementById('season-save').addEventListener('click', async () => {
   const msg = document.getElementById('season-msg');
   const mondays = Array.from(document.querySelectorAll('#season-rows input[type=date]')).map(i => i.value);
   if (mondays.some(m => !m)) { msg.style.color = '#c0392b'; msg.textContent = 'Set a Monday for every week.'; return; }
+  // Warn only if the dates actually changed — Payroll checks are keyed to dates
+  const changed = seasonWeeks.some((w, i) => w.monday !== mondays[i]);
+  if (changed && !confirm(
+      'Changing the week dates will re-date the Payroll day columns. Any attendance ' +
+      'checks already entered are tied to the old dates and will NOT carry over to the ' +
+      'new ones.\n\nThis is safe before the season starts. Continue?')) {
+    return;
+  }
   msg.style.color = '#666'; msg.textContent = 'Saving…';
   try {
     const res = await fetch('/api/season', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mondays})});
