@@ -957,7 +957,6 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 <div class="tab-bar">
   <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
-  <div class="tab" data-tab="totals">🧮 <span>Totals</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Bunks &amp; Camps</span></div>
 </div>
 
@@ -1182,6 +1181,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <select id="pr-sort" class="pr-input" onchange="renderPayroll()">
           <option value="last">Last name</option>
           <option value="area">Area</option>
+          <option value="total">Total (high to low)</option>
         </select></label>
       <button id="pr-lock" class="pr-period-btn" style="margin-left:auto">🔓 Unlocked</button>
     </div>
@@ -1201,29 +1201,6 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   </div>
 </div><!-- /tab-payroll -->
 
-<!-- ===== TOTALS TAB ===== -->
-<div class="tab-panel" id="tab-totals">
-  <div class="card">
-    <div class="card-hd">
-      <div>
-        <div class="card-title">Payroll Totals</div>
-        <div class="card-hint">Cumulative check-ins per staff member across all 8 weeks (X, ½, and N/A marks are not counted).</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin:0 0 .8rem;font-size:.82rem;color:#555">
-      <label>Filter area:
-        <select id="tot-filter-area" class="pr-input" onchange="renderTotals()"></select></label>
-      <label>Sort by:
-        <select id="tot-sort" class="pr-input" onchange="renderTotals()">
-          <option value="last">Last name</option>
-          <option value="area">Area</option>
-          <option value="total">Total (high to low)</option>
-        </select></label>
-    </div>
-    <div style="overflow-x:auto"><table class="payroll-table" id="totals-table"></table></div>
-  </div>
-</div><!-- /tab-totals -->
-
 </div><!-- /container -->
 
 <script>
@@ -1236,7 +1213,6 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-    if (tab.dataset.tab === 'totals') renderTotals();
     if (tab.dataset.tab === 'payroll') renderPayroll();
   });
 });
@@ -1646,13 +1622,13 @@ async function loadWeather() {
 // ─────────────────────────────────────────────
 let payroll = {staff: [], checks: {}, days: []};
 let prPeriod = 0;   // 0..3 → weeks 1&2, 3&4, 5&6, 7&8
+let prTotals = false;   // when true, show the cumulative Totals view
 
 async function loadPayroll() {
   try {
     const res = await fetch('/api/payroll');
     payroll = await res.json();
     renderPayroll();
-    renderTotals();
   } catch(e) { /* ignore */ }
 }
 
@@ -1687,11 +1663,17 @@ function renderPayroll() {
   pb.innerHTML = '';
   for (let p = 0; p < 4; p++) {
     const b = document.createElement('button');
-    b.className = 'pr-period-btn' + (p === prPeriod ? ' active' : '');
+    b.className = 'pr-period-btn' + ((!prTotals && p === prPeriod) ? ' active' : '');
     b.textContent = `Weeks ${p*2+1} & ${p*2+2}`;
-    b.onclick = () => { prPeriod = p; renderPayroll(); };
+    b.onclick = () => { prPeriod = p; prTotals = false; renderPayroll(); };
     pb.appendChild(b);
   }
+  const tb = document.createElement('button');   // Totals view, slightly separated
+  tb.className = 'pr-period-btn' + (prTotals ? ' active' : '');
+  tb.textContent = '🧮 Totals';
+  tb.style.marginLeft = '1.4rem';
+  tb.onclick = () => { prTotals = true; renderPayroll(); };
+  pb.appendChild(tb);
   // area filter dropdown (preserve current selection)
   const fsel = document.getElementById('pr-filter-area');
   const areas = [...new Set(payroll.staff.map(s => s.area).filter(Boolean))].sort();
@@ -1703,11 +1685,22 @@ function renderPayroll() {
   const filterArea = fsel.value;
   const sortKey = document.getElementById('pr-sort').value;
 
+  // Lock button + add-staff controls reflect lock state (both views)
+  document.getElementById('pr-lock').textContent = payroll.locked ? '🔒 Locked' : '🔓 Unlocked';
+  ['pr-last','pr-first','pr-area','pr-add'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.disabled = payroll.locked;
+  });
+
+  if (prTotals) { renderTotalsTable(filterArea, sortKey); return; }
+
   // table
   const days = prPeriodDays();
   let staff = payroll.staff.filter(s => filterArea === 'ALL' || s.area === filterArea);
   staff.sort((a,b) => {
-    if (sortKey === 'area') {
+    if (sortKey === 'total') {
+      const d = prCount(b.id) - prCount(a.id);
+      if (d) return d;
+    } else if (sortKey === 'area') {
       const c = (a.area||'').toLowerCase().localeCompare((b.area||'').toLowerCase());
       if (c) return c;
     }
@@ -1749,12 +1742,6 @@ function renderPayroll() {
   const tbl = document.getElementById('payroll-table');
   tbl.innerHTML = html;
   tbl.className = 'payroll-table' + (payroll.locked ? ' pr-locked' : '');
-
-  // Reflect lock state on the button + add-staff controls
-  document.getElementById('pr-lock').textContent = payroll.locked ? '🔒 Locked' : '🔓 Unlocked';
-  ['pr-last','pr-first','pr-area','pr-add'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.disabled = payroll.locked;
-  });
 
   // Day cells: blank -> ✓ (counts) -> ✗ -> blank
   tbl.querySelectorAll('td.pr-cell').forEach(cell => {
@@ -1821,16 +1808,8 @@ function totalChecks(id) {
 }
 function isJC(s) { return (s.title || '').toLowerCase().includes('junior'); }
 
-function renderTotals() {
-  if (!payroll.days || !payroll.days.length) return;
-  const fsel = document.getElementById('tot-filter-area');
-  const areas = [...new Set(payroll.staff.map(s => s.area).filter(Boolean))].sort();
-  const cur = fsel.value || 'ALL';
-  fsel.innerHTML = '<option value="ALL">All areas</option>' +
-    areas.map(a => `<option value="${a}">${a}</option>`).join('');
-  fsel.value = (cur === 'ALL' || areas.includes(cur)) ? cur : 'ALL';
-  const filterArea = fsel.value, sortKey = document.getElementById('tot-sort').value;
-
+// Totals view (rendered into the same Payroll table when the Totals button is on)
+function renderTotalsTable(filterArea, sortKey) {
   let staff = payroll.staff.filter(s => filterArea === 'ALL' || s.area === filterArea)
                            .map(s => ({...s, _total: totalChecks(s.id)}));
   staff.sort((a,b) => {
@@ -1843,7 +1822,7 @@ function renderTotals() {
     return (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase());
   });
 
-  let html = '<thead><tr><th>Staff</th><th>Area</th><th>Total Checks</th></tr></thead><tbody>';
+  let html = '<thead><tr><th>Staff</th><th>Area</th><th>Total Checks<br><small style="font-weight:400">(all 8 weeks)</small></th></tr></thead><tbody>';
   staff.forEach(s => {
     const jc = isJC(s) ? ' <small style="color:#1A79BF;font-weight:700">JC</small>' : '';
     const areaTxt = (s.area === 'Support' && s.title) ? s.title : (s.area || '');
@@ -1853,7 +1832,9 @@ function renderTotals() {
             `<td class="pr-count">${s._total}</td></tr>`;
   });
   html += '</tbody>';
-  document.getElementById('totals-table').innerHTML = html;
+  const tbl = document.getElementById('payroll-table');
+  tbl.innerHTML = html;
+  tbl.className = 'payroll-table';
 }
 
 document.getElementById('pr-add').addEventListener('click', async () => {
