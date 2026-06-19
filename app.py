@@ -2435,10 +2435,10 @@ function renderPayroll() {
   const areaWrap = fsel.closest('label');
   if (areaWrap) areaWrap.style.display = prExt ? 'none' : '';
   const sortWrap = document.getElementById('pr-sort').closest('label');
-  if (sortWrap) sortWrap.style.display = prExt ? 'none' : '';
+  if (sortWrap) sortWrap.style.display = (prExt || prTotals) ? 'none' : '';
 
   if (prExt) { renderExtTable('ALL', prExtPeriod); return; }
-  if (prTotals) { renderTotalsTable(filterArea, sortKey); return; }
+  if (prTotals) { renderTotalsTable(filterArea, 'last'); return; }
 
   // table
   const days = prPeriodDays();
