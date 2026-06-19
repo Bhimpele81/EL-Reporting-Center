@@ -873,7 +873,7 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
     # ---- Row 1: Week/date header (pre-filled; user completes week # and dates in Excel) ----
     ws.row_dimensions[1].height = 36
     ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=7)
-    c = ws.cell(row=1, column=2, value=(f"WEEK {week_num} :" if week_num else "WEEK # :"))
+    c = ws.cell(row=1, column=2, value=(f"WEEK {week_num}: {_week_dates(week_num)}" if week_num else "WEEK # :"))
     c.font = F_WEEK_HDR; c.alignment = CTR
 
     date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
@@ -1027,17 +1027,22 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
 _EXT_TIME_RE    = re.compile(r"(?:Hours|Drop-off)\s+(\d+(?::\d+)?)\s*[-–]", re.IGNORECASE)
 _PM_EXT_TIME_RE = re.compile(r"Pick-up\s+\d+(?::\d+)?\s*[^\d\s]\s*(\d+(?::\d+)?)", re.IGNORECASE)
 
-# Week date ranges for 2026 camp season (used by Group Attendance header)
+# Week date ranges for the 2026 camp season (shown in report headers)
 _WEEK_DATES = [
-    "June 23 - 27, 2026",
-    "June 30 - July 4, 2026",
-    "July 7 - 11, 2026",
-    "July 14 - 18, 2026",
-    "July 21 - 25, 2026",
-    "July 28 - Aug 1, 2026",
-    "Aug 4 - 8, 2026",
-    "Aug 11 - 15, 2026",
+    "June 22 – 26",
+    "June 29 – July 3",
+    "July 6 – July 10",
+    "July 13 – July 17",
+    "July 20 – July 24",
+    "July 27 – July 31",
+    "August 3 – August 7",
+    "August 10 – August 14",
 ]
+
+
+def _week_dates(week_num) -> str:
+    """Date-range text for a camp week (1-8); empty if out of range."""
+    return _WEEK_DATES[week_num - 1] if (week_num and 1 <= week_num <= 8) else ""
 
 
 def _parse_ext_time(token: str) -> datetime.time:
@@ -1192,7 +1197,7 @@ def build_extend_sheet(ws, campers: list, period: str, week_num: int = None) -> 
 
     # ---- Row 1: WEEK label ----
     ws.row_dimensions[1].height = 14.65
-    c = ws.cell(row=1, column=1, value=(f"WEEK {week_num}:" if week_num else "WEEK:"))
+    c = ws.cell(row=1, column=1, value=(f"WEEK {week_num}: {_week_dates(week_num)}" if week_num else "WEEK:"))
     c.font = F_WEEK
 
     def _hdr(col, val, align=CTR, border=HDR_BORDER):
