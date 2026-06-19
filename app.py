@@ -556,7 +556,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .card-hint{font-size:.75rem;color:#999;margin-top:.15rem;font-weight:300}
 label.lbl{display:block;font-size:.75rem;font-weight:600;color:var(--brand-dark);letter-spacing:.04em;text-transform:uppercase;margin-bottom:.4rem}
 /* Drop zone */
-.drop-zone{border:2px dashed var(--border);border-radius:var(--r);padding:1.75rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--mist);position:relative}
+.drop-zone{border:2px dashed var(--border);border-radius:var(--r);padding:1rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--mist);position:relative}
 .drop-zone:hover,.drop-zone.drag-over{border-color:var(--brand-mid);background:var(--brand-light)}
 .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .drop-icon{font-size:2rem;margin-bottom:.4rem}
@@ -784,10 +784,9 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 
   <div class="card">
     <div class="card-hd">
-      <span class="card-num">1</span>
       <div>
         <div class="card-title">Select Report Type</div>
-        <div class="card-hint">Choose the type of report you are converting</div>
+        <div class="card-hint">Choose the report you want to run</div>
       </div>
     </div>
     <div class="rtype-section-hd">📊 Reports</div>
@@ -809,7 +808,6 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   <!-- Week selector — only visible when Driver Totals is selected -->
   <div class="card" id="week-card" style="display:none">
     <div class="card-hd">
-      <span class="card-num">★</span>
       <div>
         <div class="card-title">Select Camp Week</div>
         <div class="card-hint">Only campers enrolled in the selected week are included. (Driver Totals instead highlights that week's campers in yellow.)</div>
@@ -827,30 +825,11 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-hd">
-      <span class="card-num">2</span>
-      <div>
-        <div class="card-title">Upload Report File</div>
-        <div class="card-hint">Upload a master sheet once and every report reuses it — only upload again when the data changes. Original per-report exports still work too.</div>
-      </div>
-    </div>
-    <div id="master-banner" style="display:none;align-items:center;gap:.6rem;padding:.6rem .85rem;background:#eef4fb;border:1px solid #b9d2ec;border-radius:8px;margin-bottom:.7rem;font-size:.83rem;color:#1A79BF;font-weight:500">
-      <span>📋</span>
-      <span id="master-banner-text" style="flex:1">—</span>
-      <button id="master-clear" style="cursor:pointer;font-size:.75rem;color:#777;background:#fff;border:1px solid #ccd;border-radius:6px;padding:.2rem .55rem">Clear</button>
-    </div>
-    <div class="drop-zone" id="drop-zone">
-      <input type="file" id="excel-file" accept=".csv,.xlsx,.xls">
-      <div class="drop-icon">📊</div>
-      <div class="drop-text"><strong>Click to choose</strong> or drag &amp; drop your report file</div>
-      <div class="drop-meta">Accepted formats: .csv, .xlsx, .xls — export directly from your camp management system</div>
-    </div>
-    <div class="file-chosen" id="file-chosen">
-      <span>✅</span>
-      <span id="file-name">—</span>
-      <button class="rm" id="remove-file">✕</button>
-    </div>
+  <!-- Saved-master banner: shows which data the report will use -->
+  <div id="master-banner" style="display:none;align-items:center;gap:.6rem;padding:.6rem .85rem;background:#eef4fb;border:1px solid #b9d2ec;border-radius:8px;margin:0 0 .8rem;font-size:.83rem;color:#1A79BF;font-weight:500">
+    <span>📋</span>
+    <span id="master-banner-text" style="flex:1">—</span>
+    <button id="master-clear" style="cursor:pointer;font-size:.75rem;color:#777;background:#fff;border:1px solid #ccd;border-radius:6px;padding:.2rem .55rem">Clear</button>
   </div>
 
   <button class="run-btn" id="run-btn" disabled>
@@ -869,6 +848,27 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 
   <div class="action-bar" id="action-bar" style="display:none">
     <a class="dl-btn" id="dl-link" href="#" download>⬇ Download Report</a>
+  </div>
+
+  <!-- Update master sheet (optional — only when the data changes) -->
+  <div class="card" style="margin-top:1.25rem">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Update Master Sheet</div>
+        <div class="card-hint">Only needed when the camper data changes — upload a new master and it replaces the saved one for every report. (Original per-report exports still work too.)</div>
+      </div>
+    </div>
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="excel-file" accept=".csv,.xlsx,.xls">
+      <div class="drop-icon">📊</div>
+      <div class="drop-text"><strong>Click to choose</strong> or drag &amp; drop the master sheet</div>
+      <div class="drop-meta">Accepted formats: .csv, .xlsx, .xls</div>
+    </div>
+    <div class="file-chosen" id="file-chosen">
+      <span>✅</span>
+      <span id="file-name">—</span>
+      <button class="rm" id="remove-file">✕</button>
+    </div>
   </div>
 
   <div id="error-card">
