@@ -1136,7 +1136,7 @@ def parse_extend(file_bytes: bytes, period: str = "am") -> list:
     return campers
 
 
-def build_extend_sheet(ws, campers: list, period: str) -> None:
+def build_extend_sheet(ws, campers: list, period: str, week_num: int = None) -> None:
     """
     Build the single sheet for AM/PM Extend report.
 
@@ -1192,7 +1192,7 @@ def build_extend_sheet(ws, campers: list, period: str) -> None:
 
     # ---- Row 1: WEEK label ----
     ws.row_dimensions[1].height = 14.65
-    c = ws.cell(row=1, column=1, value="WEEK:")
+    c = ws.cell(row=1, column=1, value=(f"WEEK {week_num}:" if week_num else "WEEK:"))
     c.font = F_WEEK
 
     def _hdr(col, val, align=CTR, border=HDR_BORDER):
@@ -2182,7 +2182,7 @@ def process_report(file_bytes: bytes, report_type: str,
         wb = Workbook()
         ws = wb.active
         ws.title = "AM Extend"
-        build_extend_sheet(ws, campers, period="am")
+        build_extend_sheet(ws, campers, period="am", week_num=week_num)
 
         out_filename = f"AM Extend {report_date.strftime('%m%d%Y')}.xlsx"
         out_path = os.path.join(output_dir, out_filename)
@@ -2209,7 +2209,7 @@ def process_report(file_bytes: bytes, report_type: str,
         wb = Workbook()
         ws = wb.active
         ws.title = "PM Extend"
-        build_extend_sheet(ws, campers, period="pm")
+        build_extend_sheet(ws, campers, period="pm", week_num=week_num)
 
         out_filename = f"PM Extend {report_date.strftime('%m%d%Y')}.xlsx"
         out_path = os.path.join(output_dir, out_filename)
