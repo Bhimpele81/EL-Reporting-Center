@@ -5,6 +5,7 @@
    "first": "Nick",
    "area": "Swim",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s1"
   },
   {
@@ -12,6 +13,7 @@
    "first": "Samantha",
    "area": "Senior",
    "bunk": "Spirit",
+   "title": "Group Counselor",
    "id": "s2"
   },
   {
@@ -19,6 +21,7 @@
    "first": "Kevin",
    "area": "Junior",
    "bunk": "Hawks",
+   "title": "Group Counselor",
    "id": "s3"
   },
   {
@@ -26,6 +29,7 @@
    "first": "Alyson",
    "area": "Music & Dance",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s4"
   },
   {
@@ -33,6 +37,7 @@
    "first": "Bridget",
    "area": "Ceramics",
    "bunk": "",
+   "title": "Lead Specialist",
    "id": "s5"
   },
   {
@@ -40,6 +45,7 @@
    "first": "Joshua",
    "area": "Wildercraft",
    "bunk": "",
+   "title": "Asst Specialist Counselor",
    "id": "s6"
   },
   {
@@ -47,6 +53,7 @@
    "first": "Jacqueline",
    "area": "Junior",
    "bunk": "Bulldogs",
+   "title": "Junior Group Counselor",
    "id": "s7"
   },
   {
@@ -54,6 +61,7 @@
    "first": "Cristina",
    "area": "Junior",
    "bunk": "Cheetahs",
+   "title": "Junior Group Counselor",
    "id": "s8"
   },
   {
@@ -61,6 +69,7 @@
    "first": "Ellyn",
    "area": "Support",
    "bunk": "",
+   "title": "Floater",
    "id": "s9"
   },
   {
@@ -68,6 +77,7 @@
    "first": "Katelyn",
    "area": "Swim",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s10"
   },
   {
@@ -75,6 +85,7 @@
    "first": "Joey",
    "area": "Inter",
    "bunk": "Raiders",
+   "title": "Junior Group Counselor",
    "id": "s11"
   },
   {
@@ -82,6 +93,7 @@
    "first": "Jessica",
    "area": "Junior",
    "bunk": "Lions",
+   "title": "Group Counselor",
    "id": "s12"
   },
   {
@@ -89,6 +101,7 @@
    "first": "Emily",
    "area": "Upper",
    "bunk": "Comets",
+   "title": "Junior Group Counselor",
    "id": "s13"
   },
   {
@@ -96,6 +109,7 @@
    "first": "Ruby",
    "area": "Swim",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s14"
   },
   {
@@ -103,6 +117,7 @@
    "first": "Matthew",
    "area": "Upper",
    "bunk": "Titans",
+   "title": "Group Counselor",
    "id": "s15"
   },
   {
@@ -110,6 +125,7 @@
    "first": "Bianca",
    "area": "Upper",
    "bunk": "Meteors",
+   "title": "Junior Group Counselor",
    "id": "s16"
   },
   {
@@ -117,6 +133,7 @@
    "first": "Ben",
    "area": "Wildercraft",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s17"
   },
   {
@@ -124,6 +141,7 @@
    "first": "Xavier",
    "area": "Ropes",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s18"
   },
   {
@@ -131,6 +149,7 @@
    "first": "Gavin",
    "area": "Senior",
    "bunk": "Phils",
+   "title": "Asst Group Counselor",
    "id": "s19"
   },
   {
@@ -138,6 +157,7 @@
    "first": "Anna",
    "area": "Swim",
    "bunk": "",
+   "title": "Asst Specialist Counselor",
    "id": "s20"
   },
   {
@@ -145,6 +165,7 @@
    "first": "Cidney",
    "area": "Support",
    "bunk": "",
+   "title": "Floater",
    "id": "s21"
   },
   {
@@ -152,6 +173,7 @@
    "first": "Addison",
    "area": "Junior",
    "bunk": "Tigers",
+   "title": "Junior Group Counselor",
    "id": "s22"
   },
   {
@@ -159,6 +181,7 @@
    "first": "Kevin",
    "area": "Athletics",
    "bunk": "",
+   "title": "Lead Specialist",
    "id": "s23"
   },
   {
@@ -166,6 +189,7 @@
    "first": "Stephanie",
    "area": "Upper",
    "bunk": "Mystics",
+   "title": "Group Counselor",
    "id": "s24"
   },
   {
@@ -173,6 +197,7 @@
    "first": "Charlotte",
    "area": "Junior",
    "bunk": "Munchkins",
+   "title": "Asst Group Counselor",
    "id": "s25"
   },
   {
@@ -180,6 +205,7 @@
    "first": "Olivia",
    "area": "Athletics",
    "bunk": "",
+   "title": "Asst Tennis Specialist",
    "id": "s26"
   },
   {
@@ -187,6 +213,7 @@
    "first": "Jack",
    "area": "Support",
    "bunk": "",
+   "title": "Snack Shack Supervisor",
    "id": "s27"
   },
   {
@@ -194,6 +221,7 @@
    "first": "Kaidence",
    "area": "Junior",
    "bunk": "Rugrats",
+   "title": "Junior Group Counselor",
    "id": "s28"
   },
   {
@@ -201,6 +229,7 @@
    "first": "Levi",
    "area": "Inter",
    "bunk": "Wings",
+   "title": "Junior Group Counselor",
    "id": "s29"
   },
   {
@@ -208,6 +237,7 @@
    "first": "Charles",
    "area": "Inter",
    "bunk": "Eagles",
+   "title": "Junior Group Counselor",
    "id": "s30"
   },
   {
@@ -215,6 +245,7 @@
    "first": "Ryan",
    "area": "Inter",
    "bunk": "Fusion",
+   "title": "Junior Group Counselor",
    "id": "s31"
   },
   {
@@ -222,6 +253,7 @@
    "first": "Jisha",
    "area": "Arts & Crafts",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s32"
   },
   {
@@ -229,6 +261,7 @@
    "first": "Nick",
    "area": "Junior",
    "bunk": "Lions",
+   "title": "Junior Group Counselor",
    "id": "s33"
   },
   {
@@ -236,6 +269,7 @@
    "first": "Kara",
    "area": "Upper",
    "bunk": "Comets",
+   "title": "Junior Group Counselor",
    "id": "s34"
   },
   {
@@ -243,6 +277,7 @@
    "first": "Caroline",
    "area": "Support",
    "bunk": "",
+   "title": "Nurse",
    "id": "s35"
   },
   {
@@ -250,6 +285,7 @@
    "first": "Meghan",
    "area": "Upper",
    "bunk": "Stars",
+   "title": "Group Counselor",
    "id": "s36"
   },
   {
@@ -257,6 +293,7 @@
    "first": "Carina",
    "area": "Senior",
    "bunk": "Olympians",
+   "title": "Junior Group Counselor",
    "id": "s37"
   },
   {
@@ -264,6 +301,7 @@
    "first": "Evalyn",
    "area": "Upper",
    "bunk": "Stars",
+   "title": "Junior Group Counselor",
    "id": "s38"
   },
   {
@@ -271,6 +309,7 @@
    "first": "Amber",
    "area": "Inter",
    "bunk": "Wings",
+   "title": "Junior Group Counselor",
    "id": "s39"
   },
   {
@@ -278,6 +317,7 @@
    "first": "Cole",
    "area": "Senior",
    "bunk": "Thunder",
+   "title": "Asst Group Counselor",
    "id": "s40"
   },
   {
@@ -285,6 +325,7 @@
    "first": "Jocelyn",
    "area": "Inter",
    "bunk": "Jets",
+   "title": "Junior Group Counselor",
    "id": "s41"
   },
   {
@@ -292,6 +333,7 @@
    "first": "Julia",
    "area": "Arts & Crafts",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s42"
   },
   {
@@ -299,6 +341,7 @@
    "first": "Addey",
    "area": "Swim",
    "bunk": "",
+   "title": "Pool Lead",
    "id": "s43"
   },
   {
@@ -306,6 +349,7 @@
    "first": "Macy",
    "area": "Inter",
    "bunk": "Belles",
+   "title": "Junior Group Counselor",
    "id": "s44"
   },
   {
@@ -313,6 +357,7 @@
    "first": "Nichole",
    "area": "Swim",
    "bunk": "",
+   "title": "Pool Lead",
    "id": "s45"
   },
   {
@@ -320,6 +365,7 @@
    "first": "Jewel",
    "area": "Athletics",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s46"
   },
   {
@@ -327,6 +373,7 @@
    "first": "Michael",
    "area": "Ropes",
    "bunk": "",
+   "title": "Lead Specialist",
    "id": "s47"
   },
   {
@@ -334,6 +381,7 @@
    "first": "Sarah",
    "area": "Support",
    "bunk": "",
+   "title": "Office Personnel",
    "id": "s48"
   },
   {
@@ -341,6 +389,7 @@
    "first": "Kennedy",
    "area": "Drama",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s49"
   },
   {
@@ -348,6 +397,7 @@
    "first": "Emily",
    "area": "Junior",
    "bunk": "Tigers",
+   "title": "Junior Group Counselor",
    "id": "s50"
   },
   {
@@ -355,6 +405,7 @@
    "first": "Emma",
    "area": "Senior",
    "bunk": "Spirit",
+   "title": "Junior Group Counselor",
    "id": "s51"
   },
   {
@@ -362,6 +413,7 @@
    "first": "Daniel",
    "area": "Athletics",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s52"
   },
   {
@@ -369,6 +421,7 @@
    "first": "Gigi",
    "area": "Support",
    "bunk": "",
+   "title": "Photographer",
    "id": "s53"
   },
   {
@@ -376,6 +429,7 @@
    "first": "Sean",
    "area": "Athletics",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s54"
   },
   {
@@ -383,6 +437,7 @@
    "first": "Carly",
    "area": "Junior",
    "bunk": "Hawks",
+   "title": "Group Counselor",
    "id": "s55"
   },
   {
@@ -390,6 +445,7 @@
    "first": "Jackson",
    "area": "Athletics",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s56"
   },
   {
@@ -397,6 +453,7 @@
    "first": "Tyler",
    "area": "Upper",
    "bunk": "Soul",
+   "title": "Group Counselor",
    "id": "s57"
   },
   {
@@ -404,6 +461,7 @@
    "first": "Karen",
    "area": "Ropes",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s58"
   },
   {
@@ -411,6 +469,7 @@
    "first": "Aaronn",
    "area": "Inter",
    "bunk": "Wings",
+   "title": "Group Counselor",
    "id": "s59"
   },
   {
@@ -418,6 +477,7 @@
    "first": "Christine",
    "area": "Inter",
    "bunk": "Floater",
+   "title": "Floater",
    "id": "s60"
   },
   {
@@ -425,6 +485,7 @@
    "first": "Ethan",
    "area": "Senior",
    "bunk": "Union",
+   "title": "Junior Group Counselor",
    "id": "s61"
   },
   {
@@ -432,6 +493,7 @@
    "first": "Amy",
    "area": "Athletics",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s62"
   },
   {
@@ -439,6 +501,7 @@
    "first": "Kelly",
    "area": "Upper",
    "bunk": "Comets",
+   "title": "Asst Group Counselor",
    "id": "s63"
   },
   {
@@ -446,6 +509,7 @@
    "first": "Jennifer",
    "area": "Junior",
    "bunk": "Rugrats",
+   "title": "Group Counselor",
    "id": "s64"
   },
   {
@@ -453,6 +517,7 @@
    "first": "Isabelle",
    "area": "Upper",
    "bunk": "CITs",
+   "title": "Group Counselor",
    "id": "s65"
   },
   {
@@ -460,6 +525,7 @@
    "first": "Jake",
    "area": "Senior",
    "bunk": "Phils",
+   "title": "Junior Group Counselor",
    "id": "s66"
   },
   {
@@ -467,6 +533,7 @@
    "first": "Abigail",
    "area": "Upper",
    "bunk": "Mystics",
+   "title": "Junior Group Counselor",
    "id": "s67"
   },
   {
@@ -474,6 +541,7 @@
    "first": "Cassandra",
    "area": "Upper",
    "bunk": "CITs",
+   "title": "Group Counselor",
    "id": "s68"
   },
   {
@@ -481,6 +549,7 @@
    "first": "Molly",
    "area": "Senior",
    "bunk": "Spirit",
+   "title": "Junior Group Counselor",
    "id": "s69"
   },
   {
@@ -488,6 +557,7 @@
    "first": "Chloe",
    "area": "Senior",
    "bunk": "Olympians",
+   "title": "Group Counselor",
    "id": "s70"
   },
   {
@@ -495,6 +565,7 @@
    "first": "Jillian",
    "area": "Inter",
    "bunk": "Sparks",
+   "title": "Group Counselor",
    "id": "s71"
   },
   {
@@ -502,6 +573,7 @@
    "first": "Sylvia",
    "area": "Arts & Crafts",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s72"
   },
   {
@@ -509,6 +581,7 @@
    "first": "Abby",
    "area": "Junior",
    "bunk": "Tigers",
+   "title": "Asst Group Counselor",
    "id": "s73"
   },
   {
@@ -516,6 +589,7 @@
    "first": "Jodi",
    "area": "Junior",
    "bunk": "Cheetahs",
+   "title": "Group Counselor",
    "id": "s74"
   },
   {
@@ -523,6 +597,7 @@
    "first": "Holly",
    "area": "Upper",
    "bunk": "CITs",
+   "title": "Group Counselor",
    "id": "s75"
   },
   {
@@ -530,6 +605,7 @@
    "first": "Kate",
    "area": "Upper",
    "bunk": "Meteors",
+   "title": "Group Counselor",
    "id": "s76"
   },
   {
@@ -537,6 +613,7 @@
    "first": "Aidan",
    "area": "Upper",
    "bunk": "Soul",
+   "title": "Junior Group Counselor",
    "id": "s77"
   },
   {
@@ -544,6 +621,7 @@
    "first": "Sophia",
    "area": "Swim",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s78"
   },
   {
@@ -551,6 +629,7 @@
    "first": "Madeline",
    "area": "Senior",
    "bunk": "Olympians",
+   "title": "Asst Group Counselor",
    "id": "s79"
   },
   {
@@ -558,6 +637,7 @@
    "first": "Scott",
    "area": "Ropes",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s80"
   },
   {
@@ -565,6 +645,7 @@
    "first": "Andrew",
    "area": "Swim",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s81"
   },
   {
@@ -572,6 +653,7 @@
    "first": "Constantine",
    "area": "Upper",
    "bunk": "Soul",
+   "title": "Junior Group Counselor",
    "id": "s82"
   },
   {
@@ -579,6 +661,7 @@
    "first": "Justin",
    "area": "Senior",
    "bunk": "Flyers",
+   "title": "Group Counselor",
    "id": "s83"
   },
   {
@@ -586,6 +669,7 @@
    "first": "Emma",
    "area": "Senior",
    "bunk": "Charge",
+   "title": "Group Counselor",
    "id": "s84"
   },
   {
@@ -593,6 +677,7 @@
    "first": "Nathaniel",
    "area": "Athletics",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s85"
   },
   {
@@ -600,6 +685,7 @@
    "first": "Zara",
    "area": "Athletics",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s86"
   },
   {
@@ -607,6 +693,7 @@
    "first": "Adam",
    "area": "Upper",
    "bunk": "Warriors",
+   "title": "Asst Group Counselor",
    "id": "s87"
   },
   {
@@ -614,6 +701,7 @@
    "first": "Peyton",
    "area": "Inter",
    "bunk": "Raiders",
+   "title": "Asst Group Counselor",
    "id": "s88"
   },
   {
@@ -621,6 +709,7 @@
    "first": "Michael",
    "area": "Inter",
    "bunk": "Eagles",
+   "title": "Group Counselor",
    "id": "s89"
   },
   {
@@ -628,6 +717,7 @@
    "first": "Robert",
    "area": "Director",
    "bunk": "",
+   "title": "Owner",
    "id": "s90"
   },
   {
@@ -635,6 +725,7 @@
    "first": "Dana",
    "area": "Junior",
    "bunk": "Tigers",
+   "title": "Group Counselor",
    "id": "s91"
   },
   {
@@ -642,6 +733,7 @@
    "first": "Keira",
    "area": "Inter",
    "bunk": "Jets",
+   "title": "Junior Group Counselor",
    "id": "s92"
   },
   {
@@ -649,6 +741,7 @@
    "first": "Ronin",
    "area": "Upper",
    "bunk": "Sixers",
+   "title": "Junior Group Counselor",
    "id": "s93"
   },
   {
@@ -656,6 +749,7 @@
    "first": "Aaron",
    "area": "Ropes",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s94"
   },
   {
@@ -663,6 +757,7 @@
    "first": "Justin",
    "area": "Swim",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s95"
   },
   {
@@ -670,6 +765,7 @@
    "first": "Cormac",
    "area": "Ropes",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s96"
   },
   {
@@ -677,6 +773,7 @@
    "first": "Patricia",
    "area": "Support",
    "bunk": "",
+   "title": "Floater",
    "id": "s97"
   },
   {
@@ -684,6 +781,7 @@
    "first": "Charley",
    "area": "Inter",
    "bunk": "Sparks",
+   "title": "Junior Group Counselor",
    "id": "s98"
   },
   {
@@ -691,6 +789,7 @@
    "first": "Kriti",
    "area": "Support",
    "bunk": "",
+   "title": "Floater",
    "id": "s99"
   },
   {
@@ -698,6 +797,7 @@
    "first": "Zachary",
    "area": "Senior",
    "bunk": "Union",
+   "title": "Junior Group Counselor",
    "id": "s100"
   },
   {
@@ -705,6 +805,7 @@
    "first": "Ethan",
    "area": "Upper",
    "bunk": "Titans",
+   "title": "Junior Group Counselor",
    "id": "s101"
   },
   {
@@ -712,6 +813,7 @@
    "first": "Marka",
    "area": "Junior",
    "bunk": "Hawks",
+   "title": "Asst Group Counselor",
    "id": "s102"
   },
   {
@@ -719,6 +821,7 @@
    "first": "Stephen",
    "area": "Swim",
    "bunk": "",
+   "title": "Pool Lead",
    "id": "s103"
   },
   {
@@ -726,6 +829,7 @@
    "first": "Brooke",
    "area": "Inter",
    "bunk": "Belles",
+   "title": "Group Counselor",
    "id": "s104"
   },
   {
@@ -733,6 +837,7 @@
    "first": "Jack",
    "area": "Senior",
    "bunk": "Phils",
+   "title": "Junior Group Counselor",
    "id": "s105"
   },
   {
@@ -740,6 +845,7 @@
    "first": "Molly",
    "area": "Inter",
    "bunk": "Belles",
+   "title": "Junior Group Counselor",
    "id": "s106"
   },
   {
@@ -747,6 +853,7 @@
    "first": "Chelsea",
    "area": "Support",
    "bunk": "",
+   "title": "Photographer",
    "id": "s107"
   },
   {
@@ -754,6 +861,7 @@
    "first": "Bee",
    "area": "Ropes",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s108"
   },
   {
@@ -761,6 +869,7 @@
    "first": "Jenna",
    "area": "Ceramics",
    "bunk": "",
+   "title": "Asst Specialist Counselor",
    "id": "s109"
   },
   {
@@ -768,6 +877,7 @@
    "first": "Timmy",
    "area": "Swim",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s110"
   },
   {
@@ -775,6 +885,7 @@
    "first": "Ethan",
    "area": "Senior",
    "bunk": "Flyers",
+   "title": "Junior Group Counselor",
    "id": "s111"
   },
   {
@@ -782,6 +893,7 @@
    "first": "Maddie",
    "area": "Junior",
    "bunk": "Munchkins",
+   "title": "Junior Group Counselor",
    "id": "s112"
   },
   {
@@ -789,6 +901,7 @@
    "first": "Robin",
    "area": "Nature",
    "bunk": "",
+   "title": "Lead Specialist",
    "id": "s113"
   },
   {
@@ -796,6 +909,7 @@
    "first": "Jessica",
    "area": "Wildercraft",
    "bunk": "",
+   "title": "Lead Specialist",
    "id": "s114"
   },
   {
@@ -803,6 +917,7 @@
    "first": "Emily",
    "area": "Junior",
    "bunk": "Bulldogs",
+   "title": "Group Counselor",
    "id": "s115"
   },
   {
@@ -810,6 +925,7 @@
    "first": "Colin",
    "area": "Upper",
    "bunk": "Sixers",
+   "title": "Junior Group Counselor",
    "id": "s116"
   },
   {
@@ -817,6 +933,7 @@
    "first": "Isabella",
    "area": "Inter",
    "bunk": "Fusion",
+   "title": "Group Counselor",
    "id": "s117"
   },
   {
@@ -824,6 +941,7 @@
    "first": "Mason",
    "area": "Ropes",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s118"
   },
   {
@@ -831,6 +949,7 @@
    "first": "Nolan",
    "area": "Junior",
    "bunk": "Hawks",
+   "title": "Junior Group Counselor",
    "id": "s119"
   },
   {
@@ -838,6 +957,7 @@
    "first": "Kiel",
    "area": "Junior",
    "bunk": "Lions",
+   "title": "Asst Group Counselor",
    "id": "s120"
   },
   {
@@ -845,6 +965,7 @@
    "first": "Liana",
    "area": "Junior",
    "bunk": "Munchkins",
+   "title": "Junior Group Counselor",
    "id": "s121"
   },
   {
@@ -852,6 +973,7 @@
    "first": "Darryn",
    "area": "Support",
    "bunk": "",
+   "title": "Floater",
    "id": "s122"
   },
   {
@@ -859,6 +981,7 @@
    "first": "Gavin",
    "area": "Support",
    "bunk": "",
+   "title": "Photographer",
    "id": "s123"
   },
   {
@@ -866,6 +989,7 @@
    "first": "Christopher",
    "area": "Senior",
    "bunk": "Thunder",
+   "title": "Junior Group Counselor",
    "id": "s124"
   },
   {
@@ -873,6 +997,7 @@
    "first": "Zachary",
    "area": "Swim",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s125"
   },
   {
@@ -880,6 +1005,7 @@
    "first": "Alexander",
    "area": "Senior",
    "bunk": "Thunder",
+   "title": "Junior Group Counselor",
    "id": "s126"
   },
   {
@@ -887,6 +1013,7 @@
    "first": "Mikayla",
    "area": "Upper",
    "bunk": "Meteors",
+   "title": "Junior Group Counselor",
    "id": "s127"
   },
   {
@@ -894,6 +1021,7 @@
    "first": "Tess",
    "area": "Junior",
    "bunk": "Rugrats",
+   "title": "Group Counselor",
    "id": "s128"
   },
   {
@@ -901,6 +1029,7 @@
    "first": "Lara",
    "area": "Support",
    "bunk": "",
+   "title": "Nurse",
    "id": "s129"
   },
   {
@@ -908,6 +1037,7 @@
    "first": "Hannah",
    "area": "Support",
    "bunk": "",
+   "title": "Junior Floater",
    "id": "s130"
   },
   {
@@ -915,6 +1045,7 @@
    "first": "Allie",
    "area": "Junior",
    "bunk": "Cheetahs",
+   "title": "Junior Group Counselor",
    "id": "s131"
   },
   {
@@ -922,6 +1053,7 @@
    "first": "Matthew",
    "area": "Upper",
    "bunk": "Sixer",
+   "title": "Group Counselor",
    "id": "s132"
   },
   {
@@ -929,6 +1061,7 @@
    "first": "Kristin",
    "area": "Ropes",
    "bunk": "",
+   "title": "Asst Lead Specialist",
    "id": "s133"
   },
   {
@@ -936,6 +1069,7 @@
    "first": "Charles",
    "area": "Athletics",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s134"
   },
   {
@@ -943,6 +1077,7 @@
    "first": "Eric",
    "area": "Athletics",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s135"
   },
   {
@@ -950,6 +1085,7 @@
    "first": "Ava",
    "area": "Athletics",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s136"
   },
   {
@@ -957,6 +1093,7 @@
    "first": "Lauryn",
    "area": "Athletics",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s137"
   },
   {
@@ -964,6 +1101,7 @@
    "first": "Rose",
    "area": "Upper",
    "bunk": "Stars",
+   "title": "Junior Group Counselor",
    "id": "s138"
   },
   {
@@ -971,6 +1109,7 @@
    "first": "Michael",
    "area": "Upper",
    "bunk": "CITs",
+   "title": "Group Counselor",
    "id": "s139"
   },
   {
@@ -978,6 +1117,7 @@
    "first": "Ava",
    "area": "Inter",
    "bunk": "Sparks",
+   "title": "Junior Group Counselor",
    "id": "s140"
   },
   {
@@ -985,6 +1125,7 @@
    "first": "John",
    "area": "Senior",
    "bunk": "Flyers",
+   "title": "Junior Group Counselor",
    "id": "s141"
   },
   {
@@ -992,6 +1133,7 @@
    "first": "Jaclyn",
    "area": "Support",
    "bunk": "",
+   "title": "Photographer",
    "id": "s142"
   },
   {
@@ -999,6 +1141,7 @@
    "first": "Adeline",
    "area": "Arts & Crafts",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s143"
   },
   {
@@ -1006,6 +1149,7 @@
    "first": "Cole",
    "area": "Upper",
    "bunk": "Warriors",
+   "title": "Junior Group Counselor",
    "id": "s144"
   },
   {
@@ -1013,6 +1157,7 @@
    "first": "Drew",
    "area": "Upper",
    "bunk": "Warriors",
+   "title": "Group Counselor",
    "id": "s145"
   },
   {
@@ -1020,6 +1165,7 @@
    "first": "Raelynn",
    "area": "Upper",
    "bunk": "Mystics",
+   "title": "Junior Group Counselor",
    "id": "s146"
   },
   {
@@ -1027,6 +1173,7 @@
    "first": "Jacob",
    "area": "Upper",
    "bunk": "CITs",
+   "title": "Group Counselor",
    "id": "s147"
   },
   {
@@ -1034,6 +1181,7 @@
    "first": "Disha",
    "area": "Inter",
    "bunk": "Wings",
+   "title": "Group Counselor",
    "id": "s148"
   },
   {
@@ -1041,6 +1189,7 @@
    "first": "Josh",
    "area": "Athletics",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s149"
   },
   {
@@ -1048,6 +1197,7 @@
    "first": "Lisa",
    "area": "Inter",
    "bunk": "Jets",
+   "title": "Group Counselor",
    "id": "s150"
   },
   {
@@ -1055,6 +1205,7 @@
    "first": "Zevin",
    "area": "Support",
    "bunk": "",
+   "title": "Nurse",
    "id": "s151"
   },
   {
@@ -1062,6 +1213,7 @@
    "first": "Adam",
    "area": "Junior",
    "bunk": "Bulldogs",
+   "title": "Junior Group Counselor",
    "id": "s152"
   },
   {
@@ -1069,6 +1221,7 @@
    "first": "Erica",
    "area": "Junior",
    "bunk": "Munchkins",
+   "title": "Group Counselor",
    "id": "s153"
   },
   {
@@ -1076,6 +1229,7 @@
    "first": "Ashley",
    "area": "Arts & Crafts",
    "bunk": "",
+   "title": "Lead Specialist",
    "id": "s154"
   },
   {
@@ -1083,6 +1237,7 @@
    "first": "Jan",
    "area": "Swim",
    "bunk": "",
+   "title": "Pool Lead",
    "id": "s155"
   },
   {
@@ -1090,6 +1245,7 @@
    "first": "Rylee",
    "area": "Senior",
    "bunk": "Charge",
+   "title": "Junior Group Counselor",
    "id": "s156"
   },
   {
@@ -1097,6 +1253,7 @@
    "first": "Brianna",
    "area": "Junior",
    "bunk": "Cheetahs",
+   "title": "Group Counselor",
    "id": "s157"
   },
   {
@@ -1104,6 +1261,7 @@
    "first": "Jaxon",
    "area": "Inter",
    "bunk": "Eagles",
+   "title": "Junior Group Counselor",
    "id": "s158"
   },
   {
@@ -1111,6 +1269,7 @@
    "first": "Ryan",
    "area": "Athletics",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s159"
   },
   {
@@ -1118,6 +1277,7 @@
    "first": "William",
    "area": "Junior",
    "bunk": "Lions",
+   "title": "Junior Group Counselor",
    "id": "s160"
   },
   {
@@ -1125,6 +1285,7 @@
    "first": "Abigail",
    "area": "Support",
    "bunk": "",
+   "title": "Office Personnel",
    "id": "s161"
   },
   {
@@ -1132,6 +1293,7 @@
    "first": "Jeffrey",
    "area": "Athletics",
    "bunk": "",
+   "title": "Junior Specialist Counselor",
    "id": "s162"
   },
   {
@@ -1139,6 +1301,7 @@
    "first": "Rachael",
    "area": "Swim",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s163"
   },
   {
@@ -1146,6 +1309,7 @@
    "first": "Sophia",
    "area": "Senior",
    "bunk": "Charge",
+   "title": "Junior Group Counselor",
    "id": "s164"
   },
   {
@@ -1153,6 +1317,7 @@
    "first": "Gabriela",
    "area": "Inter",
    "bunk": "Raiders",
+   "title": "Group Counselor",
    "id": "s165"
   },
   {
@@ -1160,6 +1325,7 @@
    "first": "Ethan",
    "area": "Junior",
    "bunk": "Bulldogs",
+   "title": "Group Counselor",
    "id": "s166"
   },
   {
@@ -1167,6 +1333,7 @@
    "first": "Jennifer",
    "area": "Drama",
    "bunk": "",
+   "title": "Lead Specialist",
    "id": "s167"
   },
   {
@@ -1174,6 +1341,7 @@
    "first": "Lauren",
    "area": "Music & Dance",
    "bunk": "",
+   "title": "Lead Specialist",
    "id": "s168"
   },
   {
@@ -1181,6 +1349,7 @@
    "first": "Sophia",
    "area": "Swim",
    "bunk": "",
+   "title": "Specialist Counselor",
    "id": "s169"
   },
   {
@@ -1188,6 +1357,7 @@
    "first": "Mimi",
    "area": "Junior",
    "bunk": "Rugrats",
+   "title": "Group Counselor",
    "id": "s170"
   },
   {
@@ -1195,6 +1365,7 @@
    "first": "Scott",
    "area": "Senior",
    "bunk": "Union",
+   "title": "Group Counselor",
    "id": "s171"
   }
  ]

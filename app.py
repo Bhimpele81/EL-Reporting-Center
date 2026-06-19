@@ -251,18 +251,20 @@ def _payroll_load() -> dict:
         _payroll_save(data)
     data.setdefault("staff", [])
     data.setdefault("checks", {})
-    # Backfill the 'bunk' field (added later) from the seed for staff missing it
-    if any("bunk" not in s for s in data["staff"]):
+    # Backfill 'bunk'/'title' (added later) from the seed for staff missing them
+    if any(("bunk" not in s or "title" not in s) for s in data["staff"]):
         try:
             with open(SEED_PATH) as f:
-                seed_bunk = {(x["last"].lower(), x["first"].lower()): x.get("bunk", "")
-                             for x in json.load(f).get("staff", [])}
+                seed_map = {(x["last"].lower(), x["first"].lower()): x
+                            for x in json.load(f).get("staff", [])}
         except Exception:
-            seed_bunk = {}
+            seed_map = {}
         for s in data["staff"]:
+            sm = seed_map.get((s.get("last", "").lower(), s.get("first", "").lower()), {})
             if "bunk" not in s:
-                s["bunk"] = seed_bunk.get((s.get("last", "").lower(),
-                                           s.get("first", "").lower()), "")
+                s["bunk"] = sm.get("bunk", "")
+            if "title" not in s:
+                s["title"] = sm.get("title", "")
         _payroll_save(data)
     return data
 
@@ -691,7 +693,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .container{max-width:960px;margin:0 auto;padding:2rem 1.5rem 4rem}
 .tab-panel{display:none}.tab-panel.active{display:block}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
-.payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center}
+.payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
+.payroll-table td{height:42px}
 .payroll-table thead th{background:var(--brand);color:#fff;font-weight:700;white-space:nowrap}
 .payroll-table td.pr-name{text-align:left;font-weight:600;white-space:nowrap}
 .payroll-table td.pr-area{color:#555;white-space:nowrap}
@@ -1662,8 +1665,9 @@ function renderPayroll() {
     html += `<tr data-id="${s.id}">`;
     html += `<td class="pr-count" id="cnt-${s.id}">${prCount(s.id)}</td>`;
     html += `<td class="pr-name">${s.last}, ${s.first}</td>`;
+    const areaTxt = (s.area === 'Support' && s.title) ? s.title : (s.area || '');
     const bunkLine = s.bunk ? `<br><small style="color:#888;font-weight:400">${s.bunk}</small>` : '';
-    html += `<td class="pr-area">${s.area || ''}${bunkLine}</td>`;
+    html += `<td class="pr-area">${areaTxt}${bunkLine}</td>`;
     days.forEach((d,i) => {
       const st = cellState(s.id, d.iso);
       const sym = st === 'check' ? '✓' : st === 'x' ? '✗' : '';
