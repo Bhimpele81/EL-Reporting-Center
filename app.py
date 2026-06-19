@@ -1713,7 +1713,7 @@ function renderPayroll() {
     }
     return (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase());
   });
-  const showExtra = prPeriod >= 1;   // 2 extra columns only after Weeks 1 & 2
+  const showExtra = prPeriod === 0;   // BS / SP\\MTC columns only on the Weeks 1 & 2 block
   let html = '<thead><tr><th>#</th><th>Staff</th><th>Area</th>';
   days.forEach((d,i) => {
     const cls = 'pr-day' + (i === 5 ? ' pr-week-sep' : '');
