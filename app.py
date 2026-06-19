@@ -252,8 +252,8 @@ def _payroll_load() -> dict:
     data.setdefault("staff", [])
     data.setdefault("checks", {})
     data.setdefault("locked", False)
-    # Backfill 'bunk'/'title' (added later) from the seed for staff missing them
-    if any(("bunk" not in s or "title" not in s) for s in data["staff"]):
+    # Backfill 'bunk'/'title'/'ext' (added later) from the seed for staff missing them
+    if any(("bunk" not in s or "title" not in s or "ext" not in s) for s in data["staff"]):
         try:
             with open(SEED_PATH) as f:
                 seed_map = {(x["last"].lower(), x["first"].lower()): x
@@ -266,6 +266,8 @@ def _payroll_load() -> dict:
                 s["bunk"] = sm.get("bunk", "")
             if "title" not in s:
                 s["title"] = sm.get("title", "")
+            if "ext" not in s:
+                s["ext"] = sm.get("ext", "")
         _payroll_save(data)
     return data
 
@@ -425,6 +427,96 @@ def api_payroll_lock():
     data["locked"] = bool(body.get("locked"))
     _payroll_save(data)
     return jsonify({"locked": data["locked"]})
+
+
+@app.route("/api/payroll/export")
+def api_payroll_export():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    view   = request.args.get("view", "weeks")
+    area   = request.args.get("area", "ALL")
+    sort   = request.args.get("sort", "last")
+    try:
+        period = int(request.args.get("period", "0"))
+    except (TypeError, ValueError):
+        period = 0
+
+    data = _payroll_load()
+    checks = data["checks"]
+    days_all = _payroll_days()
+    staff = [s for s in data["staff"] if area == "ALL" or s.get("area") == area]
+
+    SYM = {"check": "✓", "x": "✗", "half": "½", "na": "N/A", True: "✓"}
+    def namekey(s): return (s.get("last", "") + s.get("first", "")).lower()
+    def cnt(sid, days):
+        c = checks.get(sid, {})
+        return sum(1 for d in days if c.get(d["iso"]) in ("check", True))
+    def area_txt(s):
+        return s.get("title") if (s.get("area") == "Support" and s.get("title")) else s.get("area", "")
+
+    wb = Workbook(); ws = wb.active; ws.title = "Payroll"
+    HDR = Font(bold=True, color="FFFFFF"); FILL = PatternFill("solid", fgColor="6D1F2F")
+    CTR = Alignment(horizontal="center", vertical="center")
+    LEFT = Alignment(horizontal="left", vertical="center")
+    _t = Side(style="thin", color="CCCCCC"); BORD = Border(left=_t, right=_t, top=_t, bottom=_t)
+
+    def header(cols):
+        ws.append(cols)
+        for c in ws[ws.max_row]:
+            c.font = HDR; c.fill = FILL; c.alignment = CTR; c.border = BORD
+
+    if view == "totals":
+        staff.sort(key=(lambda s: (-cnt(s["id"], days_all), namekey(s))) if sort == "total"
+                   else (lambda s: (s.get("area", "").lower(), namekey(s))) if sort == "area"
+                   else namekey)
+        header(["Staff", "Area", "Total Checks (all 8 weeks)"])
+        for s in staff:
+            jc = " (JC)" if "junior" in (s.get("title", "").lower()) else ""
+            a = area_txt(s) + (f" — {s['bunk']}" if s.get("bunk") else "")
+            ws.append([f"{s.get('last','')}, {s.get('first','')}{jc}", a, cnt(s["id"], days_all)])
+            for c in ws[ws.max_row]:
+                c.border = BORD; c.alignment = CTR if c.column == 3 else LEFT
+        widths = {"A": 30, "B": 22, "C": 14}; fname = "Payroll_Totals.xlsx"
+    elif view == "ext":
+        staff = [s for s in staff if s.get("ext")]
+        staff.sort(key=namekey)
+        header(["Staff", "MON", "TUES", "WED", "THURS", "FRI"])
+        for s in staff:
+            ws.append([f"{s.get('last','')}, {s.get('first','')}", "", "", "", "", ""])
+            ws.row_dimensions[ws.max_row].height = 26
+            for c in ws[ws.max_row]:
+                c.border = BORD; c.alignment = LEFT if c.column == 1 else CTR
+        widths = {"A": 30, "B": 11, "C": 11, "D": 11, "E": 11, "F": 11}; fname = "Extended_Staff.xlsx"
+    else:  # weeks
+        days = days_all[period * 10:period * 10 + 10]
+        staff.sort(key=(lambda s: (-cnt(s["id"], days), namekey(s))) if sort == "total"
+                   else (lambda s: (s.get("area", "").lower(), namekey(s))) if sort == "area"
+                   else namekey)
+        cols = ["#", "Staff", "Area"] + [f"{d['dow']} {d['md']}" for d in days]
+        if period == 0:
+            cols += ["BS", "SP\\MTC"]
+        header(cols)
+        for s in staff:
+            c = checks.get(s["id"], {})
+            row = [cnt(s["id"], days), f"{s.get('last','')}, {s.get('first','')}",
+                   area_txt(s) + (f" / {s['bunk']}" if s.get("bunk") else "")]
+            row += [SYM.get(c.get(d["iso"]), "") for d in days]
+            if period == 0:
+                row += [SYM.get(c.get(f"xtra:0:{cc}"), "") for cc in (1, 2)]
+            ws.append(row)
+            for cell in ws[ws.max_row]:
+                cell.border = BORD; cell.alignment = LEFT if cell.column == 2 else CTR
+        widths = {"A": 5, "B": 26, "C": 18}; fname = f"Payroll_Weeks_{period*2+1}_{period*2+2}.xlsx"
+
+    for col, w in widths.items():
+        ws.column_dimensions[col].width = w
+    ws.page_setup.orientation = "landscape"
+    ws.print_options.horizontalCentered = True
+
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name=fname, mimetype=_XLSX_MIME)
 
 
 @app.route("/api/payroll/check", methods=["POST"])
@@ -723,8 +815,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td.pr-cell.st-half{color:#1A79BF;font-size:1.1rem;font-weight:700}
 .payroll-table td.pr-cell.st-na{color:#888;font-size:.95rem;font-weight:700}
 .payroll-table th.pr-day,.payroll-table td.pr-cell{width:42px;min-width:42px}
-.payroll-table th.pr-extra{width:58px;min-width:58px;background:#3f1119;color:#fff}
-.payroll-table td.pr-xcell{width:58px;min-width:58px;background:#f3e7ea}
+.payroll-table th.pr-extra{width:66px;min-width:66px;background:#3f1119;color:#fff;white-space:nowrap}
+.payroll-table td.pr-xcell{width:66px;min-width:66px;background:#f3e7ea}
 .payroll-table.pr-locked td.pr-cell,.payroll-table.pr-locked td.pr-xcell{cursor:not-allowed}
 .payroll-table .pr-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.95rem;padding:0}
 .pr-week-sep{border-left:3px solid #6d1f2f !important}
@@ -1634,6 +1726,7 @@ async function loadWeather() {
 let payroll = {staff: [], checks: {}, days: []};
 let prPeriod = 0;   // 0..3 → weeks 1&2, 3&4, 5&6, 7&8
 let prTotals = false;   // when true, show the cumulative Totals view
+let prExt = false;      // when true, show the blank Extended Staff sheet
 
 async function loadPayroll() {
   try {
@@ -1674,17 +1767,23 @@ function renderPayroll() {
   pb.innerHTML = '';
   for (let p = 0; p < 4; p++) {
     const b = document.createElement('button');
-    b.className = 'pr-period-btn' + ((!prTotals && p === prPeriod) ? ' active' : '');
+    b.className = 'pr-period-btn' + ((!prTotals && !prExt && p === prPeriod) ? ' active' : '');
     b.textContent = `Weeks ${p*2+1} & ${p*2+2}`;
-    b.onclick = () => { prPeriod = p; prTotals = false; renderPayroll(); };
+    b.onclick = () => { prPeriod = p; prTotals = false; prExt = false; renderPayroll(); };
     pb.appendChild(b);
   }
   const tb = document.createElement('button');   // Totals view, slightly separated
   tb.className = 'pr-period-btn' + (prTotals ? ' active' : '');
   tb.textContent = '🧮 Totals';
   tb.style.marginLeft = '1.4rem';
-  tb.onclick = () => { prTotals = true; renderPayroll(); };
+  tb.onclick = () => { prTotals = true; prExt = false; renderPayroll(); };
   pb.appendChild(tb);
+  const eb = document.createElement('button');   // Extended Staff blank sheet
+  eb.className = 'pr-period-btn' + (prExt ? ' active' : '');
+  eb.textContent = '👤 Extended Staff';
+  eb.style.marginLeft = '.5rem';
+  eb.onclick = () => { prExt = true; prTotals = false; renderPayroll(); };
+  pb.appendChild(eb);
   // area filter dropdown (preserve current selection)
   const fsel = document.getElementById('pr-filter-area');
   const areas = [...new Set(payroll.staff.map(s => s.area).filter(Boolean))].sort();
@@ -1702,6 +1801,7 @@ function renderPayroll() {
     const el = document.getElementById(id); if (el) el.disabled = payroll.locked;
   });
 
+  if (prExt) { renderExtTable(filterArea); return; }
   if (prTotals) { renderTotalsTable(filterArea, sortKey); return; }
 
   // table
@@ -1819,6 +1919,24 @@ function totalChecks(id) {
 }
 function isJC(s) { return (s.title || '').toLowerCase().includes('junior'); }
 
+// Extended Staff — blank printable check-in sheet (only AM/PM-extended staff)
+function renderExtTable(filterArea) {
+  const staff = payroll.staff
+    .filter(s => s.ext && (filterArea === 'ALL' || s.area === filterArea))
+    .sort((a,b) => (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase()));
+  let html = `<caption>Extended Staff — daily check-in (${staff.length})</caption>` +
+    '<thead><tr><th>Staff</th>' +
+    ['MON','TUES','WED','THURS','FRI'].map(d => `<th style="width:74px;min-width:74px">${d}</th>`).join('') +
+    '</tr></thead><tbody>';
+  staff.forEach(s => {
+    html += `<tr><td class="pr-name">${s.last}, ${s.first}</td>` +
+            '<td></td><td></td><td></td><td></td><td></td></tr>';
+  });
+  html += '</tbody>';
+  const tbl = document.getElementById('payroll-table');
+  tbl.innerHTML = html; tbl.className = 'payroll-table';
+}
+
 // Totals view (rendered into the same Payroll table when the Totals button is on)
 function renderTotalsTable(filterArea, sortKey) {
   let staff = payroll.staff.filter(s => filterArea === 'ALL' || s.area === filterArea)
@@ -1879,22 +1997,12 @@ function payrollTitle() {
 // Print / save-as-PDF (prints exactly what's on screen, filtered/sorted)
 document.getElementById('pr-print').addEventListener('click', () => window.print());
 
-// Export the current (filtered/sorted) table to an .xls Excel file
+// Export the current (filtered/sorted) view to a real .xlsx (server-built)
 document.getElementById('pr-export').addEventListener('click', () => {
-  const tbl = document.getElementById('payroll-table').cloneNode(true);
-  if (!prTotals) {  // drop the delete (✕) column in the weeks grid
-    tbl.querySelectorAll('tr').forEach(tr => { if (tr.lastElementChild) tr.lastElementChild.remove(); });
-  }
-  tbl.querySelectorAll('button').forEach(b => b.remove());
-  const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
-    'xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>' +
-    tbl.outerHTML + '</body></html>';
-  const blob = new Blob(['﻿' + html], {type: 'application/vnd.ms-excel'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = payrollTitle().replace(/[^\w]+/g, '_').replace(/^_|_$/g, '') + '.xls';
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(a.href);
+  const view = prTotals ? 'totals' : prExt ? 'ext' : 'weeks';
+  const area = encodeURIComponent(document.getElementById('pr-filter-area').value);
+  const sort = document.getElementById('pr-sort').value;
+  window.location = `/api/payroll/export?view=${view}&period=${prPeriod}&area=${area}&sort=${sort}`;
 });
 
 // Boot
