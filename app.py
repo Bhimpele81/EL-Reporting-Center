@@ -700,7 +700,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td.pr-area{color:#555;white-space:nowrap}
 .payroll-table td.pr-count{font-weight:700;color:var(--brand);width:34px}
 .payroll-table tbody tr:nth-child(even){background:#f4eef0}
-.payroll-table td.pr-cell{cursor:pointer;font-weight:800;font-size:1.05rem;user-select:none;line-height:1}
+.payroll-table td.pr-cell{cursor:pointer;font-weight:800;font-size:1.6rem;user-select:none;line-height:1}
 .payroll-table td.pr-cell.st-check{color:#2e7d32}
 .payroll-table td.pr-cell.st-x{color:#c0392b}
 .payroll-table .pr-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.95rem;padding:0}
