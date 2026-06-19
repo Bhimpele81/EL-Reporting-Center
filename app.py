@@ -417,15 +417,15 @@ def api_payroll():
 @app.route("/api/payroll/check", methods=["POST"])
 def api_payroll_check():
     body = request.get_json(force=True, silent=True) or {}
-    sid = str(body.get("id", "")); dt = str(body.get("date", "")); val = bool(body.get("value"))
+    sid = str(body.get("id", "")); dt = str(body.get("date", "")); val = body.get("value")
     if not sid or not dt:
         return jsonify({"error": "missing id/date"}), 400
     data = _payroll_load()
     checks = data["checks"].setdefault(sid, {})
-    if val:
-        checks[dt] = True
+    if val in ("check", "x"):
+        checks[dt] = val
     else:
-        checks.pop(dt, None)
+        checks.pop(dt, None)   # blank / cleared
     _payroll_save(data)
     return jsonify({"ok": True})
 
@@ -697,7 +697,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td.pr-area{color:#555;white-space:nowrap}
 .payroll-table td.pr-count{font-weight:700;color:var(--brand);width:34px}
 .payroll-table tbody tr:nth-child(even){background:#f4eef0}
-.payroll-table input[type=checkbox]{width:18px;height:18px;cursor:pointer}
+.payroll-table td.pr-cell{cursor:pointer;font-weight:800;font-size:1.05rem;user-select:none;line-height:1}
+.payroll-table td.pr-cell.st-check{color:#2e7d32}
+.payroll-table td.pr-cell.st-x{color:#c0392b}
 .payroll-table .pr-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.95rem;padding:0}
 .pr-week-sep{border-left:3px solid #6d1f2f !important}
 .pr-period-btn{padding:.4rem .8rem;border:1px solid var(--brand);background:#fff;color:var(--brand);border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem}
@@ -1605,9 +1607,16 @@ function prPeriodDays() {
   return payroll.days.slice(prPeriod * 10, prPeriod * 10 + 10);
 }
 
+function cellState(id, iso) {
+  const v = (payroll.checks[id] || {})[iso];
+  if (v === true || v === 'check') return 'check';   // legacy true == check
+  if (v === 'x') return 'x';
+  return '';
+}
+
 function prCount(id) {
-  const c = payroll.checks[id] || {};
-  return prPeriodDays().reduce((n, d) => n + (c[d.iso] ? 1 : 0), 0);
+  // Only checkmarks count toward the total (X marks do not)
+  return prPeriodDays().reduce((n, d) => n + (cellState(id, d.iso) === 'check' ? 1 : 0), 0);
 }
 
 function renderPayroll() {
@@ -1656,9 +1665,10 @@ function renderPayroll() {
     const bunkLine = s.bunk ? `<br><small style="color:#888;font-weight:400">${s.bunk}</small>` : '';
     html += `<td class="pr-area">${s.area || ''}${bunkLine}</td>`;
     days.forEach((d,i) => {
-      const sep = (i === 5) ? ' class="pr-week-sep"' : '';
-      const ck = c[d.iso] ? 'checked' : '';
-      html += `<td${sep}><input type="checkbox" data-id="${s.id}" data-date="${d.iso}" ${ck}></td>`;
+      const st = cellState(s.id, d.iso);
+      const sym = st === 'check' ? '✓' : st === 'x' ? '✗' : '';
+      const cls = 'pr-cell st-' + (st || 'none') + (i === 5 ? ' pr-week-sep' : '');
+      html += `<td class="${cls}" data-id="${s.id}" data-date="${d.iso}">${sym}</td>`;
     });
     html += `<td><button class="pr-del" data-id="${s.id}" title="Remove">✕</button></td>`;
     html += '</tr>';
@@ -1667,14 +1677,19 @@ function renderPayroll() {
   const tbl = document.getElementById('payroll-table');
   tbl.innerHTML = html;
 
-  tbl.querySelectorAll('input[type=checkbox]').forEach(cb => {
-    cb.addEventListener('change', async () => {
-      const id = cb.dataset.id, dt = cb.dataset.date, val = cb.checked;
+  tbl.querySelectorAll('td.pr-cell').forEach(cell => {
+    cell.addEventListener('click', async () => {
+      const id = cell.dataset.id, dt = cell.dataset.date;
+      const cur = cellState(id, dt);
+      const next = cur === '' ? 'check' : cur === 'check' ? 'x' : '';  // cycle
       payroll.checks[id] = payroll.checks[id] || {};
-      if (val) payroll.checks[id][dt] = true; else delete payroll.checks[id][dt];
+      if (next) payroll.checks[id][dt] = next; else delete payroll.checks[id][dt];
+      cell.textContent = next === 'check' ? '✓' : next === 'x' ? '✗' : '';
+      cell.classList.remove('st-check', 'st-x', 'st-none');
+      cell.classList.add('st-' + (next || 'none'));
       document.getElementById('cnt-' + id).textContent = prCount(id);
       try { await fetch('/api/payroll/check', {method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({id, date: dt, value: val})}); } catch(e) {}
+            body: JSON.stringify({id, date: dt, value: next})}); } catch(e) {}
     });
   });
   tbl.querySelectorAll('.pr-del').forEach(btn => {
