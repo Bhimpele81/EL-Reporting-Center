@@ -1848,7 +1848,7 @@ def build_pm_grp_extend_sheet(ws, campers: list, week_num: int = None) -> None:
             cell.border = T_ALL
             if af: cell.fill = af
             if letter not in sched:
-                cell.value = "C"; cell.font = F_ABSENT; cell.alignment = CTR
+                cell.value = "-"; cell.font = F_ABSENT; cell.alignment = CTR
 
         r += 1
         group_count += 1
@@ -1890,9 +1890,8 @@ def build_pm_grp_extend_sheet(ws, campers: list, week_num: int = None) -> None:
     ws.oddHeader.center.text  = _hdr
     ws.evenHeader.center.text = _hdr
 
-    # ---- Footer: ✓/C/O legend printed on every page (spread across L/C/R) ----
+    # ---- Footer: ✓/O legend printed on every page (left + right) ----
     ws.oddFooter.left.text   = "&32✓&16 = Camper in Attendance"
-    ws.oddFooter.center.text = "&32C&16 = Camper Confirmed Absent"
     ws.oddFooter.right.text  = "&32O&16 = Camper Not Present"
 
 
