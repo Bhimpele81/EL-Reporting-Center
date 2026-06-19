@@ -855,7 +855,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 
   <button class="run-btn" id="run-btn" disabled>
     <span id="run-icon">⚙️</span>
-    <span id="run-label">Convert Report</span>
+    <span id="run-label">Run Report</span>
   </button>
 
   <div id="prog-panel">
@@ -1154,14 +1154,16 @@ async function pollStatus() {
       document.getElementById('pbar').style.width = '100%';
       document.getElementById('spinner').style.animation = 'none';
       document.getElementById('spinner').style.borderTopColor = '#6fcf97';
-      document.getElementById('prog-title').textContent = 'Complete!';
+      document.getElementById('prog-title').textContent = 'Complete! Downloading…';
       document.getElementById('run-btn').disabled = false;
-      document.getElementById('run-label').textContent = 'Convert Report';
+      document.getElementById('run-label').textContent = 'Run Report';
       document.getElementById('run-icon').textContent = '⚙️';
 
       const dlLink = document.getElementById('dl-link');
       dlLink.href  = `/api/download/${currentJobId}`;
       document.getElementById('action-bar').style.display = 'flex';
+      // Auto-download (button stays as a fallback if the browser blocks it)
+      try { dlLink.click(); } catch(e) {}
       loadRecent();
       loadMaster();   // a freshly uploaded master is now saved for reuse
     }
@@ -1181,7 +1183,7 @@ function showError(msg) {
   document.getElementById('error-card').classList.add('visible');
   document.getElementById('prog-panel').classList.remove('visible');
   document.getElementById('run-btn').disabled = false;
-  document.getElementById('run-label').textContent = 'Convert Report';
+  document.getElementById('run-label').textContent = 'Run Report';
   document.getElementById('run-icon').textContent = '⚙️';
 }
 
