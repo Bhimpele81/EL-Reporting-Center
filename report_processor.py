@@ -1773,7 +1773,7 @@ def build_pm_grp_extend_sheet(ws, campers: list, week_num: int = None) -> None:
     F_DAYHDR = Font(name=FONT_NAME, bold=True,  size=16, color=WHITE)     # larger day names
     F_BUNK   = Font(name=FONT_NAME, bold=False, size=12)                  # smaller bunk
     F_DATA   = Font(name=FONT_NAME, bold=False, size=14)
-    F_ABSENT = Font(name=FONT_NAME, bold=False, size=14, color="999999")  # lightly greyed C
+    F_ABSENT = Font(name=FONT_NAME, bold=True, size=18, color="595959")  # dash for non-attending days
     F_TOTAL  = Font(name=FONT_NAME, bold=True,  size=18)                  # larger total
 
     CTR  = Alignment(horizontal="center", vertical="center")
@@ -1848,7 +1848,7 @@ def build_pm_grp_extend_sheet(ws, campers: list, week_num: int = None) -> None:
             cell.border = T_ALL
             if af: cell.fill = af
             if letter not in sched:
-                cell.value = "-"; cell.font = F_ABSENT; cell.alignment = CTR
+                cell.value = "—"; cell.font = F_ABSENT; cell.alignment = CTR
 
         r += 1
         group_count += 1
