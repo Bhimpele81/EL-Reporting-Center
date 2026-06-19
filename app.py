@@ -822,6 +822,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .pr-week-sep{border-left:3px solid #6d1f2f !important}
 .pr-period-btn{padding:.4rem .8rem;border:1px solid var(--brand);background:#fff;color:var(--brand);border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem}
 .pr-period-btn.active{background:var(--brand);color:#fff}
+.pr-period-btn.pr-sm{padding:.28rem .55rem;font-size:.72rem;font-weight:600}
 .pr-input{padding:.45rem .6rem;border:1px solid var(--border);border-radius:8px;font-size:.85rem}
 .payroll-table caption{caption-side:top;text-align:left;font-weight:700;font-size:1rem;padding:.3rem 0 .5rem;color:var(--brand)}
 @media print {
@@ -1283,9 +1284,9 @@ header{padding:0 1rem;gap:.75rem;height:64px}
           <option value="area">Area</option>
           <option value="total">Total (high to low)</option>
         </select></label>
-      <button id="pr-export" class="pr-period-btn" style="margin-left:auto">⬇ Excel</button>
-      <button id="pr-print" class="pr-period-btn">🖨 Print / PDF</button>
-      <button id="pr-lock" class="pr-period-btn">🔓 Unlocked</button>
+      <button id="pr-export" class="pr-period-btn pr-sm" style="margin-left:auto">⬇ Excel</button>
+      <button id="pr-print" class="pr-period-btn pr-sm">🖨 Print / PDF</button>
+      <button id="pr-lock" class="pr-period-btn pr-sm">🔓 Unlocked</button>
     </div>
 
     <div style="overflow-x:auto">
