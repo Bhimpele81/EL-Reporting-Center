@@ -871,6 +871,28 @@ def api_logout():
     return jsonify({"ok": True})
 
 
+@app.route("/api/account/password", methods=["POST"])
+def api_account_password():
+    """Let the signed-in user change their own password."""
+    u = _current_user()
+    if u is None:
+        return jsonify({"error": "auth"}), 401
+    body = request.get_json(force=True, silent=True) or {}
+    current = body.get("current") or ""
+    new = body.get("new") or ""
+    if not check_password_hash(u.get("pw_hash", ""), current):
+        return jsonify({"error": "Current password is incorrect."}), 403
+    if len(new) < 4:
+        return jsonify({"error": "New password must be at least 4 characters."}), 400
+    data = _users_load()
+    rec = next((x for x in data["users"] if x.get("username", "").lower() == u["username"].lower()), None)
+    if rec is None:
+        return jsonify({"error": "not found"}), 404
+    rec["pw_hash"] = generate_password_hash(new)
+    _users_save(data)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/users", methods=["GET"])
 @admin_required
 def api_users():
@@ -1206,6 +1228,11 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 #notice-box p{font-size:.9rem;color:#444;line-height:1.5;margin:0 0 .8rem}
 #notice-box .notice-btn{margin-top:.4rem;padding:.6rem 1.6rem;background:var(--brand);color:#fff;border:none;border-radius:8px;font-family:'Roboto Slab',serif;font-weight:700;font-size:.85rem;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
 #notice-box .notice-btn:hover{background:var(--brand-dark)}
+/* ---- Change-password modal ---- */
+#cpw-overlay{position:fixed;inset:0;background:rgba(20,6,9,.72);backdrop-filter:blur(4px);z-index:10001;display:flex;align-items:center;justify-content:center;padding:1.5rem}
+#cpw-overlay.hidden{display:none}
+#cpw-box{background:#fff;border-radius:14px;padding:1.8rem 1.8rem 1.5rem;max-width:380px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+#cpw-box h2{font-family:'Roboto Slab',serif;font-size:1.15rem;color:var(--brand);margin:0 0 .5rem}
 /* ---- Pricing modal ---- */
 #pricing-overlay{position:fixed;inset:0;background:rgba(20,6,9,.72);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:2rem 0}
 #pricing-overlay.hidden{display:none}
@@ -1435,7 +1462,9 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 .pw-go:hover{background:var(--brand-dark)}
 .pw-toggle{font-size:.82rem;color:#777;margin-top:.9rem}
 .pw-toggle a{color:var(--brand);font-weight:600;cursor:pointer;text-decoration:underline}
-.h-user{display:flex;align-items:center;gap:.5rem;font-size:.72rem;color:#fff;opacity:.95}
+.h-user{display:flex;align-items:center;gap:.6rem;color:#fff}
+#h-user-name{font-size:.95rem;font-weight:700;letter-spacing:.02em;cursor:pointer;padding:.15rem .2rem;border-bottom:1px dotted rgba(255,255,255,.5)}
+#h-user-name:hover{border-bottom-color:#fff}
 .h-user button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.05em;padding:.45rem 1rem;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:.4rem;line-height:1.1;height:34px;box-sizing:border-box;transition:background .18s}
 .h-user button:hover{background:rgba(255,255,255,.28)}
 </style>
@@ -1534,6 +1563,22 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   </div>
 </div>
 
+<!-- Change-my-password modal -->
+<div id="cpw-overlay" class="hidden">
+  <div id="cpw-box">
+    <h2>Change Password</h2>
+    <p style="font-size:.85rem;color:#666;margin:0 0 1rem">Update the password for <strong id="cpw-who"></strong>.</p>
+    <div class="pw-field"><input id="cpw-current" type="password" placeholder="Current password" autocomplete="current-password"></div>
+    <div class="pw-field"><input id="cpw-new" type="password" placeholder="New password" autocomplete="new-password"></div>
+    <div class="pw-field"><input id="cpw-confirm" type="password" placeholder="Confirm new password" autocomplete="new-password"></div>
+    <div id="cpw-error" style="font-size:.82rem;color:#c0392b;min-height:1.1rem;margin-bottom:.4rem"></div>
+    <div style="display:flex;gap:.5rem;justify-content:flex-end">
+      <button id="cpw-cancel" class="pr-period-btn pr-sm">Cancel</button>
+      <button id="cpw-save" class="pw-go" style="width:auto;margin:0;padding:.55rem 1.2rem">Save</button>
+    </div>
+  </div>
+</div>
+
 <header>
   <div class="h-logo" role="img" aria-label="Elbow Lane Day Camp"></div>
   <div>
@@ -1541,7 +1586,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="h-sub">Reporting Center</div>
   </div>
   <div class="h-nav">
-    <span class="h-user" id="h-user" style="display:none"><span id="h-user-name"></span><button id="logout-btn">Sign out</button></span>
+    <span class="h-user" id="h-user" style="display:none"><span id="h-user-name" title="Change my password"></span><button id="logout-btn">Sign out</button></span>
     <button class="h-pricing" id="pricing-btn">$ Pricing</button>
     <a class="h-support" href="mailto:bhimpele@gmail.com?subject=EL%20Reporting%20Center%20Support">✉ Support</a>
   </div>
@@ -2942,6 +2987,39 @@ document.getElementById('usr-copy').addEventListener('click', async () => {
   document.getElementById('logout-btn').addEventListener('click', async () => {
     try { await fetch('/api/logout', {method:'POST'}); } catch(e) {}
     location.reload();
+  });
+
+  // Click your name → change your own password
+  const cpw = document.getElementById('cpw-overlay');
+  const cpwErr = document.getElementById('cpw-error');
+  function openCpw() {
+    if (!currentUser) return;
+    document.getElementById('cpw-who').textContent = currentUser.username;
+    ['cpw-current','cpw-new','cpw-confirm'].forEach(id => document.getElementById(id).value = '');
+    cpwErr.textContent = '';
+    cpw.classList.remove('hidden');
+    document.getElementById('cpw-current').focus();
+  }
+  function closeCpw() { cpw.classList.add('hidden'); }
+  document.getElementById('h-user-name').addEventListener('click', openCpw);
+  document.getElementById('cpw-cancel').addEventListener('click', closeCpw);
+  cpw.addEventListener('click', e => { if (e.target === cpw) closeCpw(); });
+  document.getElementById('cpw-save').addEventListener('click', async () => {
+    const current = document.getElementById('cpw-current').value;
+    const nw = document.getElementById('cpw-new').value;
+    const conf = document.getElementById('cpw-confirm').value;
+    cpwErr.textContent = '';
+    if (!current || !nw) { cpwErr.textContent = 'Fill in all fields.'; return; }
+    if (nw.length < 4) { cpwErr.textContent = 'New password must be at least 4 characters.'; return; }
+    if (nw !== conf) { cpwErr.textContent = 'New passwords do not match.'; return; }
+    try {
+      const res = await fetch('/api/account/password', {method:'POST',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify({current, new: nw})});
+      const d = await res.json();
+      if (!res.ok || d.error) { cpwErr.textContent = d.error || 'Could not change password.'; return; }
+      closeCpw();
+      alert('Password changed.');
+    } catch(e) { cpwErr.textContent = 'Network error: ' + e.message; }
   });
 
   // On load: if already signed in, go straight in; otherwise show the gate.
