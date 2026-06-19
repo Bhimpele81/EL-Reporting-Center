@@ -1803,11 +1803,21 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.8rem;padding-top:.8rem;border-top:1px solid #eee">
       <strong style="font-size:.85rem;color:#555">Add user:</strong>
-      <input class="pr-input" id="usr-username" placeholder="Username" style="width:150px">
-      <input class="pr-input" id="usr-password" placeholder="Password" style="width:130px">
+      <input class="pr-input" id="usr-username" placeholder="Username" style="width:140px">
+      <input class="pr-input" id="usr-password" placeholder="Password" style="width:120px">
+      <input class="pr-input" id="usr-email" placeholder="Their email (optional)" style="width:170px">
       <label style="font-size:.8rem;color:#666"><input type="checkbox" id="usr-admin"> Admin</label>
       <button class="pr-period-btn" id="usr-add">＋ Add User</button>
       <span id="usr-msg" style="font-size:.82rem;color:#777"></span>
+    </div>
+    <div id="usr-result" style="display:none;margin-top:.7rem;padding:.8rem .9rem;background:#edfaf3;border:1px solid #a3d9b8;border-radius:8px">
+      <div style="font-size:.82rem;color:#2e7d32;font-weight:600;margin-bottom:.4rem">✓ Account created — share these credentials:</div>
+      <pre id="usr-creds" style="font-size:.82rem;background:#fff;border:1px solid #d7ecdf;border-radius:6px;padding:.6rem .7rem;margin:0 0 .5rem;white-space:pre-wrap;word-break:break-word"></pre>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <button class="pr-period-btn pr-sm" id="usr-copy">📋 Copy</button>
+        <a class="pr-period-btn pr-sm" id="usr-email-link" href="#" style="text-decoration:none">✉ Email it</a>
+        <span id="usr-copy-msg" style="font-size:.8rem;color:#777;align-self:center"></span>
+      </div>
     </div>
   </div>
 
@@ -2824,21 +2834,51 @@ async function loadUsers() {
 
 document.getElementById('usr-add').addEventListener('click', async () => {
   const msg = document.getElementById('usr-msg');
-  const body = {
-    username: document.getElementById('usr-username').value.trim(),
-    password: document.getElementById('usr-password').value,
-    is_admin: document.getElementById('usr-admin').checked,
-  };
-  if (!body.username || !body.password) { msg.style.color = '#c0392b'; msg.textContent = 'Username and password required.'; return; }
+  const username = document.getElementById('usr-username').value.trim();
+  const password = document.getElementById('usr-password').value;
+  const email    = document.getElementById('usr-email').value.trim();
+  const body = { username, password, is_admin: document.getElementById('usr-admin').checked };
+  if (!username || !password) { msg.style.color = '#c0392b'; msg.textContent = 'Username and password required.'; return; }
   try {
     const res = await fetch('/api/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     const d = await res.json();
     if (!res.ok || d.error) { msg.style.color = '#c0392b'; msg.textContent = d.error || 'Could not add user.'; return; }
     msg.style.color = '#2e7d32'; msg.textContent = `✓ Added ${d.username}.`;
-    ['usr-username','usr-password'].forEach(id => document.getElementById(id).value = '');
+
+    // Build a shareable credentials message + Copy / Email actions
+    const url = window.location.origin;
+    const message =
+      `Elbow Lane Reporting Center — your login\n` +
+      `Site: ${url}\n` +
+      `Username: ${username}\n` +
+      `Password: ${password}\n\n` +
+      `Sign in at the link above. Keep this private.`;
+    document.getElementById('usr-creds').textContent = message;
+    const subject = 'Your Elbow Lane Reporting Center login';
+    document.getElementById('usr-email-link').href =
+      `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+    document.getElementById('usr-copy-msg').textContent = '';
+    document.getElementById('usr-result').style.display = '';
+
+    ['usr-username','usr-password','usr-email'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('usr-admin').checked = false;
     loadUsers();
   } catch(e) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + e.message; }
+});
+
+document.getElementById('usr-copy').addEventListener('click', async () => {
+  const text = document.getElementById('usr-creds').textContent;
+  const cm = document.getElementById('usr-copy-msg');
+  try {
+    await navigator.clipboard.writeText(text);
+    cm.textContent = 'Copied!';
+  } catch(e) {
+    // Fallback: select the text for manual copy
+    const r = document.createRange(); r.selectNodeContents(document.getElementById('usr-creds'));
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    cm.textContent = 'Press Ctrl/Cmd+C to copy.';
+  }
+  setTimeout(() => { cm.textContent = ''; }, 4000);
 });
 
 (function() {
