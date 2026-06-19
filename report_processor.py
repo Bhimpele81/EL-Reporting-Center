@@ -816,7 +816,7 @@ def parse_group_attendance(file_bytes: bytes) -> list:
 
 
 def build_group_attendance_sheet(ws, campers: list, config: dict,
-                                  report_date=None) -> None:
+                                  report_date=None, week_num: int = None) -> None:
     """
     Build the Data1 sheet for Group Attendance.
 
@@ -873,7 +873,7 @@ def build_group_attendance_sheet(ws, campers: list, config: dict,
     # ---- Row 1: Week/date header (pre-filled; user completes week # and dates in Excel) ----
     ws.row_dimensions[1].height = 36
     ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=7)
-    c = ws.cell(row=1, column=2, value="WEEK # :")
+    c = ws.cell(row=1, column=2, value=(f"WEEK {week_num} :" if week_num else "WEEK # :"))
     c.font = F_WEEK_HDR; c.alignment = CTR
 
     date_str = (report_date.strftime("%-m/%-d/%Y") if os.name != "nt"
@@ -2155,7 +2155,7 @@ def process_report(file_bytes: bytes, report_type: str,
         wb = Workbook()
         ws = wb.active
         ws.title = "Data1"
-        build_group_attendance_sheet(ws, campers, config, report_date)
+        build_group_attendance_sheet(ws, campers, config, report_date, week_num=week_num)
 
         out_filename = f"Group Attendance {report_date.strftime('%m%d%Y')}.xlsx"
         out_path = os.path.join(output_dir, out_filename)
