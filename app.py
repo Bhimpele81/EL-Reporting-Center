@@ -302,6 +302,18 @@ def api_master():
     return jsonify({"loaded": False})
 
 
+@app.route("/api/master/download")
+def api_master_download():
+    """Download the currently-saved master sheet (to edit and re-upload)."""
+    data = _load_master()
+    if data is None:
+        return jsonify({"error": "No saved master sheet."}), 404
+    meta = _load_master_meta() or {}
+    fname = meta.get("filename") or "master.csv"
+    return send_file(io.BytesIO(data), as_attachment=True, download_name=fname,
+                     mimetype=_mime_for(fname))
+
+
 @app.route("/api/master", methods=["DELETE"])
 def api_master_clear():
     """Forget the saved master sheet."""
@@ -382,6 +394,10 @@ def _mime_for(filename: str) -> str:
         return _DOCX_MIME
     if fn.endswith(".zip"):
         return "application/zip"
+    if fn.endswith(".csv"):
+        return "text/csv"
+    if fn.endswith(".xls"):
+        return "application/vnd.ms-excel"
     return _XLSX_MIME
 
 
@@ -829,6 +845,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   <div id="master-banner" style="display:none;align-items:center;gap:.6rem;padding:.6rem .85rem;background:#eef4fb;border:1px solid #b9d2ec;border-radius:8px;margin:0 0 .8rem;font-size:.83rem;color:#1A79BF;font-weight:500">
     <span>📋</span>
     <span id="master-banner-text" style="flex:1">—</span>
+    <a id="master-download" href="/api/master/download" style="cursor:pointer;font-size:.75rem;color:#1A79BF;background:#fff;border:1px solid #b9d2ec;border-radius:6px;padding:.2rem .55rem;text-decoration:none">⬇ Download</a>
     <button id="master-clear" style="cursor:pointer;font-size:.75rem;color:#777;background:#fff;border:1px solid #ccd;border-radius:6px;padding:.2rem .55rem">Clear</button>
   </div>
 
