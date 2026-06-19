@@ -1195,7 +1195,7 @@ HTML = r"""<!DOCTYPE html>
 body{font-family:'DM Sans',sans-serif;background:var(--mist);color:var(--ink);min-height:100vh}
 header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-items:center;gap:1.25rem;height:80px;box-shadow:0 2px 16px rgba(109,31,47,.35);position:sticky;top:0;z-index:200}
 .h-nav{margin-left:auto;display:flex;align-items:center;gap:.6rem}
-.h-support,.h-pricing{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.05em;padding:.45rem 1rem;border-radius:6px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:.4rem;transition:background .18s}
+.h-support,.h-pricing{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.05em;padding:.45rem 1rem;border-radius:6px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:.4rem;line-height:1.1;height:34px;box-sizing:border-box;transition:background .18s}
 .h-support:hover,.h-pricing:hover{background:rgba(255,255,255,.28)}
 /* ---- First-time notice modal ---- */
 #notice-overlay{position:fixed;inset:0;background:rgba(20,6,9,.72);backdrop-filter:blur(4px);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1.5rem}
@@ -1436,7 +1436,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 .pw-toggle{font-size:.82rem;color:#777;margin-top:.9rem}
 .pw-toggle a{color:var(--brand);font-weight:600;cursor:pointer;text-decoration:underline}
 .h-user{display:flex;align-items:center;gap:.5rem;font-size:.72rem;color:#fff;opacity:.95}
-.h-user button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.05em;padding:.45rem 1rem;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:.4rem;transition:background .18s}
+.h-user button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.05em;padding:.45rem 1rem;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:.4rem;line-height:1.1;height:34px;box-sizing:border-box;transition:background .18s}
 .h-user button:hover{background:rgba(255,255,255,.28)}
 </style>
 </head>
