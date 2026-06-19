@@ -7,6 +7,7 @@ Shares the same design system as Transport Pro.
 
 import os
 import io
+import csv
 import json
 import uuid
 import threading
@@ -132,7 +133,13 @@ PAYROLL_KEY       = "payroll.json"
 LOCAL_PAYROLL     = os.path.join(UPLOAD_DIR, "payroll.json")
 SEED_PATH         = os.path.join(BASE_DIR, "payroll_seed.json")
 WEEK1_MONDAY      = date(2026, 6, 22)   # first Monday of the 2026 season
-_PROTECTED_KEYS   = {"bunk_config.json", MASTER_KEY, MASTER_META_KEY, PAYROLL_KEY}
+FAMILIES_KEY      = "families.json"
+LOCAL_FAMILIES    = os.path.join(UPLOAD_DIR, "families.json")
+# Fields stored for each family contact record
+FAMILY_FIELDS     = ["camper", "parent1", "phone1", "email1",
+                     "parent2", "phone2", "email2", "address", "notes"]
+_PROTECTED_KEYS   = {"bunk_config.json", MASTER_KEY, MASTER_META_KEY,
+                     PAYROLL_KEY, FAMILIES_KEY}
 
 
 def _save_master(file_bytes: bytes, filename: str) -> dict:
@@ -272,6 +279,110 @@ def _payroll_load() -> dict:
     return data
 
 
+# ---------------------------------------------------------------------------
+# Family contacts — uploaded/imported once, then editable in the Utilities tab
+# ---------------------------------------------------------------------------
+
+def _families_save(data: dict) -> None:
+    try:
+        with open(LOCAL_FAMILIES, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+    if _s3:
+        try:
+            _s3.put_object(Bucket=S3_BUCKET, Key=FAMILIES_KEY,
+                           Body=json.dumps(data).encode("utf-8"),
+                           ContentType="application/json")
+        except ClientError:
+            pass
+
+
+def _families_load() -> dict:
+    data = None
+    if _s3:
+        buf = _s3_get_file(FAMILIES_KEY)
+        if buf:
+            try:
+                data = json.load(buf)
+            except Exception:
+                data = None
+    if data is None and os.path.exists(LOCAL_FAMILIES):
+        try:
+            with open(LOCAL_FAMILIES, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = None
+    if data is None:
+        data = {"families": []}
+    data.setdefault("families", [])
+    return data
+
+
+def _family_next_id(families: list) -> str:
+    nums = [int(x["id"][1:]) for x in families
+            if str(x.get("id", "")).startswith("f") and str(x["id"])[1:].isdigit()]
+    return "f" + str((max(nums) if nums else 0) + 1)
+
+
+# Header aliases → our canonical field names (best-effort import mapping)
+_FAMILY_ALIASES = {
+    "camper":  ["camper", "camper name", "child", "child name", "student", "name"],
+    "parent1": ["parent1", "parent 1", "guardian1", "guardian 1", "parent", "guardian",
+                "mother", "father", "parent/guardian", "primary contact", "contact 1", "contact1"],
+    "phone1":  ["phone1", "phone 1", "phone", "cell", "cell phone", "mobile",
+                "primary phone", "parent1 phone", "contact 1 phone"],
+    "email1":  ["email1", "email 1", "email", "e-mail", "parent1 email",
+                "primary email", "contact 1 email"],
+    "parent2": ["parent2", "parent 2", "guardian2", "guardian 2", "secondary contact",
+                "contact 2", "contact2"],
+    "phone2":  ["phone2", "phone 2", "secondary phone", "parent2 phone", "contact 2 phone"],
+    "email2":  ["email2", "email 2", "secondary email", "parent2 email", "contact 2 email"],
+    "address": ["address", "home address", "street", "mailing address"],
+    "notes":   ["notes", "note", "comments", "comment", "remarks"],
+}
+
+
+def _families_from_rows(rows: list) -> list:
+    """Map a list of header→value dicts (or header row + data rows) into family records."""
+    if not rows:
+        return []
+    # rows is a list of lists: first row = headers
+    headers = [str(h or "").strip() for h in rows[0]]
+    hl = [h.lower() for h in headers]
+    # Build column index for each canonical field
+    col_for = {}
+    for field, aliases in _FAMILY_ALIASES.items():
+        for a in aliases:
+            if a in hl:
+                col_for[field] = hl.index(a)
+                break
+    out = []
+    for r in rows[1:]:
+        rec = {}
+        for field in FAMILY_FIELDS:
+            ci = col_for.get(field)
+            rec[field] = (str(r[ci]).strip() if (ci is not None and ci < len(r) and r[ci] is not None) else "")
+        # Skip wholly blank rows
+        if any(rec.get(f) for f in FAMILY_FIELDS):
+            out.append(rec)
+    return out
+
+
+def _read_spreadsheet_rows(file_bytes: bytes, filename: str) -> list:
+    """Return a list of rows (each a list of cell values); first row = headers."""
+    name = (filename or "").lower()
+    if name.endswith((".xlsx", ".xlsm", ".xls")):
+        from openpyxl import load_workbook
+        wb = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+        ws = wb.active
+        return [[c for c in row] for row in ws.iter_rows(values_only=True)]
+    # CSV / TSV
+    text = file_bytes.decode("utf-8-sig", errors="replace")
+    delim = "\t" if (name.endswith(".tsv") or "\t" in text.split("\n", 1)[0]) else ","
+    return [row for row in csv.reader(io.StringIO(text), delimiter=delim)]
+
+
 # In-memory job store  {job_id: {status, progress, result}}
 jobs: dict = {}
 jobs_lock = threading.Lock()
@@ -382,6 +493,20 @@ def api_master():
     if meta and _load_master() is not None:
         return jsonify({"loaded": True, **meta})
     return jsonify({"loaded": False})
+
+
+@app.route("/api/master", methods=["POST"])
+def api_master_save():
+    """Upload + save a master sheet directly (from the Utilities tab)."""
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"error": "No file uploaded."}), 400
+    file_bytes = f.read()
+    if not is_master(file_bytes):
+        return jsonify({"error": "That file doesn't look like a master sheet. "
+                                 "Check that it has the expected camper columns."}), 400
+    meta = _save_master(file_bytes, f.filename)
+    return jsonify({"loaded": True, **meta})
 
 
 @app.route("/api/master/download")
@@ -591,6 +716,71 @@ def api_payroll_del(sid):
     return jsonify({"ok": True})
 
 
+@app.route("/api/families", methods=["GET"])
+def api_families():
+    return jsonify(_families_load())
+
+
+@app.route("/api/families", methods=["POST"])
+def api_families_add():
+    body = request.get_json(force=True, silent=True) or {}
+    data = _families_load()
+    entry = {"id": _family_next_id(data["families"])}
+    for f in FAMILY_FIELDS:
+        entry[f] = (body.get(f) or "").strip()
+    if not any(entry[f] for f in FAMILY_FIELDS):
+        return jsonify({"error": "Enter at least one field."}), 400
+    data["families"].append(entry)
+    _families_save(data)
+    return jsonify(entry)
+
+
+@app.route("/api/families/<fid>", methods=["PATCH"])
+def api_families_edit(fid):
+    body = request.get_json(force=True, silent=True) or {}
+    data = _families_load()
+    fam = next((x for x in data["families"] if x.get("id") == fid), None)
+    if fam is None:
+        return jsonify({"error": "not found"}), 404
+    for f in FAMILY_FIELDS:
+        if f in body:
+            fam[f] = (body.get(f) or "").strip()
+    _families_save(data)
+    return jsonify(fam)
+
+
+@app.route("/api/families/<fid>", methods=["DELETE"])
+def api_families_del(fid):
+    data = _families_load()
+    data["families"] = [x for x in data["families"] if x.get("id") != fid]
+    _families_save(data)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/families/import", methods=["POST"])
+def api_families_import():
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"error": "No file uploaded."}), 400
+    mode = request.form.get("mode", "replace")   # 'replace' or 'append'
+    try:
+        rows = _read_spreadsheet_rows(f.read(), f.filename)
+        parsed = _families_from_rows(rows)
+    except Exception as e:
+        return jsonify({"error": f"Could not read file: {e}"}), 400
+    if not parsed:
+        return jsonify({"error": "No family rows found. Check that the sheet has a header row."}), 400
+    data = _families_load()
+    existing = [] if mode == "replace" else data["families"]
+    out = list(existing)
+    for rec in parsed:
+        rec = {"id": _family_next_id(out), **rec}
+        out.append(rec)
+    data["families"] = out
+    _families_save(data)
+    return jsonify({"ok": True, "count": len(parsed), "total": len(out), "mode": mode})
+
+
 @app.route("/api/process", methods=["POST"])
 def api_process():
     excel_file  = request.files.get("excel_file")
@@ -788,6 +978,15 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .h-nav{margin-left:auto;display:flex;align-items:center;gap:.6rem}
 .h-support,.h-pricing{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.05em;padding:.45rem 1rem;border-radius:6px;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:.4rem;transition:background .18s}
 .h-support:hover,.h-pricing:hover{background:rgba(255,255,255,.28)}
+/* ---- First-time notice modal ---- */
+#notice-overlay{position:fixed;inset:0;background:rgba(20,6,9,.72);backdrop-filter:blur(4px);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1.5rem}
+#notice-overlay.hidden{display:none}
+#notice-box{background:#fff;border-radius:16px;padding:2rem 2rem 1.6rem;max-width:460px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.35);text-align:center}
+#notice-box .notice-icon{font-size:2.2rem;margin-bottom:.5rem}
+#notice-box h2{font-family:'Roboto Slab',serif;font-size:1.2rem;color:var(--brand);margin:0 0 .7rem}
+#notice-box p{font-size:.9rem;color:#444;line-height:1.5;margin:0 0 .8rem}
+#notice-box .notice-btn{margin-top:.4rem;padding:.6rem 1.6rem;background:var(--brand);color:#fff;border:none;border-radius:8px;font-family:'Roboto Slab',serif;font-weight:700;font-size:.85rem;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
+#notice-box .notice-btn:hover{background:var(--brand-dark)}
 /* ---- Pricing modal ---- */
 #pricing-overlay{position:fixed;inset:0;background:rgba(20,6,9,.72);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:2rem 0}
 #pricing-overlay.hidden{display:none}
@@ -834,6 +1033,12 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td.pr-area-edit:hover{background:#f4eef0;outline:1px dashed var(--brand)}
 .pr-area-input{width:80px;font-size:.8rem;padding:2px 3px;border:1px solid var(--brand);border-radius:4px;text-align:center}
 .payroll-table th.pr-extday{width:74px;min-width:74px}
+.fam-table{border-collapse:collapse;width:100%;font-size:.8rem}
+.fam-table th,.fam-table td{border:1px solid #e2e2e2;padding:.35rem .5rem;text-align:left;vertical-align:top}
+.fam-table thead th{background:var(--brand);color:#fff;font-weight:600;white-space:nowrap;font-size:.72rem;text-transform:uppercase;letter-spacing:.03em}
+.fam-table td.fam-cell{cursor:pointer;min-width:70px}
+.fam-table td.fam-cell:hover{background:#f4eef0;outline:1px dashed var(--brand)}
+.fam-table .fam-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.9rem;padding:0}
 .payroll-table td.pr-count{font-weight:700;color:var(--brand);width:34px}
 .payroll-table tbody tr:nth-child(even){background:#f4eef0}
 .payroll-table td.pr-cell,.payroll-table td.pr-xcell{cursor:pointer;font-weight:800;font-size:1.6rem;user-select:none;line-height:1}
@@ -1076,6 +1281,17 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   </div>
 </div>
 
+<!-- First-time "what's new" notice -->
+<div id="notice-overlay" class="hidden">
+  <div id="notice-box">
+    <div class="notice-icon">📋</div>
+    <h2>Heads up — new Utilities tab</h2>
+    <p>The <strong>Bunks &amp; Camps</strong> tab is now <strong>Utilities</strong>. From now on, upload your <strong>Master Sheet</strong> from the <strong>Utilities</strong> tab (not the Run Report tab).</p>
+    <p style="color:#777;font-size:.82rem">You can also import &amp; manage <strong>Family Contacts</strong> there. Bunks &amp; Camps settings moved to the bottom of that tab.</p>
+    <button id="notice-ok" class="notice-btn">Got it</button>
+  </div>
+</div>
+
 <header>
   <div class="h-logo" role="img" aria-label="Elbow Lane Day Camp"></div>
   <div>
@@ -1091,7 +1307,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 <div class="tab-bar">
   <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
-  <div class="tab" data-tab="config">⚙️ <span>Bunks &amp; Camps</span></div>
+  <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
 </div>
 
 <div class="container">
@@ -1168,26 +1384,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <a class="dl-btn" id="dl-link" href="#" download>⬇ Download Report</a>
   </div>
 
-  <!-- Update master sheet (optional — only when the data changes) -->
-  <div class="card" style="margin-top:1.25rem">
-    <div class="card-hd">
-      <div>
-        <div class="card-title">Update Master Sheet</div>
-        <div class="card-hint">Only needed when the camper data changes — upload a new master and it replaces the saved one for every report. (Original per-report exports still work as well.)</div>
-      </div>
-    </div>
-    <div class="drop-zone" id="drop-zone">
-      <input type="file" id="excel-file" accept=".csv,.xlsx,.xls">
-      <div class="drop-icon">📊</div>
-      <div class="drop-text"><strong>Click to choose</strong> or drag &amp; drop the master sheet</div>
-      <div class="drop-meta">Accepted formats: .csv, .xlsx, .xls</div>
-    </div>
-    <div class="file-chosen" id="file-chosen">
-      <span>✅</span>
-      <span id="file-name">—</span>
-      <button class="rm" id="remove-file">✕</button>
-    </div>
-  </div>
+  <!-- (Master sheet is now uploaded/managed from the Utilities tab.) -->
 
   <div id="error-card">
     <strong>⚠ Processing Error</strong>
@@ -1274,9 +1471,65 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 
 </div><!-- /tab-upload -->
 
-<!-- ===== CONFIG TAB ===== -->
+<!-- ===== UTILITIES TAB ===== -->
 <div class="tab-panel" id="tab-config">
 
+  <!-- Master sheet upload -->
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Master Sheet</div>
+        <div class="card-hint">Upload the camper master sheet. It's saved on the server and used for every report — re-upload here whenever the camper data changes.</div>
+      </div>
+    </div>
+    <div id="master-status" style="display:none;align-items:center;gap:.6rem;padding:.6rem .85rem;background:#eef4fb;border:1px solid #b9d2ec;border-radius:8px;margin:0 0 .8rem;font-size:.83rem;color:#1A79BF;font-weight:500">
+      <span>📋</span>
+      <span id="master-status-text" style="flex:1">—</span>
+      <a id="master-status-dl" href="/api/master/download" style="cursor:pointer;font-size:.75rem;color:#1A79BF;background:#fff;border:1px solid #b9d2ec;border-radius:6px;padding:.2rem .55rem;text-decoration:none">⬇ Download</a>
+      <button id="master-status-clear" style="cursor:pointer;font-size:.75rem;color:#777;background:#fff;border:1px solid #ccd;border-radius:6px;padding:.2rem .55rem">Clear</button>
+    </div>
+    <div class="drop-zone" id="master-drop">
+      <input type="file" id="master-file" accept=".csv,.xlsx,.xls">
+      <div class="drop-icon">📊</div>
+      <div class="drop-text"><strong>Click to choose</strong> or drag &amp; drop the master sheet</div>
+      <div class="drop-meta">Accepted formats: .csv, .xlsx, .xls</div>
+    </div>
+    <div id="master-msg" style="font-size:.82rem;margin-top:.5rem"></div>
+  </div>
+
+  <!-- Family contacts -->
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Family Contacts</div>
+        <div class="card-hint">Contact information for camper families. Import a spreadsheet to load them in bulk, or add &amp; edit families below. Used to source family-contact reports.</div>
+      </div>
+    </div>
+    <div class="drop-zone" id="fam-drop" style="padding:.75rem">
+      <input type="file" id="fam-file" accept=".csv,.xlsx,.xls,.tsv">
+      <div class="drop-icon" style="font-size:1.4rem">📇</div>
+      <div class="drop-text"><strong>Click to choose</strong> or drag &amp; drop a family contact spreadsheet</div>
+      <div class="drop-meta">Columns are auto-detected (camper, parent, phone, email, address, notes)</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:1rem;margin:.5rem 0 .2rem;font-size:.8rem;color:#666">
+      <label><input type="radio" name="fam-import-mode" value="replace" checked> Replace all</label>
+      <label><input type="radio" name="fam-import-mode" value="append"> Add to existing</label>
+      <span id="fam-msg" style="margin-left:auto"></span>
+    </div>
+    <div style="overflow-x:auto;margin-top:.6rem">
+      <table class="fam-table" id="fam-table"></table>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.8rem;padding-top:.8rem;border-top:1px solid #eee">
+      <strong style="font-size:.85rem;color:#555">Add family:</strong>
+      <input class="pr-input" id="fam-camper"  placeholder="Camper"  style="width:130px">
+      <input class="pr-input" id="fam-parent1" placeholder="Parent/Guardian" style="width:140px">
+      <input class="pr-input" id="fam-phone1"  placeholder="Phone"   style="width:120px">
+      <input class="pr-input" id="fam-email1"  placeholder="Email"   style="width:160px">
+      <button class="pr-period-btn" id="fam-add">＋ Add</button>
+    </div>
+  </div>
+
+  <!-- Bunks & Camps (rarely change once the season starts) -->
   <div class="card">
     <div class="card-hd">
       <span class="card-num" style="background:var(--gold);color:#1a1018">★</span>
@@ -1365,7 +1618,6 @@ document.querySelectorAll('.tab').forEach(tab => {
 // ─────────────────────────────────────────────
 // Upload tab state
 // ─────────────────────────────────────────────
-let excelFile = null;
 let selectedReportType = 'bunk_snapshot';
 let selectedWeek = 1;
 let currentJobId = null;
@@ -1373,30 +1625,79 @@ let pollTimer = null;
 let lastLineCount = 0;
 let masterLoaded = false;
 
-// Saved master sheet status
+// Saved master sheet status — reflected on the Run Report banner AND the
+// Utilities "Master Sheet" card.
 async function loadMaster() {
   try {
     const res = await fetch('/api/master');
     const d = await res.json();
     masterLoaded = !!d.loaded;
     const banner = document.getElementById('master-banner');
+    const status = document.getElementById('master-status');
     if (masterLoaded) {
       document.getElementById('master-banner-text').innerHTML =
         `Using saved master: <strong>${d.filename || 'master sheet'}</strong>` +
         (d.uploaded_at ? ` &middot; uploaded ${d.uploaded_at}` : '') +
         `. Reports and Labels will use this data until an updated file is uploaded.`;
       banner.style.display = 'flex';
+      if (status) {
+        document.getElementById('master-status-text').innerHTML =
+          `Current master: <strong>${d.filename || 'master sheet'}</strong>` +
+          (d.uploaded_at ? ` &middot; uploaded ${d.uploaded_at}` : '');
+        status.style.display = 'flex';
+      }
     } else {
-      banner.style.display = 'none';
+      // No master saved — prompt the user to upload one in the Utilities tab
+      document.getElementById('master-banner-text').innerHTML =
+        `No master sheet saved yet. Upload one in the <strong>Utilities</strong> tab to run reports.`;
+      document.getElementById('master-download').style.display = 'none';
+      document.getElementById('master-clear').style.display = 'none';
+      banner.style.display = 'flex';
+      if (status) status.style.display = 'none';
+    }
+    // Restore the banner buttons when a master is present
+    if (masterLoaded) {
+      document.getElementById('master-download').style.display = '';
+      document.getElementById('master-clear').style.display = '';
     }
   } catch(e) { masterLoaded = false; }
   updateRunBtn();
 }
 
-document.getElementById('master-clear').addEventListener('click', async () => {
+async function clearMaster() {
   try { await fetch('/api/master', {method: 'DELETE'}); } catch(e) {}
   loadMaster();
+}
+document.getElementById('master-clear').addEventListener('click', clearMaster);
+document.getElementById('master-status-clear').addEventListener('click', clearMaster);
+
+// Upload a master sheet from the Utilities tab
+const masterDrop = document.getElementById('master-drop');
+const masterFile = document.getElementById('master-file');
+async function uploadMaster(f) {
+  const msg = document.getElementById('master-msg');
+  if (!f) return;
+  msg.style.color = '#666'; msg.textContent = 'Uploading…';
+  const fd = new FormData(); fd.append('file', f);
+  try {
+    const res = await fetch('/api/master', {method: 'POST', body: fd});
+    const d = await res.json();
+    if (!res.ok || d.error) { msg.style.color = '#c0392b'; msg.textContent = d.error || 'Upload failed.'; return; }
+    msg.style.color = '#2e7d32'; msg.textContent = '✓ Master sheet saved.';
+    loadMaster();
+  } catch(e) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + e.message; }
+}
+masterDrop.addEventListener('dragover', e => { e.preventDefault(); masterDrop.classList.add('drag-over'); });
+masterDrop.addEventListener('dragleave', () => masterDrop.classList.remove('drag-over'));
+masterDrop.addEventListener('drop', e => {
+  e.preventDefault(); masterDrop.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) uploadMaster(e.dataTransfer.files[0]);
 });
+masterFile.addEventListener('change', e => { if (e.target.files[0]) uploadMaster(e.target.files[0]); });
+
+function updateRunBtn() {
+  document.getElementById('run-btn').disabled = !(masterLoaded && selectedReportType);
+}
 
 // Reports that use a camp-week selection
 const WEEK_AWARE = ['driver_totals','group_attendance','am_extend','pm_extend','pm_grp_extend','inter_labels','jr_transport_labels'];
@@ -1422,53 +1723,13 @@ document.querySelectorAll('.week-btn').forEach(btn => {
   });
 });
 
-// Drop zone
-const dropZone = document.getElementById('drop-zone');
-const fileInput = document.getElementById('excel-file');
-
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('drag-over');
-  const f = e.dataTransfer.files[0];
-  if (f && (f.name.endsWith('.csv') || f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) setFile(f);
-});
-fileInput.addEventListener('change', e => {
-  if (e.target.files[0]) setFile(e.target.files[0]);
-});
-document.getElementById('remove-file').addEventListener('click', e => {
-  e.stopPropagation();
-  clearFile();
-});
-
-function setFile(f) {
-  excelFile = f;
-  document.getElementById('file-name').textContent = f.name;
-  document.getElementById('file-chosen').classList.add('visible');
-  dropZone.querySelector('.drop-icon').textContent = '✅';
-  updateRunBtn();
-}
-
-function clearFile() {
-  excelFile = null;
-  fileInput.value = '';
-  document.getElementById('file-chosen').classList.remove('visible');
-  dropZone.querySelector('.drop-icon').textContent = '📊';
-  updateRunBtn();
-}
-
-function updateRunBtn() {
-  document.getElementById('run-btn').disabled = !((excelFile || masterLoaded) && selectedReportType);
-}
 
 // Run button
 document.getElementById('run-btn').addEventListener('click', async () => {
-  if (!(excelFile || masterLoaded) || !selectedReportType) return;
+  if (!masterLoaded || !selectedReportType) return;
   startProcessing();
 
-  const fd = new FormData();
-  if (excelFile) fd.append('excel_file', excelFile);   // omit to reuse saved master
+  const fd = new FormData();   // always runs from the saved master
   fd.append('report_type', selectedReportType);
   if (WEEK_AWARE.includes(selectedReportType)) fd.append('week_num', selectedWeek);
 
@@ -2102,12 +2363,142 @@ document.getElementById('pr-export').addEventListener('click', () => {
   window.location = `/api/payroll/export?view=${view}&period=${prPeriod}&area=${area}&sort=${sort}&extp=${prExtPeriod}`;
 });
 
+// ---- Family contacts ----
+let families = [];
+const FAM_COLS = [
+  ['camper','Camper'], ['parent1','Parent/Guardian'], ['phone1','Phone'], ['email1','Email'],
+  ['parent2','Parent/Guardian 2'], ['phone2','Phone 2'], ['email2','Email 2'],
+  ['address','Address'], ['notes','Notes'],
+];
+const famEsc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+async function loadFamilies() {
+  try {
+    const res = await fetch('/api/families');
+    const d = await res.json();
+    families = d.families || [];
+  } catch(e) { families = []; }
+  renderFamilies();
+}
+
+function renderFamilies() {
+  const tbl = document.getElementById('fam-table');
+  if (!tbl) return;
+  if (!families.length) {
+    tbl.innerHTML = '<tbody><tr><td style="color:#aaa;padding:.6rem">No families yet. Import a spreadsheet or add one below.</td></tr></tbody>';
+    return;
+  }
+  let h = '<thead><tr>' + FAM_COLS.map(c => `<th>${c[1]}</th>`).join('') + '<th></th></tr></thead><tbody>';
+  families.forEach(f => {
+    h += `<tr data-id="${f.id}">` +
+      FAM_COLS.map(c => `<td class="fam-cell" data-id="${f.id}" data-field="${c[0]}" title="Click to edit">${famEsc(f[c[0]])}</td>`).join('') +
+      `<td><button class="pr-del fam-del" data-id="${f.id}" title="Remove">✕</button></td></tr>`;
+  });
+  h += '</tbody>';
+  tbl.innerHTML = h;
+
+  tbl.querySelectorAll('td.fam-cell').forEach(td => {
+    td.addEventListener('click', () => {
+      if (td.querySelector('input')) return;
+      const id = td.dataset.id, field = td.dataset.field;
+      const fam = families.find(x => x.id === id); if (!fam) return;
+      const orig = fam[field] || '';
+      td.innerHTML = `<input class="pr-area-input" style="width:96%;text-align:left" value="${famEsc(orig)}">`;
+      const inp = td.querySelector('input'); inp.focus(); inp.select();
+      let done = false;
+      const commit = async (save) => {
+        if (done) return; done = true;
+        const val = inp.value.trim();
+        if (save && val !== orig) {
+          fam[field] = val;
+          try { await fetch('/api/families/' + id, {method:'PATCH',
+                headers:{'Content-Type':'application/json'}, body: JSON.stringify({[field]: val})}); } catch(e) {}
+        }
+        renderFamilies();
+      };
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter')  { e.preventDefault(); commit(true);  }
+        if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+      });
+      inp.addEventListener('blur', () => commit(true));
+    });
+  });
+
+  tbl.querySelectorAll('.fam-del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const f = families.find(x => x.id === id);
+      if (!confirm(`Remove ${f && f.camper ? f.camper : 'this family'}?`)) return;
+      families = families.filter(x => x.id !== id);
+      renderFamilies();
+      try { await fetch('/api/families/' + id, {method:'DELETE'}); } catch(e) {}
+    });
+  });
+}
+
+document.getElementById('fam-add').addEventListener('click', async () => {
+  const body = {
+    camper:  document.getElementById('fam-camper').value.trim(),
+    parent1: document.getElementById('fam-parent1').value.trim(),
+    phone1:  document.getElementById('fam-phone1').value.trim(),
+    email1:  document.getElementById('fam-email1').value.trim(),
+  };
+  if (!Object.values(body).some(v => v)) return;
+  try {
+    const res = await fetch('/api/families', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const d = await res.json();
+    if (res.ok && d.id) {
+      families.push(d);
+      ['fam-camper','fam-parent1','fam-phone1','fam-email1'].forEach(id => document.getElementById(id).value = '');
+      renderFamilies();
+    }
+  } catch(e) {}
+});
+
+const famDrop = document.getElementById('fam-drop');
+const famFile = document.getElementById('fam-file');
+async function importFamilies(f) {
+  const msg = document.getElementById('fam-msg');
+  if (!f) return;
+  const mode = (document.querySelector('input[name="fam-import-mode"]:checked') || {}).value || 'replace';
+  msg.style.color = '#666'; msg.textContent = 'Importing…';
+  const fd = new FormData(); fd.append('file', f); fd.append('mode', mode);
+  try {
+    const res = await fetch('/api/families/import', {method:'POST', body: fd});
+    const d = await res.json();
+    if (!res.ok || d.error) { msg.style.color = '#c0392b'; msg.textContent = d.error || 'Import failed.'; return; }
+    msg.style.color = '#2e7d32'; msg.textContent = `✓ Imported ${d.count} (${d.total} total).`;
+    loadFamilies();
+  } catch(e) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + e.message; }
+}
+famDrop.addEventListener('dragover', e => { e.preventDefault(); famDrop.classList.add('drag-over'); });
+famDrop.addEventListener('dragleave', () => famDrop.classList.remove('drag-over'));
+famDrop.addEventListener('drop', e => {
+  e.preventDefault(); famDrop.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) importFamilies(e.dataTransfer.files[0]);
+});
+famFile.addEventListener('change', e => { if (e.target.files[0]) { importFamilies(e.target.files[0]); e.target.value=''; } });
+
 // Boot
 loadConfig();
 loadRecent();
 loadWeather();
 loadMaster();
 loadPayroll();
+loadFamilies();
+
+// ---- First-time "Utilities" notice (shows once per browser) ----
+(function() {
+  const KEY = 'el_seen_utilities_notice_v1';
+  const overlay = document.getElementById('notice-overlay');
+  const close = () => { overlay.classList.add('hidden'); try { localStorage.setItem(KEY, '1'); } catch(e) {} };
+  try {
+    if (!localStorage.getItem(KEY)) overlay.classList.remove('hidden');
+  } catch(e) {}
+  document.getElementById('notice-ok').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+})();
 
 // ---- Pricing modal ----
 (function() {
