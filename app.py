@@ -833,6 +833,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td.pr-area-edit{cursor:pointer}
 .payroll-table td.pr-area-edit:hover{background:#f4eef0;outline:1px dashed var(--brand)}
 .pr-area-input{width:80px;font-size:.8rem;padding:2px 3px;border:1px solid var(--brand);border-radius:4px;text-align:center}
+.payroll-table th.pr-extday{width:74px;min-width:74px}
 .payroll-table td.pr-count{font-weight:700;color:var(--brand);width:34px}
 .payroll-table tbody tr:nth-child(even){background:#f4eef0}
 .payroll-table td.pr-cell,.payroll-table td.pr-xcell{cursor:pointer;font-weight:800;font-size:1.6rem;user-select:none;line-height:1}
@@ -859,6 +860,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
   #payroll-table .pr-del { display:none; }
   /* keep maroon headers, row shading and symbol colors when printing */
   #payroll-table, #payroll-table * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  /* Extended Staff sheet fills the page width (Staff ~30%, 5 day cols split the rest) */
+  #payroll-table.pr-ext { width:100%; }
+  #payroll-table.pr-ext .pr-extday { width:14%; }
 }
 .card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:1.5rem 1.75rem;margin-bottom:1.1rem;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:box-shadow .2s}
 .card:hover{box-shadow:0 3px 12px rgba(109,31,47,.07)}
@@ -2011,7 +2015,7 @@ function renderExtTable(filterArea, extPeriod) {
   const shiftLbl = extPeriod === 'AM' ? 'AM' : extPeriod === 'PM' ? 'PM' : 'AM & PM';
   let html = `<caption>Extended Staff (${shiftLbl}) — daily check-in (${staff.length})</caption>` +
     '<thead><tr><th>Staff</th>' +
-    ['MON','TUES','WED','THURS','FRI'].map(d => `<th style="width:74px;min-width:74px">${d}</th>`).join('') +
+    ['MON','TUES','WED','THURS','FRI'].map(d => `<th class="pr-extday">${d}</th>`).join('') +
     '</tr></thead><tbody>';
   staff.forEach(s => {
     html += `<tr><td class="pr-name">${s.last}, ${s.first}</td>` +
@@ -2019,7 +2023,7 @@ function renderExtTable(filterArea, extPeriod) {
   });
   html += '</tbody>';
   const tbl = document.getElementById('payroll-table');
-  tbl.innerHTML = html; tbl.className = 'payroll-table';
+  tbl.innerHTML = html; tbl.className = 'payroll-table pr-ext';
 }
 
 // Totals view (rendered into the same Payroll table when the Totals button is on)
