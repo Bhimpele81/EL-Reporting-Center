@@ -11,7 +11,7 @@ import json
 import uuid
 import threading
 import urllib.request
-from datetime import datetime
+from datetime import datetime, date, timedelta
 try:
     from zoneinfo import ZoneInfo
     _EASTERN = ZoneInfo("America/New_York")
@@ -128,7 +128,11 @@ MASTER_KEY        = "current_master.dat"
 MASTER_META_KEY   = "current_master_meta.json"
 LOCAL_MASTER      = os.path.join(UPLOAD_DIR, "current_master.dat")
 LOCAL_MASTER_META = os.path.join(UPLOAD_DIR, "current_master_meta.json")
-_PROTECTED_KEYS   = {"bunk_config.json", MASTER_KEY, MASTER_META_KEY}
+PAYROLL_KEY       = "payroll.json"
+LOCAL_PAYROLL     = os.path.join(UPLOAD_DIR, "payroll.json")
+SEED_PATH         = os.path.join(BASE_DIR, "payroll_seed.json")
+WEEK1_MONDAY      = date(2026, 6, 22)   # first Monday of the 2026 season
+_PROTECTED_KEYS   = {"bunk_config.json", MASTER_KEY, MASTER_META_KEY, PAYROLL_KEY}
 
 
 def _save_master(file_bytes: bytes, filename: str) -> dict:
@@ -189,6 +193,66 @@ def _load_master_meta() -> dict | None:
         except Exception:
             pass
     return None
+
+# ---------------------------------------------------------------------------
+# Payroll attendance (staff roster + daily check-ins) — persisted like config
+# ---------------------------------------------------------------------------
+
+def _payroll_days() -> list:
+    """The 40 camp days (8 weeks x Mon-Fri) with day-of-week + m/d labels."""
+    dows = ["MON", "TUES", "WED", "TH", "FRI"]
+    out = []
+    for i in range(40):
+        wk, dow = divmod(i, 5)
+        d = WEEK1_MONDAY + timedelta(days=wk * 7 + dow)
+        out.append({"iso": d.isoformat(), "dow": dows[dow],
+                    "md": f"{d.month}/{d.day}", "week": wk + 1})
+    return out
+
+
+def _payroll_save(data: dict) -> None:
+    try:
+        with open(LOCAL_PAYROLL, "w") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+    if _s3:
+        try:
+            _s3.put_object(Bucket=S3_BUCKET, Key=PAYROLL_KEY,
+                           Body=json.dumps(data).encode("utf-8"),
+                           ContentType="application/json")
+        except ClientError:
+            pass
+
+
+def _payroll_load() -> dict:
+    data = None
+    if _s3:
+        buf = _s3_get_file(PAYROLL_KEY)
+        if buf:
+            try:
+                data = json.load(buf)
+            except Exception:
+                data = None
+    if data is None and os.path.exists(LOCAL_PAYROLL):
+        try:
+            with open(LOCAL_PAYROLL) as f:
+                data = json.load(f)
+        except Exception:
+            data = None
+    if data is None:
+        # First run — seed the roster from the bundled seed file
+        try:
+            with open(SEED_PATH) as f:
+                seed = json.load(f)
+            data = {"staff": seed.get("staff", []), "checks": {}}
+        except Exception:
+            data = {"staff": [], "checks": {}}
+        _payroll_save(data)
+    data.setdefault("staff", [])
+    data.setdefault("checks", {})
+    return data
+
 
 # In-memory job store  {job_id: {status, progress, result}}
 jobs: dict = {}
@@ -329,6 +393,55 @@ def api_master_clear():
             except ClientError:
                 pass
     return jsonify({"loaded": False})
+
+
+@app.route("/api/payroll", methods=["GET"])
+def api_payroll():
+    data = _payroll_load()
+    return jsonify({"staff": data["staff"], "checks": data["checks"], "days": _payroll_days()})
+
+
+@app.route("/api/payroll/check", methods=["POST"])
+def api_payroll_check():
+    body = request.get_json(force=True, silent=True) or {}
+    sid = str(body.get("id", "")); dt = str(body.get("date", "")); val = bool(body.get("value"))
+    if not sid or not dt:
+        return jsonify({"error": "missing id/date"}), 400
+    data = _payroll_load()
+    checks = data["checks"].setdefault(sid, {})
+    if val:
+        checks[dt] = True
+    else:
+        checks.pop(dt, None)
+    _payroll_save(data)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/payroll/staff", methods=["POST"])
+def api_payroll_add():
+    body = request.get_json(force=True, silent=True) or {}
+    last = (body.get("last") or "").strip()
+    first = (body.get("first") or "").strip()
+    area = (body.get("area") or "").strip()
+    if not last and not first:
+        return jsonify({"error": "Name required."}), 400
+    data = _payroll_load()
+    nums = [int(s["id"][1:]) for s in data["staff"]
+            if str(s.get("id", "")).startswith("s") and str(s["id"])[1:].isdigit()]
+    entry = {"id": "s" + str((max(nums) if nums else 0) + 1),
+             "last": last, "first": first, "area": area}
+    data["staff"].append(entry)
+    _payroll_save(data)
+    return jsonify(entry)
+
+
+@app.route("/api/payroll/staff/<sid>", methods=["DELETE"])
+def api_payroll_del(sid):
+    data = _payroll_load()
+    data["staff"] = [s for s in data["staff"] if s.get("id") != sid]
+    data["checks"].pop(sid, None)
+    _payroll_save(data)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/process", methods=["POST"])
@@ -564,6 +677,19 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .tab-badge{background:var(--brand);color:#fff;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:10px;min-width:18px;text-align:center}
 .container{max-width:960px;margin:0 auto;padding:2rem 1.5rem 4rem}
 .tab-panel{display:none}.tab-panel.active{display:block}
+.payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
+.payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center}
+.payroll-table thead th{background:var(--brand);color:#fff;font-weight:700;white-space:nowrap}
+.payroll-table td.pr-name{text-align:left;font-weight:600;white-space:nowrap}
+.payroll-table td.pr-area{color:#555;white-space:nowrap}
+.payroll-table td.pr-count{font-weight:700;color:var(--brand);width:34px}
+.payroll-table tbody tr:nth-child(even){background:#f4eef0}
+.payroll-table input[type=checkbox]{width:18px;height:18px;cursor:pointer}
+.payroll-table .pr-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.95rem;padding:0}
+.pr-week-sep{border-left:3px solid #6d1f2f !important}
+.pr-period-btn{padding:.4rem .8rem;border:1px solid var(--brand);background:#fff;color:var(--brand);border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem}
+.pr-period-btn.active{background:var(--brand);color:#fff}
+.pr-input{padding:.45rem .6rem;border:1px solid var(--border);border-radius:8px;font-size:.85rem}
 .card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:1.5rem 1.75rem;margin-bottom:1.1rem;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:box-shadow .2s}
 .card:hover{box-shadow:0 3px 12px rgba(109,31,47,.07)}
 .card-hd{display:flex;align-items:center;gap:.7rem;margin-bottom:1.1rem}
@@ -790,6 +916,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 
 <div class="tab-bar">
   <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
+  <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Bunks &amp; Camps</span></div>
 </div>
 
@@ -994,6 +1121,33 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   </div>
 
 </div><!-- /tab-config -->
+
+<!-- ===== PAYROLL TAB ===== -->
+<div class="tab-panel" id="tab-payroll">
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Payroll — Staff Attendance</div>
+        <div class="card-hint">Check each day a staff member is present. The count on the left totals the checks for the two-week period. Changes save automatically.</div>
+      </div>
+    </div>
+
+    <div id="payroll-periods" style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.3rem 0 .9rem"></div>
+
+    <div style="overflow-x:auto">
+      <table class="payroll-table" id="payroll-table"></table>
+    </div>
+
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:1.1rem;padding-top:.9rem;border-top:1px solid #eee">
+      <strong style="font-size:.85rem;color:#555">Add staff:</strong>
+      <input class="pr-input" id="pr-last"  placeholder="Last name"  style="width:140px">
+      <input class="pr-input" id="pr-first" placeholder="First name" style="width:140px">
+      <input class="pr-input" id="pr-area"  placeholder="Area"       style="width:140px">
+      <button class="pr-period-btn" id="pr-add">＋ Add Staff</button>
+      <span id="pr-msg" style="font-size:.82rem;color:#777"></span>
+    </div>
+  </div>
+</div><!-- /tab-payroll -->
 
 </div><!-- /container -->
 
@@ -1410,11 +1564,117 @@ async function loadWeather() {
   }
 }
 
+// ─────────────────────────────────────────────
+// Payroll tab
+// ─────────────────────────────────────────────
+let payroll = {staff: [], checks: {}, days: []};
+let prPeriod = 0;   // 0..3 → weeks 1&2, 3&4, 5&6, 7&8
+
+async function loadPayroll() {
+  try {
+    const res = await fetch('/api/payroll');
+    payroll = await res.json();
+    renderPayroll();
+  } catch(e) { /* ignore */ }
+}
+
+function prPeriodDays() {
+  return payroll.days.slice(prPeriod * 10, prPeriod * 10 + 10);
+}
+
+function prCount(id) {
+  const c = payroll.checks[id] || {};
+  return prPeriodDays().reduce((n, d) => n + (c[d.iso] ? 1 : 0), 0);
+}
+
+function renderPayroll() {
+  // period buttons
+  const pb = document.getElementById('payroll-periods');
+  pb.innerHTML = '';
+  for (let p = 0; p < 4; p++) {
+    const b = document.createElement('button');
+    b.className = 'pr-period-btn' + (p === prPeriod ? ' active' : '');
+    b.textContent = `Weeks ${p*2+1} & ${p*2+2}`;
+    b.onclick = () => { prPeriod = p; renderPayroll(); };
+    pb.appendChild(b);
+  }
+  // table
+  const days = prPeriodDays();
+  const staff = [...payroll.staff].sort((a,b) =>
+    (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase()));
+  let html = '<thead><tr><th>#</th><th>Staff</th><th>Area</th>';
+  days.forEach((d,i) => {
+    const sep = (i === 5) ? ' class="pr-week-sep"' : '';
+    html += `<th${sep}>${d.dow}<br>${d.md}</th>`;
+  });
+  html += '<th></th></tr></thead><tbody>';
+  staff.forEach(s => {
+    const c = payroll.checks[s.id] || {};
+    html += `<tr data-id="${s.id}">`;
+    html += `<td class="pr-count" id="cnt-${s.id}">${prCount(s.id)}</td>`;
+    html += `<td class="pr-name">${s.last}, ${s.first}</td>`;
+    html += `<td class="pr-area">${s.area || ''}</td>`;
+    days.forEach((d,i) => {
+      const sep = (i === 5) ? ' class="pr-week-sep"' : '';
+      const ck = c[d.iso] ? 'checked' : '';
+      html += `<td${sep}><input type="checkbox" data-id="${s.id}" data-date="${d.iso}" ${ck}></td>`;
+    });
+    html += `<td><button class="pr-del" data-id="${s.id}" title="Remove">✕</button></td>`;
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  const tbl = document.getElementById('payroll-table');
+  tbl.innerHTML = html;
+
+  tbl.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      const id = cb.dataset.id, dt = cb.dataset.date, val = cb.checked;
+      payroll.checks[id] = payroll.checks[id] || {};
+      if (val) payroll.checks[id][dt] = true; else delete payroll.checks[id][dt];
+      document.getElementById('cnt-' + id).textContent = prCount(id);
+      try { await fetch('/api/payroll/check', {method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({id, date: dt, value: val})}); } catch(e) {}
+    });
+  });
+  tbl.querySelectorAll('.pr-del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const s = payroll.staff.find(x => x.id === id);
+      if (!confirm(`Remove ${s ? s.last + ', ' + s.first : 'this staff member'}?`)) return;
+      payroll.staff = payroll.staff.filter(x => x.id !== id);
+      delete payroll.checks[id];
+      renderPayroll();
+      try { await fetch('/api/payroll/staff/' + id, {method:'DELETE'}); } catch(e) {}
+    });
+  });
+}
+
+document.getElementById('pr-add').addEventListener('click', async () => {
+  const last = document.getElementById('pr-last').value.trim();
+  const first = document.getElementById('pr-first').value.trim();
+  const area = document.getElementById('pr-area').value.trim();
+  const msg = document.getElementById('pr-msg');
+  if (!last && !first) { msg.textContent = 'Enter a name.'; return; }
+  msg.textContent = 'Adding…';
+  try {
+    const res = await fetch('/api/payroll/staff', {method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({last, first, area})});
+    const entry = await res.json();
+    payroll.staff.push(entry);
+    document.getElementById('pr-last').value = '';
+    document.getElementById('pr-first').value = '';
+    document.getElementById('pr-area').value = '';
+    msg.textContent = '';
+    renderPayroll();
+  } catch(e) { msg.textContent = 'Error adding staff.'; }
+});
+
 // Boot
 loadConfig();
 loadRecent();
 loadWeather();
 loadMaster();
+loadPayroll();
 
 // ---- Pricing modal ----
 (function() {
