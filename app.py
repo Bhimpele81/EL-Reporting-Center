@@ -1462,11 +1462,15 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 .pw-go:hover{background:var(--brand-dark)}
 .pw-toggle{font-size:.82rem;color:#777;margin-top:.9rem}
 .pw-toggle a{color:var(--brand);font-weight:600;cursor:pointer;text-decoration:underline}
-.h-user{display:flex;align-items:center;gap:.6rem;color:#fff}
-#h-user-name{font-size:.95rem;font-weight:700;letter-spacing:.02em;cursor:pointer;padding:.15rem .2rem;border-bottom:1px dotted rgba(255,255,255,.5)}
-#h-user-name:hover{border-bottom-color:#fff}
-.h-user button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.05em;padding:.45rem 1rem;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:.4rem;line-height:1.1;height:34px;box-sizing:border-box;transition:background .18s}
-.h-user button:hover{background:rgba(255,255,255,.28)}
+.h-user{position:relative;display:flex;align-items:center;color:#fff}
+.h-user-trigger{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:.9rem;font-weight:700;letter-spacing:.02em;cursor:pointer;display:flex;align-items:center;gap:.4rem;padding:.4rem .8rem;height:34px;box-sizing:border-box;border-radius:6px;transition:background .18s}
+.h-user-trigger:hover{background:rgba(255,255,255,.25)}
+.h-user-trigger .caret{font-size:.65rem;opacity:.85}
+.h-user-menu{position:absolute;top:100%;right:0;margin-top:.35rem;background:#fff;border:1px solid #e2e2e2;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);min-width:175px;overflow:hidden;z-index:9998}
+.h-user-menu.hidden{display:none}
+.h-user-menu button{display:flex;align-items:center;gap:.55rem;width:100%;text-align:left;background:none;border:none;padding:.65rem .9rem;font-size:.85rem;color:#333;cursor:pointer}
+.h-user-menu button:hover{background:#f4eef0;color:var(--brand)}
+.h-user-menu .menu-sep{border-top:1px solid #eee}
 </style>
 </head>
 <body>
@@ -1586,7 +1590,13 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="h-sub">Reporting Center</div>
   </div>
   <div class="h-nav">
-    <span class="h-user" id="h-user" style="display:none"><span id="h-user-name" title="Change my password"></span><button id="logout-btn">Sign out</button></span>
+    <span class="h-user" id="h-user" style="display:none">
+      <button class="h-user-trigger" id="h-user-btn" title="Account"><span id="h-user-name"></span><span class="caret">▾</span></button>
+      <div class="h-user-menu hidden" id="h-user-menu">
+        <button id="menu-reset">🔑 Reset Password</button>
+        <button id="menu-logout" class="menu-sep">↩ Sign Out</button>
+      </div>
+    </span>
     <button class="h-pricing" id="pricing-btn">$ Pricing</button>
     <a class="h-support" href="mailto:bhimpele@gmail.com?subject=EL%20Reporting%20Center%20Support">✉ Support</a>
   </div>
@@ -2986,12 +2996,21 @@ document.getElementById('usr-copy').addEventListener('click', async () => {
   document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
   document.getElementById('reg-code').addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
 
-  document.getElementById('logout-btn').addEventListener('click', async () => {
+  // Account dropdown (click your name)
+  const userMenu = document.getElementById('h-user-menu');
+  function closeMenu() { userMenu.classList.add('hidden'); }
+  document.getElementById('h-user-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    userMenu.classList.toggle('hidden');
+  });
+  document.addEventListener('click', () => closeMenu());
+  document.getElementById('menu-logout').addEventListener('click', async () => {
+    closeMenu();
     try { await fetch('/api/logout', {method:'POST'}); } catch(e) {}
     location.reload();
   });
 
-  // Click your name → change your own password
+  // Reset Password menu item → change-password dialog
   const cpw = document.getElementById('cpw-overlay');
   const cpwErr = document.getElementById('cpw-error');
   function openCpw() {
@@ -3003,7 +3022,7 @@ document.getElementById('usr-copy').addEventListener('click', async () => {
     document.getElementById('cpw-current').focus();
   }
   function closeCpw() { cpw.classList.add('hidden'); }
-  document.getElementById('h-user-name').addEventListener('click', openCpw);
+  document.getElementById('menu-reset').addEventListener('click', () => { closeMenu(); openCpw(); });
   document.getElementById('cpw-cancel').addEventListener('click', closeCpw);
   cpw.addEventListener('click', e => { if (e.target === cpw) closeCpw(); });
   document.getElementById('cpw-save').addEventListener('click', async () => {
