@@ -1751,11 +1751,14 @@ def build_jr_transport_labels_docx(records: list, config: dict) -> tuple:
     return _avery5960_docx(flat), counts, pages
 
 
-def build_pm_grp_extend_sheet(ws, campers: list) -> None:
+def build_pm_grp_extend_sheet(ws, campers: list, week_num: int = None) -> None:
     """
     PM GRP EXTEND: landscape. Each group prints on its own page with the group
     name as a banner at the top, then BUNK | CAMPER | Pick Up | MON-FRI | Days,
     and a camper total under the names.
+
+    A "PM EXTENDED GROUP ATTENDANCE" title plus the week # / dates print as a
+    page header at the top of every page.
     """
     _thin = Side(style="thin")
     T_ALL = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
@@ -1870,8 +1873,9 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.print_title_rows = None
 
-    # ---- Margins: wider bottom so the big 32pt legend footer never overlaps -
-    ws.page_margins.top    = 0.5
+    # ---- Margins: wider bottom so the big 32pt legend footer never overlaps;
+    #      wider top so the two-line page header clears the group banner --------
+    ws.page_margins.top    = 0.9
     ws.page_margins.bottom = 0.9
     ws.page_margins.left   = 0.25
     ws.page_margins.right  = 0.25
@@ -1879,6 +1883,12 @@ def build_pm_grp_extend_sheet(ws, campers: list) -> None:
     ws.page_margins.footer = 0.3
     ws.print_options.horizontalCentered = True
     ws.print_options.verticalCentered   = False
+
+    # ---- Page header: title + week/dates, printed at the top of every page ----
+    _wk = f"WEEK {week_num}: {_week_dates(week_num)}" if week_num else ""
+    _hdr = "&14&BPM EXTENDED GROUP ATTENDANCE" + (f"\n&12&B{_wk}" if _wk else "")
+    ws.oddHeader.center.text  = _hdr
+    ws.evenHeader.center.text = _hdr
 
     # ---- Footer: ✓/C/O legend printed on every page (spread across L/C/R) ----
     ws.oddFooter.left.text   = "&32✓&16 = Camper in Attendance"
@@ -2249,7 +2259,7 @@ def process_report(file_bytes: bytes, report_type: str,
         wb = Workbook()
         ws = wb.active
         ws.title = "PM GRP Extend"
-        build_pm_grp_extend_sheet(ws, campers)
+        build_pm_grp_extend_sheet(ws, campers, week_num=week_num)
 
         out_filename = f"PM GRP Extend {report_date.strftime('%m%d%Y')}.xlsx"
         out_path = os.path.join(output_dir, out_filename)
