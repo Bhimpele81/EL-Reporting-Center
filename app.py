@@ -1301,7 +1301,10 @@ header{padding:0 1rem;gap:.75rem;height:64px}
           <option value="AM">AM only</option>
           <option value="PM">PM only</option>
         </select></label>
-      <button id="pr-export" class="pr-period-btn pr-sm" style="margin-left:auto">⬇ Excel</button>
+    </div>
+
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;margin:0 0 .4rem">
+      <button id="pr-export" class="pr-period-btn pr-sm">⬇ Excel</button>
       <button id="pr-print" class="pr-period-btn pr-sm">🖨 Print / PDF</button>
       <button id="pr-lock" class="pr-period-btn pr-sm">🔓 Unlocked</button>
     </div>
