@@ -2085,15 +2085,17 @@ async function loadMaster() {
       // If the username is an email, show only the part before the @
       const uploader = (d.uploaded_by || '').replace(/@.*$/, '');
       const by = uploader ? ` by <strong>${uploader}</strong>` : '';
+      // Reformat "6/19/2026 4:00 PM EDT" -> "6/19/2026 @ 4:00 PM"
+      let when = (d.uploaded_at || '').replace(/\s*[A-Z]{2,4}\s*$/, '')
+                                      .replace(/\s+(\d{1,2}:\d{2}\s*[AP]M)/i, ' @ $1');
+      const stamp = when ? ` &middot; uploaded on ${when}${by}` : '';
       document.getElementById('master-banner-text').innerHTML =
-        `Using saved master: <strong>${d.filename || 'master sheet'}</strong>` +
-        (d.uploaded_at ? ` &middot; uploaded ${d.uploaded_at}${by}` : '') +
+        `Using saved master: <strong>${d.filename || 'master sheet'}</strong>${stamp}` +
         `. Reports and Labels will use this data until an updated file is uploaded.`;
       banner.style.display = 'flex';
       if (status) {
         document.getElementById('master-status-text').innerHTML =
-          `Current master: <strong>${d.filename || 'master sheet'}</strong>` +
-          (d.uploaded_at ? ` &middot; uploaded ${d.uploaded_at}${by}` : '');
+          `Current master: <strong>${d.filename || 'master sheet'}</strong>${stamp}`;
         status.style.display = 'flex';
       }
     } else {
