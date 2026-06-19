@@ -1436,7 +1436,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 .pw-toggle{font-size:.82rem;color:#777;margin-top:.9rem}
 .pw-toggle a{color:var(--brand);font-weight:600;cursor:pointer;text-decoration:underline}
 .h-user{display:flex;align-items:center;gap:.5rem;font-size:.72rem;color:#fff;opacity:.95}
-.h-user button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.7rem;font-weight:600;padding:.3rem .7rem;border-radius:6px;cursor:pointer}
+.h-user button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.78rem;font-weight:600;letter-spacing:.05em;padding:.45rem 1rem;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:.4rem;transition:background .18s}
 .h-user button:hover{background:rgba(255,255,255,.28)}
 </style>
 </head>
