@@ -809,11 +809,11 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td.pr-area{color:#555;width:86px;white-space:normal;line-height:1.15}
 .payroll-table td.pr-count{font-weight:700;color:var(--brand);width:34px}
 .payroll-table tbody tr:nth-child(even){background:#f4eef0}
-.payroll-table td.pr-cell{cursor:pointer;font-weight:800;font-size:1.6rem;user-select:none;line-height:1}
-.payroll-table td.pr-cell.st-check{color:#2e7d32}
-.payroll-table td.pr-cell.st-x{color:#c0392b}
-.payroll-table td.pr-cell.st-half{color:#1A79BF;font-size:1.1rem;font-weight:700}
-.payroll-table td.pr-cell.st-na{color:#888;font-size:.95rem;font-weight:700}
+.payroll-table td.pr-cell,.payroll-table td.pr-xcell{cursor:pointer;font-weight:800;font-size:1.6rem;user-select:none;line-height:1}
+.payroll-table td.st-check{color:#2e7d32}
+.payroll-table td.st-x{color:#c0392b}
+.payroll-table td.st-half{color:#1A79BF}
+.payroll-table td.st-na{color:#888;font-size:1.05rem;font-weight:700}
 .payroll-table th.pr-day,.payroll-table td.pr-cell{width:42px;min-width:42px}
 .payroll-table th.pr-extra{width:66px;min-width:66px;background:#3f1119;color:#fff;white-space:nowrap}
 .payroll-table td.pr-xcell{width:66px;min-width:66px;background:#f3e7ea}
@@ -829,7 +829,6 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
   #payroll-table, #payroll-table * { visibility:visible; }
   #payroll-table { position:absolute; left:0; top:0; width:auto; font-size:9pt; }
   #payroll-table .pr-del { display:none; }
-  @page { size:landscape; margin:.4in; }
 }
 .card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:1.5rem 1.75rem;margin-bottom:1.1rem;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:box-shadow .2s}
 .card:hover{box-shadow:0 3px 12px rgba(109,31,47,.07)}
@@ -1994,8 +1993,15 @@ function payrollTitle() {
   return t;
 }
 
-// Print / save-as-PDF (prints exactly what's on screen, filtered/sorted)
-document.getElementById('pr-print').addEventListener('click', () => window.print());
+// Print / save-as-PDF (prints exactly what's on screen, filtered/sorted).
+// Narrow views (Extended Staff, Totals) print portrait; the wide grid lands­cape.
+document.getElementById('pr-print').addEventListener('click', () => {
+  const portrait = prExt || prTotals;
+  let st = document.getElementById('pr-print-orient');
+  if (!st) { st = document.createElement('style'); st.id = 'pr-print-orient'; document.head.appendChild(st); }
+  st.textContent = `@media print{@page{size:${portrait ? 'portrait' : 'landscape'};margin:.45in}}`;
+  window.print();
+});
 
 // Export the current (filtered/sorted) view to a real .xlsx (server-built)
 document.getElementById('pr-export').addEventListener('click', () => {
