@@ -565,6 +565,21 @@ def api_payroll_add():
     return jsonify(entry)
 
 
+@app.route("/api/payroll/staff/<sid>", methods=["PATCH"])
+def api_payroll_edit(sid):
+    body = request.get_json(force=True, silent=True) or {}
+    data = _payroll_load()
+    if data.get("locked"):
+        return jsonify({"error": "locked"}), 403
+    s = next((x for x in data["staff"] if x.get("id") == sid), None)
+    if s is None:
+        return jsonify({"error": "not found"}), 404
+    if "area" in body:
+        s["area"] = (body.get("area") or "").strip()
+    _payroll_save(data)
+    return jsonify(s)
+
+
 @app.route("/api/payroll/staff/<sid>", methods=["DELETE"])
 def api_payroll_del(sid):
     data = _payroll_load()
@@ -815,6 +830,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table thead th{background:var(--brand);color:#fff;font-weight:700;white-space:nowrap}
 .payroll-table td.pr-name{text-align:left;font-weight:600;width:150px;white-space:normal;line-height:1.15}
 .payroll-table td.pr-area{color:#555;width:86px;white-space:normal;line-height:1.15}
+.payroll-table td.pr-area-edit{cursor:pointer}
+.payroll-table td.pr-area-edit:hover{background:#f4eef0;outline:1px dashed var(--brand)}
+.pr-area-input{width:80px;font-size:.8rem;padding:2px 3px;border:1px solid var(--brand);border-radius:4px;text-align:center}
 .payroll-table td.pr-count{font-weight:700;color:var(--brand);width:34px}
 .payroll-table tbody tr:nth-child(even){background:#f4eef0}
 .payroll-table td.pr-cell,.payroll-table td.pr-xcell{cursor:pointer;font-weight:800;font-size:1.6rem;user-select:none;line-height:1}
@@ -1863,7 +1881,7 @@ function renderPayroll() {
     html += `<td class="pr-name">${s.last}, ${s.first}</td>`;
     const areaTxt = (s.area === 'Support' && s.title) ? s.title : (s.area || '');
     const bunkLine = s.bunk ? `<br><small style="color:#888;font-weight:400">${s.bunk}</small>` : '';
-    html += `<td class="pr-area">${areaTxt}${bunkLine}</td>`;
+    html += `<td class="pr-area pr-area-edit" data-id="${s.id}" title="Click to edit area">${areaTxt}${bunkLine}</td>`;
     days.forEach((d,i) => {
       const st = cellState(s.id, d.iso);
       const sym = st === 'check' ? '✓' : st === 'x' ? '✗' : '';
@@ -1931,6 +1949,36 @@ function renderPayroll() {
       delete payroll.checks[id];
       renderPayroll();
       try { await fetch('/api/payroll/staff/' + id, {method:'DELETE'}); } catch(e) {}
+    });
+  });
+
+  // Click an Area cell to edit it inline
+  tbl.querySelectorAll('td.pr-area-edit').forEach(td => {
+    td.addEventListener('click', () => {
+      if (payroll.locked || td.querySelector('input')) return;
+      const id = td.dataset.id;
+      const s = payroll.staff.find(x => x.id === id);
+      if (!s) return;
+      const orig = s.area || '';
+      td.innerHTML = `<input class="pr-area-input" value="${orig.replace(/"/g,'&quot;')}">`;
+      const inp = td.querySelector('input');
+      inp.focus(); inp.select();
+      let done = false;
+      const commit = async (save) => {
+        if (done) return; done = true;
+        const val = inp.value.trim();
+        if (save && val !== orig) {
+          s.area = val;
+          try { await fetch('/api/payroll/staff/' + id, {method:'PATCH',
+                headers:{'Content-Type':'application/json'}, body: JSON.stringify({area: val})}); } catch(e) {}
+        }
+        renderPayroll();
+      };
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter')  { e.preventDefault(); commit(true);  }
+        if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+      });
+      inp.addEventListener('blur', () => commit(true));
     });
   });
 }
