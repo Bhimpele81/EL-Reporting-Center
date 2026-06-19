@@ -1,0 +1,121 @@
+# Project Handoff — EL Reporting Center (+ PGAGolfPool)
+
+Paste this file (or its key points) at the start of a new Claude Code session to restore context.
+Last updated: 2026-06-19.
+
+---
+
+## Repos & where the code lives
+
+| Repo | Purpose | Notes |
+|------|---------|-------|
+| **Bhimpele81/EL-Reporting-Center** | The camp reporting web app (this is the main project) | Flask single-file app. Deployed on **Render** at `https://el-reporting-center.onrender.com`. Local working copy used this session: `C:\Users\bhimpele\AppData\Local\Temp\EL-Reporting-Center`. |
+| **Bhimpele81/PGAGolfPool** | A separate React golf pool tracker | Fixed a tee-time timezone/caching bug this session (commit `566be3a`). |
+
+Push to `master` (EL-Reporting-Center) / `main` (PGAGolfPool); Render auto-deploys EL-Reporting-Center on push.
+
+---
+
+## EL Reporting Center — architecture
+
+- **`app.py`** — Flask app. Serves a single-page UI via `render_template_string(HTML)` where `HTML = r"""..."""` (a **raw** string — so use single `\n` for JS newlines, and `\\` for a literal backslash). All HTML/CSS/JS is inline in that string.
+- **`report_processor.py`** — all report builders (openpyxl for Excel, python-docx for Word labels) + the master-sheet parser.
+- **Storage**: AWS S3 (boto3, optional) **plus** local files under `uploads/`. JSON state files: `bunk_config.json`, `current_master.dat`/`_meta.json`, `payroll.json`, `families.json`, `users.json`. These are hidden from the "Recent reports" list via `_PROTECTED_KEYS`.
+- **Fonts**: Roboto Slab + DM Sans. Brand color `#6D1F2F` (burgundy).
+
+### Three tabs
+1. **Run Report** — pick a report (+ week for week-aware ones), Run → builds in background, auto-downloads. Shows the saved-master banner (with uploader). No master upload here anymore.
+2. **Payroll** — shared staff attendance system (see below).
+3. **Utilities** (renamed from "Bunks & Camps") — top→bottom: **Master Sheet** upload, **Family Contacts**, **Bunks & Camps** config, and (admins only) **User Accounts**.
+
+---
+
+## Reports (all sourced from one uploaded master sheet)
+
+Week-aware reports filter/annotate to a selected week (1–8): Group Attendance, AM/PM/GRP Extend, Driver Totals, Inter & Junior labels.
+
+- **Bunk Snapshot** (Report + Totals sheets)
+- **Group Attendance** — bunk-per-page, FT CIT lines appended with area in parens; week # + dates header
+- **AM Extend** — page header `AM EXTENDED HOURS SIGN-IN` + week/dates
+- **PM Extend** — page header `PM EXTENDED HOURS SIGN-OUT` + week/dates
+- **PM GRP Extend** — group-per-page; page header `PM EXTENDED GROUP ATTENDANCE` + week/dates; non-attending days marked with a bold em dash (—); footer legend ✓ / O only (the "C = Confirmed Absent" legend was removed)
+- **Driver Totals** — driver-name banner, week highlight, booster/walk legend footer
+- **Labels (Word/Avery 5960)**: **Inter** labels, **Junior** transport labels (3 sections, page-boundary padded)
+
+Master-sheet workflow: upload once (Utilities), auto-detected, de-duplicated, persisted, reused, week-filtered.
+
+---
+
+## Payroll (server-persisted, shared across devices — `payroll.json`)
+
+- Editable grid of staff × 40 season days, shown two weeks at a time (Weeks 1&2 … 7&8). Seeded from `payroll_seed.json`.
+- **Tri-state day cells**: blank → ✓ (counts) → ✗. Left count column totals the visible block.
+- **BS** and **SP\MTC** extra columns (✓/✗/½/N/A, never counted) — **Weeks 1&2 block only**; same size/style as day cells with a left separator.
+- **Add/delete staff**; **click an Area cell to edit it inline** (`PATCH /api/payroll/staff/<id>`).
+- **Filter area** + **Sort by** (last/area/total) on the weeks grid. Both hidden in Extended Staff; **Sort by also hidden in Totals** (Totals always sorts by last name).
+- **Lock/Unlock** freezes edits.
+- **Totals** view — cumulative checks all 8 weeks, "JC" tag for Junior Counselors.
+- **Extended Staff** view — blank printable Mon–Fri check-in sheet for AM/PM-extended staff, with an **AM/PM shift** filter; prints full-page-width.
+- **Print/PDF** (portrait for all views now) + **Excel export** (`/api/payroll/export`) mirror the current filtered/sorted view.
+
+---
+
+## Utilities tab
+
+- **Master Sheet** — drag/drop upload → `POST /api/master` (validates it's a master, saves, records uploader). Blue box shows `uploaded … by <user>`; if the username is an email, only the part before `@` is shown.
+- **Family Contacts** — import a spreadsheet (`POST /api/families/import`, columns auto-detected: camper, parent/guardian, phone, email, address, notes; Replace vs Append), editable table (click any cell to edit inline), Add family form, per-row delete. Stored in `families.json`. **Generic schema for now — needs tuning once the real families spreadsheet is provided. Reports that source this data are not built yet (planned).**
+- **Bunks & Camps** — existing camp/bunk/group config editor.
+- **User Accounts** (admins only) — add user (with optional email → Copy/Email-it credentials via mailto), Reset PW, delete.
+
+---
+
+## Authentication (added this session)
+
+- Real server-side auth: **per-user accounts** with hashed passwords (werkzeug), Flask signed-cookie sessions. `before_request` gates **all `/api/*`** except `/api/me`, `/api/login`, `/api/register`, `/api/logout`.
+- **Single username field** = login ID *and* display name (no separate "name").
+- **Self-registration** gated by a shared **ACCESS_CODE**; **first account created = admin**. Bill is the sole admin.
+- Header shows the signed-in username (bold, clickable) + **Sign out**. Clicking the name opens a **Change Password** dialog (`POST /api/account/password`, verifies current password).
+- Admin manages users from Utilities → User Accounts. `/api/users` GET/POST, `/api/users/<u>` PATCH (password/name/role)/DELETE. Self-demotion blocked.
+
+### ⚠️ Render env vars to set (important)
+- **`SECRET_KEY`** — long random string; signs session cookies and keeps logins stable across restarts/workers. Falls back to a default if unset (works but less secure).
+- **`ACCESS_CODE`** — registration code (defaults to `trial`); change to something private.
+- `AWS_S3_BUCKET` / `AWS_S3_REGION` / `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` — optional S3.
+
+---
+
+## Conventions / gotchas
+
+- **Don't change report/spreadsheet formatting unless explicitly asked** (standing user instruction).
+- `HTML` is a **raw** Python string — JS newlines = single `\n`; literal backslash = `\\`.
+- Test endpoints locally with Flask's test client (`app.app.test_client()`); deps installed in this env are flask/openpyxl/boto3/lxml/python-docx. Master detection: `bills_master_attempt (1).csv` parses as a master; `attendance__master_*.csv` does **not**.
+- Windows: use `C:/...` paths with Python (not MSYS `/c/...`); Bash tool resets cwd between calls, so `cd` each time.
+- Commits end with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
+
+---
+
+## Recent commits (most recent first)
+
+```
+1340648 Payroll Totals: hide Sort by dropdown; always sort alphabetically
+a56f144 Master blue box: strip @domain from uploader when username is an email
+81e8fd1 Self-service password change (click your name)
+faff0d8 Header: fixed height so envelope emoji doesn't make Support taller
+e3a47c7 Header: match Sign out button size to Pricing/Support
+a27a4a2 Admin: after creating a user, show credentials with Copy + Email actions
+c3920b1 Accounts: collapse name + username into a single username field
+43b0f3b Admin user management: create users, reset passwords, promote/demote
+d398943 Add per-user login accounts; record master uploader; gate API behind sessions
+db81d3e Rename Bunks & Camps -> Utilities; move master upload there; add Family Contacts; first-time notice
+8867416 PM GRP Extend: make non-attending dash visible
+31f73f1 PM GRP Extend: drop 'C = Confirmed Absent' legend; change box 'C' to '-'
+6c16817 Payroll: Extended Staff print fills full page width
+```
+
+---
+
+## Open / planned follow-ups
+
+- **Family-contact reports** — build reports that source `families.json` (waiting on the real sample spreadsheet to finalize import column mapping + fields).
+- Optional: disable self-registration (admin-only account creation); inline edit of username; trim `@domain` in the header too (currently only the master blue box does).
+- Password resets are intentionally **admin-driven** (no email provider). Self-service email reset was declined.
