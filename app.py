@@ -2082,10 +2082,11 @@ function payrollTitle() {
 // Print / save-as-PDF (prints exactly what's on screen, filtered/sorted).
 // Narrow views (Extended Staff, Totals) print portrait; the wide grid lands­cape.
 document.getElementById('pr-print').addEventListener('click', () => {
-  const portrait = prExt || prTotals;
+  // All payroll views print portrait — the grid only needs ~8" of width, so
+  // landscape just wastes space and fits fewer rows per page.
   let st = document.getElementById('pr-print-orient');
   if (!st) { st = document.createElement('style'); st.id = 'pr-print-orient'; document.head.appendChild(st); }
-  st.textContent = `@media print{@page{size:${portrait ? 'portrait' : 'landscape'};margin:.45in}}`;
+  st.textContent = `@media print{@page{size:portrait;margin:.4in}}`;
   window.print();
 });
 
