@@ -855,7 +855,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="card-hd">
       <div>
         <div class="card-title">Update Master Sheet</div>
-        <div class="card-hint">Only needed when the camper data changes — upload a new master and it replaces the saved one for every report. (Original per-report exports still work too.)</div>
+        <div class="card-hint">Only needed when the camper data changes — upload a new master and it replaces the saved one for every report. (Original per-report exports still work as well.)</div>
       </div>
     </div>
     <div class="drop-zone" id="drop-zone">
