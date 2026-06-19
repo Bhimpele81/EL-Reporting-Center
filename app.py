@@ -810,7 +810,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="card-hd">
       <div>
         <div class="card-title">Select Camp Week</div>
-        <div class="card-hint">Only campers enrolled in the selected week are included. (Driver Totals instead highlights that week's campers in yellow.)</div>
+        <div class="card-hint">Only campers enrolled in the selected week are included. (The Driver Totals Report instead highlights that week's campers in yellow.)</div>
       </div>
     </div>
     <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.25rem">
