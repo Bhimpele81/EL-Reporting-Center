@@ -1303,13 +1303,13 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         </select></label>
     </div>
 
-    <div style="display:flex;gap:.5rem;justify-content:flex-end;margin:0 0 .4rem">
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;margin:0">
       <button id="pr-export" class="pr-period-btn pr-sm">⬇ Excel</button>
       <button id="pr-print" class="pr-period-btn pr-sm">🖨 Print / PDF</button>
       <button id="pr-lock" class="pr-period-btn pr-sm">🔓 Unlocked</button>
     </div>
 
-    <div style="overflow-x:auto">
+    <div style="overflow-x:auto;margin-top:-1.7rem">
       <table class="payroll-table" id="payroll-table"></table>
     </div>
 
