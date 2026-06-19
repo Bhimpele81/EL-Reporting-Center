@@ -251,6 +251,19 @@ def _payroll_load() -> dict:
         _payroll_save(data)
     data.setdefault("staff", [])
     data.setdefault("checks", {})
+    # Backfill the 'bunk' field (added later) from the seed for staff missing it
+    if any("bunk" not in s for s in data["staff"]):
+        try:
+            with open(SEED_PATH) as f:
+                seed_bunk = {(x["last"].lower(), x["first"].lower()): x.get("bunk", "")
+                             for x in json.load(f).get("staff", [])}
+        except Exception:
+            seed_bunk = {}
+        for s in data["staff"]:
+            if "bunk" not in s:
+                s["bunk"] = seed_bunk.get((s.get("last", "").lower(),
+                                           s.get("first", "").lower()), "")
+        _payroll_save(data)
     return data
 
 
@@ -1134,6 +1147,16 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 
     <div id="payroll-periods" style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.3rem 0 .9rem"></div>
 
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin:0 0 .8rem;font-size:.82rem;color:#555">
+      <label>Filter area:
+        <select id="pr-filter-area" class="pr-input" onchange="renderPayroll()"></select></label>
+      <label>Sort by:
+        <select id="pr-sort" class="pr-input" onchange="renderPayroll()">
+          <option value="last">Last name</option>
+          <option value="area">Area</option>
+        </select></label>
+    </div>
+
     <div style="overflow-x:auto">
       <table class="payroll-table" id="payroll-table"></table>
     </div>
@@ -1598,10 +1621,27 @@ function renderPayroll() {
     b.onclick = () => { prPeriod = p; renderPayroll(); };
     pb.appendChild(b);
   }
+  // area filter dropdown (preserve current selection)
+  const fsel = document.getElementById('pr-filter-area');
+  const areas = [...new Set(payroll.staff.map(s => s.area).filter(Boolean))].sort();
+  const cur = fsel.value || 'ALL';
+  fsel.innerHTML = '<option value="ALL">All areas</option>' +
+    areas.map(a => `<option value="${a}">${a}</option>`).join('');
+  fsel.value = (cur === 'ALL' || areas.includes(cur)) ? cur : 'ALL';
+
+  const filterArea = fsel.value;
+  const sortKey = document.getElementById('pr-sort').value;
+
   // table
   const days = prPeriodDays();
-  const staff = [...payroll.staff].sort((a,b) =>
-    (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase()));
+  let staff = payroll.staff.filter(s => filterArea === 'ALL' || s.area === filterArea);
+  staff.sort((a,b) => {
+    if (sortKey === 'area') {
+      const c = (a.area||'').toLowerCase().localeCompare((b.area||'').toLowerCase());
+      if (c) return c;
+    }
+    return (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase());
+  });
   let html = '<thead><tr><th>#</th><th>Staff</th><th>Area</th>';
   days.forEach((d,i) => {
     const sep = (i === 5) ? ' class="pr-week-sep"' : '';
@@ -1613,7 +1653,8 @@ function renderPayroll() {
     html += `<tr data-id="${s.id}">`;
     html += `<td class="pr-count" id="cnt-${s.id}">${prCount(s.id)}</td>`;
     html += `<td class="pr-name">${s.last}, ${s.first}</td>`;
-    html += `<td class="pr-area">${s.area || ''}</td>`;
+    const bunkLine = s.bunk ? `<br><small style="color:#888;font-weight:400">${s.bunk}</small>` : '';
+    html += `<td class="pr-area">${s.area || ''}${bunkLine}</td>`;
     days.forEach((d,i) => {
       const sep = (i === 5) ? ' class="pr-week-sep"' : '';
       const ck = c[d.iso] ? 'checked' : '';
