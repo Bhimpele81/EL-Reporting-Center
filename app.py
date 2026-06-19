@@ -1822,12 +1822,15 @@ function renderPayroll() {
     const el = document.getElementById(id); if (el) el.disabled = payroll.locked;
   });
 
-  // AM/PM shift selector is only relevant to the Extended Staff sheet
+  // AM/PM shift selector is only relevant to the Extended Staff sheet;
+  // the area filter is not used there, so hide it.
   const extWrap = document.getElementById('pr-ext-period-wrap');
   if (extWrap) extWrap.style.display = prExt ? '' : 'none';
   document.getElementById('pr-ext-period').value = prExtPeriod;
+  const areaWrap = fsel.closest('label');
+  if (areaWrap) areaWrap.style.display = prExt ? 'none' : '';
 
-  if (prExt) { renderExtTable(filterArea, prExtPeriod); return; }
+  if (prExt) { renderExtTable('ALL', prExtPeriod); return; }
   if (prTotals) { renderTotalsTable(filterArea, sortKey); return; }
 
   // table
@@ -2039,7 +2042,7 @@ document.getElementById('pr-print').addEventListener('click', () => {
 // Export the current (filtered/sorted) view to a real .xlsx (server-built)
 document.getElementById('pr-export').addEventListener('click', () => {
   const view = prTotals ? 'totals' : prExt ? 'ext' : 'weeks';
-  const area = encodeURIComponent(document.getElementById('pr-filter-area').value);
+  const area = encodeURIComponent(prExt ? 'ALL' : document.getElementById('pr-filter-area').value);
   const sort = document.getElementById('pr-sort').value;
   window.location = `/api/payroll/export?view=${view}&period=${prPeriod}&area=${area}&sort=${sort}&extp=${prExtPeriod}`;
 });
