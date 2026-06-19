@@ -251,6 +251,7 @@ def _payroll_load() -> dict:
         _payroll_save(data)
     data.setdefault("staff", [])
     data.setdefault("checks", {})
+    data.setdefault("locked", False)
     # Backfill 'bunk'/'title' (added later) from the seed for staff missing them
     if any(("bunk" not in s or "title" not in s) for s in data["staff"]):
         try:
@@ -413,7 +414,17 @@ def api_master_clear():
 @app.route("/api/payroll", methods=["GET"])
 def api_payroll():
     data = _payroll_load()
-    return jsonify({"staff": data["staff"], "checks": data["checks"], "days": _payroll_days()})
+    return jsonify({"staff": data["staff"], "checks": data["checks"],
+                    "days": _payroll_days(), "locked": data.get("locked", False)})
+
+
+@app.route("/api/payroll/lock", methods=["POST"])
+def api_payroll_lock():
+    body = request.get_json(force=True, silent=True) or {}
+    data = _payroll_load()
+    data["locked"] = bool(body.get("locked"))
+    _payroll_save(data)
+    return jsonify({"locked": data["locked"]})
 
 
 @app.route("/api/payroll/check", methods=["POST"])
@@ -423,8 +434,10 @@ def api_payroll_check():
     if not sid or not dt:
         return jsonify({"error": "missing id/date"}), 400
     data = _payroll_load()
+    if data.get("locked"):
+        return jsonify({"error": "locked"}), 403
     checks = data["checks"].setdefault(sid, {})
-    if val in ("check", "x"):
+    if val in ("check", "x", "half", "na"):
         checks[dt] = val
     else:
         checks.pop(dt, None)   # blank / cleared
@@ -441,6 +454,8 @@ def api_payroll_add():
     if not last and not first:
         return jsonify({"error": "Name required."}), 400
     data = _payroll_load()
+    if data.get("locked"):
+        return jsonify({"error": "locked"}), 403
     nums = [int(s["id"][1:]) for s in data["staff"]
             if str(s.get("id", "")).startswith("s") and str(s["id"])[1:].isdigit()]
     entry = {"id": "s" + str((max(nums) if nums else 0) + 1),
@@ -453,6 +468,8 @@ def api_payroll_add():
 @app.route("/api/payroll/staff/<sid>", methods=["DELETE"])
 def api_payroll_del(sid):
     data = _payroll_load()
+    if data.get("locked"):
+        return jsonify({"error": "locked"}), 403
     data["staff"] = [s for s in data["staff"] if s.get("id") != sid]
     data["checks"].pop(sid, None)
     _payroll_save(data)
@@ -697,12 +714,17 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td{height:42px}
 .payroll-table thead th{background:var(--brand);color:#fff;font-weight:700;white-space:nowrap}
 .payroll-table td.pr-name{text-align:left;font-weight:600;white-space:nowrap}
-.payroll-table td.pr-area{color:#555;white-space:nowrap}
+.payroll-table td.pr-area{color:#555;width:104px;white-space:normal;line-height:1.15}
 .payroll-table td.pr-count{font-weight:700;color:var(--brand);width:34px}
 .payroll-table tbody tr:nth-child(even){background:#f4eef0}
 .payroll-table td.pr-cell{cursor:pointer;font-weight:800;font-size:1.6rem;user-select:none;line-height:1}
 .payroll-table td.pr-cell.st-check{color:#2e7d32}
 .payroll-table td.pr-cell.st-x{color:#c0392b}
+.payroll-table td.pr-cell.st-half{color:#1A79BF;font-size:1.1rem;font-weight:700}
+.payroll-table td.pr-cell.st-na{color:#888;font-size:.95rem;font-weight:700}
+.payroll-table th.pr-day,.payroll-table td.pr-cell{width:48px;min-width:48px}
+.payroll-table th.pr-extra,.payroll-table td.pr-xcell{width:52px;min-width:52px;background:#faf4f0}
+.payroll-table.pr-locked td.pr-cell,.payroll-table.pr-locked td.pr-xcell{cursor:not-allowed}
 .payroll-table .pr-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.95rem;padding:0}
 .pr-week-sep{border-left:3px solid #6d1f2f !important}
 .pr-period-btn{padding:.4rem .8rem;border:1px solid var(--brand);background:#fff;color:var(--brand);border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem}
@@ -935,6 +957,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 <div class="tab-bar">
   <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
+  <div class="tab" data-tab="totals">🧮 <span>Totals</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Bunks &amp; Camps</span></div>
 </div>
 
@@ -1160,6 +1183,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
           <option value="last">Last name</option>
           <option value="area">Area</option>
         </select></label>
+      <button id="pr-lock" class="pr-period-btn" style="margin-left:auto">🔓 Unlocked</button>
     </div>
 
     <div style="overflow-x:auto">
@@ -1177,6 +1201,29 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   </div>
 </div><!-- /tab-payroll -->
 
+<!-- ===== TOTALS TAB ===== -->
+<div class="tab-panel" id="tab-totals">
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Payroll Totals</div>
+        <div class="card-hint">Cumulative check-ins per staff member across all 8 weeks (X, ½, and N/A marks are not counted).</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin:0 0 .8rem;font-size:.82rem;color:#555">
+      <label>Filter area:
+        <select id="tot-filter-area" class="pr-input" onchange="renderTotals()"></select></label>
+      <label>Sort by:
+        <select id="tot-sort" class="pr-input" onchange="renderTotals()">
+          <option value="last">Last name</option>
+          <option value="area">Area</option>
+          <option value="total">Total (high to low)</option>
+        </select></label>
+    </div>
+    <div style="overflow-x:auto"><table class="payroll-table" id="totals-table"></table></div>
+  </div>
+</div><!-- /tab-totals -->
+
 </div><!-- /container -->
 
 <script>
@@ -1189,6 +1236,8 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'totals') renderTotals();
+    if (tab.dataset.tab === 'payroll') renderPayroll();
   });
 });
 
@@ -1603,6 +1652,7 @@ async function loadPayroll() {
     const res = await fetch('/api/payroll');
     payroll = await res.json();
     renderPayroll();
+    renderTotals();
   } catch(e) { /* ignore */ }
 }
 
@@ -1620,6 +1670,15 @@ function cellState(id, iso) {
 function prCount(id) {
   // Only checkmarks count toward the total (X marks do not)
   return prPeriodDays().reduce((n, d) => n + (cellState(id, d.iso) === 'check' ? 1 : 0), 0);
+}
+
+function xtraState(id, key) {
+  const v = (payroll.checks[id] || {})[key];
+  return ['check','x','half','na'].includes(v) ? v : '';
+}
+
+function symFor(st) {
+  return st === 'check' ? '✓' : st === 'x' ? '✗' : st === 'half' ? '½' : st === 'na' ? 'N/A' : '';
 }
 
 function renderPayroll() {
@@ -1654,11 +1713,13 @@ function renderPayroll() {
     }
     return (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase());
   });
+  const showExtra = prPeriod >= 1;   // 2 extra columns only after Weeks 1 & 2
   let html = '<thead><tr><th>#</th><th>Staff</th><th>Area</th>';
   days.forEach((d,i) => {
-    const sep = (i === 5) ? ' class="pr-week-sep"' : '';
-    html += `<th${sep}>${d.dow}<br>${d.md}</th>`;
+    const cls = 'pr-day' + (i === 5 ? ' pr-week-sep' : '');
+    html += `<th class="${cls}">${d.dow}<br>${d.md}</th>`;
   });
+  if (showExtra) html += '<th class="pr-extra">Extra 1</th><th class="pr-extra">Extra 2</th>';
   html += '<th></th></tr></thead><tbody>';
   staff.forEach(s => {
     const c = payroll.checks[s.id] || {};
@@ -1674,30 +1735,65 @@ function renderPayroll() {
       const cls = 'pr-cell st-' + (st || 'none') + (i === 5 ? ' pr-week-sep' : '');
       html += `<td class="${cls}" data-id="${s.id}" data-date="${d.iso}">${sym}</td>`;
     });
+    if (showExtra) {
+      for (let cc = 1; cc <= 2; cc++) {
+        const key = `xtra:${prPeriod}:${cc}`;
+        const xs = xtraState(s.id, key);
+        html += `<td class="pr-xcell st-${xs || 'none'}" data-id="${s.id}" data-key="${key}">${symFor(xs)}</td>`;
+      }
+    }
     html += `<td><button class="pr-del" data-id="${s.id}" title="Remove">✕</button></td>`;
     html += '</tr>';
   });
   html += '</tbody>';
   const tbl = document.getElementById('payroll-table');
   tbl.innerHTML = html;
+  tbl.className = 'payroll-table' + (payroll.locked ? ' pr-locked' : '');
 
+  // Reflect lock state on the button + add-staff controls
+  document.getElementById('pr-lock').textContent = payroll.locked ? '🔒 Locked' : '🔓 Unlocked';
+  ['pr-last','pr-first','pr-area','pr-add'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.disabled = payroll.locked;
+  });
+
+  // Day cells: blank -> ✓ (counts) -> ✗ -> blank
   tbl.querySelectorAll('td.pr-cell').forEach(cell => {
     cell.addEventListener('click', async () => {
+      if (payroll.locked) return;
       const id = cell.dataset.id, dt = cell.dataset.date;
       const cur = cellState(id, dt);
-      const next = cur === '' ? 'check' : cur === 'check' ? 'x' : '';  // cycle
+      const next = cur === '' ? 'check' : cur === 'check' ? 'x' : '';
       payroll.checks[id] = payroll.checks[id] || {};
       if (next) payroll.checks[id][dt] = next; else delete payroll.checks[id][dt];
-      cell.textContent = next === 'check' ? '✓' : next === 'x' ? '✗' : '';
-      cell.classList.remove('st-check', 'st-x', 'st-none');
+      cell.textContent = symFor(next);
+      cell.classList.remove('st-check','st-x','st-none');
       cell.classList.add('st-' + (next || 'none'));
       document.getElementById('cnt-' + id).textContent = prCount(id);
       try { await fetch('/api/payroll/check', {method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({id, date: dt, value: next})}); } catch(e) {}
     });
   });
+
+  // Extra columns: blank -> ✓ -> ✗ -> ½ -> N/A -> blank  (never counted)
+  const xorder = ['', 'check', 'x', 'half', 'na'];
+  tbl.querySelectorAll('td.pr-xcell').forEach(cell => {
+    cell.addEventListener('click', async () => {
+      if (payroll.locked) return;
+      const id = cell.dataset.id, key = cell.dataset.key;
+      const next = xorder[(xorder.indexOf(xtraState(id, key)) + 1) % xorder.length];
+      payroll.checks[id] = payroll.checks[id] || {};
+      if (next) payroll.checks[id][key] = next; else delete payroll.checks[id][key];
+      cell.textContent = symFor(next);
+      cell.classList.remove('st-check','st-x','st-half','st-na','st-none');
+      cell.classList.add('st-' + (next || 'none'));
+      try { await fetch('/api/payroll/check', {method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({id, date: key, value: next})}); } catch(e) {}
+    });
+  });
+
   tbl.querySelectorAll('.pr-del').forEach(btn => {
     btn.addEventListener('click', async () => {
+      if (payroll.locked) return;
       const id = btn.dataset.id;
       const s = payroll.staff.find(x => x.id === id);
       if (!confirm(`Remove ${s ? s.last + ', ' + s.first : 'this staff member'}?`)) return;
@@ -1707,6 +1803,57 @@ function renderPayroll() {
       try { await fetch('/api/payroll/staff/' + id, {method:'DELETE'}); } catch(e) {}
     });
   });
+}
+
+// Lock / unlock toggle
+document.getElementById('pr-lock').addEventListener('click', async () => {
+  const next = !payroll.locked;
+  payroll.locked = next;
+  renderPayroll();
+  try { await fetch('/api/payroll/lock', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({locked: next})}); } catch(e) {}
+});
+
+// ---- Totals tab (cumulative checks across all weeks) ----
+function totalChecks(id) {
+  const c = payroll.checks[id] || {};
+  return payroll.days.reduce((n, d) => n + ((c[d.iso] === 'check' || c[d.iso] === true) ? 1 : 0), 0);
+}
+function isJC(s) { return (s.title || '').toLowerCase().includes('junior'); }
+
+function renderTotals() {
+  if (!payroll.days || !payroll.days.length) return;
+  const fsel = document.getElementById('tot-filter-area');
+  const areas = [...new Set(payroll.staff.map(s => s.area).filter(Boolean))].sort();
+  const cur = fsel.value || 'ALL';
+  fsel.innerHTML = '<option value="ALL">All areas</option>' +
+    areas.map(a => `<option value="${a}">${a}</option>`).join('');
+  fsel.value = (cur === 'ALL' || areas.includes(cur)) ? cur : 'ALL';
+  const filterArea = fsel.value, sortKey = document.getElementById('tot-sort').value;
+
+  let staff = payroll.staff.filter(s => filterArea === 'ALL' || s.area === filterArea)
+                           .map(s => ({...s, _total: totalChecks(s.id)}));
+  staff.sort((a,b) => {
+    if (sortKey === 'total') return b._total - a._total ||
+      (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase());
+    if (sortKey === 'area') {
+      const c = (a.area||'').toLowerCase().localeCompare((b.area||'').toLowerCase());
+      if (c) return c;
+    }
+    return (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase());
+  });
+
+  let html = '<thead><tr><th>Staff</th><th>Area</th><th>Total Checks</th></tr></thead><tbody>';
+  staff.forEach(s => {
+    const jc = isJC(s) ? ' <small style="color:#1A79BF;font-weight:700">JC</small>' : '';
+    const areaTxt = (s.area === 'Support' && s.title) ? s.title : (s.area || '');
+    const bunkLine = s.bunk ? `<br><small style="color:#888;font-weight:400">${s.bunk}</small>` : '';
+    html += `<tr><td class="pr-name">${s.last}, ${s.first}${jc}</td>` +
+            `<td class="pr-area">${areaTxt}${bunkLine}</td>` +
+            `<td class="pr-count">${s._total}</td></tr>`;
+  });
+  html += '</tbody>';
+  document.getElementById('totals-table').innerHTML = html;
 }
 
 document.getElementById('pr-add').addEventListener('click', async () => {
