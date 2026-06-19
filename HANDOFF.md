@@ -64,6 +64,7 @@ Master-sheet workflow: upload once (Utilities), auto-detected, de-duplicated, pe
 
 - **Master Sheet** — drag/drop upload → `POST /api/master` (validates it's a master, saves, records uploader). Blue box shows `uploaded … by <user>`; if the username is an email, only the part before `@` is shown.
 - **Family Contacts** — import a spreadsheet (`POST /api/families/import`, columns auto-detected: camper, parent/guardian, phone, email, address, notes; Replace vs Append), editable table (click any cell to edit inline), Add family form, per-row delete. Stored in `families.json`. **Generic schema for now — needs tuning once the real families spreadsheet is provided. Reports that source this data are not built yet (planned).**
+- **Season Calendar** — set the Monday that starts each of the 8 camp weeks (`season.json`). Drives both the report week #/date-range headers (`process_report(..., week_dates=...)` → `report_processor.set_week_dates`) and the Payroll day columns (`_payroll_days()` derives from each week's Monday). Range strings auto-format ("June 22 – 26" / "June 29 – July 3"). `/api/season` GET/POST.
 - **Bunks & Camps** — existing camp/bunk/group config editor.
 - **User Accounts** (admins only) — add user (with optional email → Copy/Email-it credentials via mailto), Reset PW, delete.
 

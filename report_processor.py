@@ -1045,6 +1045,15 @@ def _week_dates(week_num) -> str:
     return _WEEK_DATES[week_num - 1] if (week_num and 1 <= week_num <= 8) else ""
 
 
+def set_week_dates(week_dates) -> None:
+    """Override the 8 camp-week date-range strings (from the editable season
+    calendar). Accepts a list of up to 8 strings; missing entries keep defaults."""
+    global _WEEK_DATES
+    if week_dates:
+        _WEEK_DATES = [(week_dates[i] if i < len(week_dates) and week_dates[i] else _WEEK_DATES[i])
+                       for i in range(8)]
+
+
 def _parse_ext_time(token: str) -> datetime.time:
     """Convert '7', '7:30', '8', '8:30' to datetime.time."""
     if ":" in token:
@@ -2102,7 +2111,10 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
 
 def process_report(file_bytes: bytes, report_type: str,
                    config: dict, job_id: str, output_dir: str,
-                   week_num: int = None) -> dict:
+                   week_num: int = None, week_dates=None) -> dict:
+
+    if week_dates:
+        set_week_dates(week_dates)
 
     supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend", "driver_totals", "inter_labels", "jr_transport_labels")
     if report_type not in supported:

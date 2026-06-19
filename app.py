@@ -145,11 +145,16 @@ FAMILIES_KEY      = "families.json"
 LOCAL_FAMILIES    = os.path.join(UPLOAD_DIR, "families.json")
 USERS_KEY         = "users.json"
 LOCAL_USERS       = os.path.join(UPLOAD_DIR, "users.json")
+SEASON_KEY        = "season.json"
+LOCAL_SEASON      = os.path.join(UPLOAD_DIR, "season.json")
+# Default season: Monday of each of the 8 camp weeks (2026)
+_DEFAULT_SEASON_MONDAYS = ["2026-06-22", "2026-06-29", "2026-07-06", "2026-07-13",
+                           "2026-07-20", "2026-07-27", "2026-08-03", "2026-08-10"]
 # Fields stored for each family contact record
 FAMILY_FIELDS     = ["camper", "parent1", "phone1", "email1",
                      "parent2", "phone2", "email2", "address", "notes"]
 _PROTECTED_KEYS   = {"bunk_config.json", MASTER_KEY, MASTER_META_KEY,
-                     PAYROLL_KEY, FAMILIES_KEY, USERS_KEY}
+                     PAYROLL_KEY, FAMILIES_KEY, USERS_KEY, SEASON_KEY}
 
 
 def _save_master(file_bytes: bytes, filename: str, uploaded_by: str = "") -> dict:
@@ -216,15 +221,84 @@ def _load_master_meta() -> dict | None:
 # Payroll attendance (staff roster + daily check-ins) — persisted like config
 # ---------------------------------------------------------------------------
 
-def _payroll_days() -> list:
-    """The 40 camp days (8 weeks x Mon-Fri) with day-of-week + m/d labels."""
-    dows = ["MON", "TUES", "WED", "TH", "FRI"]
+# --- Season calendar (editable 8-week Monday dates) ---
+
+def _season_save(data: dict) -> None:
+    try:
+        with open(LOCAL_SEASON, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+    if _s3:
+        try:
+            _s3.put_object(Bucket=S3_BUCKET, Key=SEASON_KEY,
+                           Body=json.dumps(data).encode("utf-8"),
+                           ContentType="application/json")
+        except ClientError:
+            pass
+
+
+def _season_load() -> dict:
+    data = None
+    if _s3:
+        buf = _s3_get_file(SEASON_KEY)
+        if buf:
+            try:
+                data = json.load(buf)
+            except Exception:
+                data = None
+    if data is None and os.path.exists(LOCAL_SEASON):
+        try:
+            with open(LOCAL_SEASON, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = None
+    if data is None:
+        data = {}
+    mondays = data.get("mondays") or []
+    # Pad/trim to exactly 8, falling back to defaults for any blanks
+    mondays = [(mondays[i] if i < len(mondays) and mondays[i] else _DEFAULT_SEASON_MONDAYS[i])
+               for i in range(8)]
+    return {"mondays": mondays}
+
+
+def _season_mondays() -> list:
     out = []
-    for i in range(40):
-        wk, dow = divmod(i, 5)
-        d = WEEK1_MONDAY + timedelta(days=wk * 7 + dow)
-        out.append({"iso": d.isoformat(), "dow": dows[dow],
-                    "md": f"{d.month}/{d.day}", "week": wk + 1})
+    for iso in _season_load()["mondays"]:
+        try:
+            out.append(date.fromisoformat(iso))
+        except (ValueError, TypeError):
+            out.append(None)
+    return out
+
+
+def _week_range_str(monday: date) -> str:
+    """'June 22 – 26' (same month) or 'June 29 – July 3' (spanning months)."""
+    if monday is None:
+        return ""
+    fri = monday + timedelta(days=4)
+    if monday.month == fri.month:
+        return f"{monday.strftime('%B')} {monday.day} – {fri.day}"
+    return f"{monday.strftime('%B')} {monday.day} – {fri.strftime('%B')} {fri.day}"
+
+
+def _season_week_strings() -> list:
+    """The 8 date-range strings used in report headers."""
+    return [_week_range_str(m) for m in _season_mondays()]
+
+
+def _payroll_days() -> list:
+    """The 40 camp days (8 weeks x Mon-Fri) with day-of-week + m/d labels,
+    derived from each week's Monday in the season calendar."""
+    dows = ["MON", "TUES", "WED", "TH", "FRI"]
+    mondays = _season_mondays()
+    out = []
+    for wk in range(8):
+        base = mondays[wk] or (date.fromisoformat(_DEFAULT_SEASON_MONDAYS[wk]))
+        for dow in range(5):
+            d = base + timedelta(days=dow)
+            out.append({"iso": d.isoformat(), "dow": dows[dow],
+                        "md": f"{d.month}/{d.day}", "week": wk + 1})
     return out
 
 
@@ -504,7 +578,7 @@ def run_job(job_id: str, file_bytes: bytes, report_type: str, week_num: int = No
 
         log(f"Processing report type: {report_type}…")
         result = process_report(file_bytes, report_type, config, job_id, OUTPUT_DIR,
-                                week_num=week_num)
+                                week_num=week_num, week_dates=_season_week_strings())
 
         if result["success"]:
             log(result["message"], "ok")
@@ -580,6 +654,31 @@ def save_config():
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/season", methods=["GET"])
+def api_season():
+    mondays = _season_load()["mondays"]
+    weeks = [{"week": i + 1, "monday": mondays[i], "range": _week_range_str(m)}
+             for i, m in enumerate(_season_mondays())]
+    return jsonify({"weeks": weeks})
+
+
+@app.route("/api/season", methods=["POST"])
+def api_season_save():
+    body = request.get_json(force=True, silent=True) or {}
+    mondays = body.get("mondays") or []
+    clean = []
+    for i in range(8):
+        iso = mondays[i] if i < len(mondays) else ""
+        try:
+            date.fromisoformat(iso)   # validate
+            clean.append(iso)
+        except (ValueError, TypeError):
+            clean.append(_DEFAULT_SEASON_MONDAYS[i])
+    _season_save({"mondays": clean})
+    return jsonify({"ok": True, "weeks": [{"week": i + 1, "monday": clean[i],
+                    "range": _week_range_str(date.fromisoformat(clean[i]))} for i in range(8)]})
 
 
 # --- Report processing ---
@@ -1285,6 +1384,10 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .fam-table td.fam-cell{cursor:pointer;min-width:70px}
 .fam-table td.fam-cell:hover{background:#f4eef0;outline:1px dashed var(--brand)}
 .fam-table .fam-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.9rem;padding:0}
+.season-row{display:flex;align-items:center;gap:.7rem;padding:.3rem 0}
+.season-row .sr-wk{font-weight:700;color:var(--brand);width:64px;font-size:.85rem}
+.season-row input[type=date]{padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.85rem}
+.season-row .sr-range{font-size:.82rem;color:#666}
 .payroll-table td.pr-count{font-weight:700;color:var(--brand);width:34px}
 .payroll-table tbody tr:nth-child(even){background:#f4eef0}
 .payroll-table td.pr-cell,.payroll-table td.pr-xcell{cursor:pointer;font-weight:800;font-size:1.6rem;user-select:none;line-height:1}
@@ -1824,6 +1927,21 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       <input class="pr-input" id="fam-phone1"  placeholder="Phone"   style="width:120px">
       <input class="pr-input" id="fam-email1"  placeholder="Email"   style="width:160px">
       <button class="pr-period-btn" id="fam-add">＋ Add</button>
+    </div>
+  </div>
+
+  <!-- Season calendar: the 8 camp weeks -->
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Season Calendar</div>
+        <div class="card-hint">Set the Monday that starts each of the 8 camp weeks. These drive the week #/date ranges on reports and the day columns in Payroll.</div>
+      </div>
+    </div>
+    <div id="season-rows"></div>
+    <div style="display:flex;align-items:center;gap:.8rem;margin-top:.6rem">
+      <button class="pr-period-btn" id="season-save">💾 Save Calendar</button>
+      <span id="season-msg" style="font-size:.82rem;color:#777"></span>
     </div>
   </div>
 
@@ -2812,6 +2930,62 @@ famDrop.addEventListener('drop', e => {
 });
 famFile.addEventListener('change', e => { if (e.target.files[0]) { importFamilies(e.target.files[0]); e.target.value=''; } });
 
+// ---- Season calendar ----
+let seasonWeeks = [];
+
+async function loadSeason() {
+  try {
+    const res = await fetch('/api/season');
+    const d = await res.json();
+    seasonWeeks = d.weeks || [];
+  } catch(e) { seasonWeeks = []; }
+  renderSeason();
+}
+
+function renderSeason() {
+  const box = document.getElementById('season-rows');
+  if (!box) return;
+  box.innerHTML = seasonWeeks.map(w =>
+    `<div class="season-row">` +
+    `<span class="sr-wk">Week ${w.week}</span>` +
+    `<input type="date" data-wk="${w.week}" value="${w.monday}">` +
+    `<span class="sr-range" id="sr-range-${w.week}">${w.range || ''}</span>` +
+    `</div>`).join('');
+  // Live-update the shown range as the Monday changes
+  box.querySelectorAll('input[type=date]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const span = document.getElementById('sr-range-' + inp.dataset.wk);
+      if (span) span.textContent = rangeFromMonday(inp.value);
+    });
+  });
+}
+
+function rangeFromMonday(iso) {
+  if (!iso) return '';
+  const mon = new Date(iso + 'T00:00:00');
+  const fri = new Date(mon); fri.setDate(fri.getDate() + 4);
+  const M = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return mon.getMonth() === fri.getMonth()
+    ? `${M[mon.getMonth()]} ${mon.getDate()} – ${fri.getDate()}`
+    : `${M[mon.getMonth()]} ${mon.getDate()} – ${M[fri.getMonth()]} ${fri.getDate()}`;
+}
+
+document.getElementById('season-save').addEventListener('click', async () => {
+  const msg = document.getElementById('season-msg');
+  const mondays = Array.from(document.querySelectorAll('#season-rows input[type=date]')).map(i => i.value);
+  if (mondays.some(m => !m)) { msg.style.color = '#c0392b'; msg.textContent = 'Set a Monday for every week.'; return; }
+  msg.style.color = '#666'; msg.textContent = 'Saving…';
+  try {
+    const res = await fetch('/api/season', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mondays})});
+    const d = await res.json();
+    if (!res.ok || d.error) { msg.style.color = '#c0392b'; msg.textContent = d.error || 'Could not save.'; return; }
+    seasonWeeks = d.weeks || seasonWeeks;
+    renderSeason();
+    msg.style.color = '#2e7d32'; msg.textContent = '✓ Saved. Reports & Payroll now use these dates.';
+    loadPayroll();   // refresh payroll day columns
+  } catch(e) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + e.message; }
+});
+
 // Load all data for the app (only after the user is signed in)
 function loadAllData() {
   loadConfig();
@@ -2821,6 +2995,7 @@ function loadAllData() {
   loadPayroll();
   loadFamilies();
   loadUsers();
+  loadSeason();
 }
 
 // ---- First-time "Utilities" notice (shows once per browser, after sign-in) ----
