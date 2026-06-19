@@ -1719,7 +1719,7 @@ function renderPayroll() {
     const cls = 'pr-day' + (i === 5 ? ' pr-week-sep' : '');
     html += `<th class="${cls}">${d.dow}<br>${d.md}</th>`;
   });
-  if (showExtra) html += '<th class="pr-extra">Extra 1</th><th class="pr-extra">Extra 2</th>';
+  if (showExtra) html += '<th class="pr-extra">BS</th><th class="pr-extra">SP\\MTC</th>';
   html += '<th></th></tr></thead><tbody>';
   staff.forEach(s => {
     const c = payroll.checks[s.id] || {};
