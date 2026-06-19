@@ -731,6 +731,14 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .pr-period-btn{padding:.4rem .8rem;border:1px solid var(--brand);background:#fff;color:var(--brand);border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem}
 .pr-period-btn.active{background:var(--brand);color:#fff}
 .pr-input{padding:.45rem .6rem;border:1px solid var(--border);border-radius:8px;font-size:.85rem}
+.payroll-table caption{caption-side:top;text-align:left;font-weight:700;font-size:1rem;padding:.3rem 0 .5rem;color:var(--brand)}
+@media print {
+  body * { visibility:hidden; }
+  #payroll-table, #payroll-table * { visibility:visible; }
+  #payroll-table { position:absolute; left:0; top:0; width:auto; font-size:9pt; }
+  #payroll-table .pr-del { display:none; }
+  @page { size:landscape; margin:.4in; }
+}
 .card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:1.5rem 1.75rem;margin-bottom:1.1rem;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:box-shadow .2s}
 .card:hover{box-shadow:0 3px 12px rgba(109,31,47,.07)}
 .card-hd{display:flex;align-items:center;gap:.7rem;margin-bottom:1.1rem}
@@ -1184,7 +1192,9 @@ header{padding:0 1rem;gap:.75rem;height:64px}
           <option value="area">Area</option>
           <option value="total">Total (high to low)</option>
         </select></label>
-      <button id="pr-lock" class="pr-period-btn" style="margin-left:auto">🔓 Unlocked</button>
+      <button id="pr-export" class="pr-period-btn" style="margin-left:auto">⬇ Excel</button>
+      <button id="pr-print" class="pr-period-btn">🖨 Print / PDF</button>
+      <button id="pr-lock" class="pr-period-btn">🔓 Unlocked</button>
     </div>
 
     <div style="overflow-x:auto">
@@ -1708,7 +1718,7 @@ function renderPayroll() {
     return (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase());
   });
   const showExtra = prPeriod === 0;   // BS / SP\\MTC columns only on the Weeks 1 & 2 block
-  let html = '<thead><tr><th>#</th><th>Staff</th><th>Area</th>';
+  let html = `<caption>${payrollTitle()}</caption><thead><tr><th>#</th><th>Staff</th><th>Area</th>`;
   days.forEach((d,i) => {
     const cls = 'pr-day' + (i === 5 ? ' pr-week-sep' : '');
     html += `<th class="${cls}">${d.dow}<br>${d.md}</th>`;
@@ -1823,7 +1833,7 @@ function renderTotalsTable(filterArea, sortKey) {
     return (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase());
   });
 
-  let html = '<thead><tr><th>Staff</th><th>Area</th><th>Total Checks<br><small style="font-weight:400">(all 8 weeks)</small></th></tr></thead><tbody>';
+  let html = `<caption>${payrollTitle()}</caption><thead><tr><th>Staff</th><th>Area</th><th>Total Checks<br><small style="font-weight:400">(all 8 weeks)</small></th></tr></thead><tbody>`;
   staff.forEach(s => {
     const jc = isJC(s) ? ' <small style="color:#1A79BF;font-weight:700">JC</small>' : '';
     const areaTxt = (s.area === 'Support' && s.title) ? s.title : (s.area || '');
@@ -1856,6 +1866,35 @@ document.getElementById('pr-add').addEventListener('click', async () => {
     msg.textContent = '';
     renderPayroll();
   } catch(e) { msg.textContent = 'Error adding staff.'; }
+});
+
+function payrollTitle() {
+  let t = prTotals ? 'Payroll Totals — All 8 Weeks'
+                   : `Payroll — Weeks ${prPeriod*2+1} & ${prPeriod*2+2}`;
+  const fa = document.getElementById('pr-filter-area').value;
+  if (fa && fa !== 'ALL') t += '  —  ' + fa;
+  return t;
+}
+
+// Print / save-as-PDF (prints exactly what's on screen, filtered/sorted)
+document.getElementById('pr-print').addEventListener('click', () => window.print());
+
+// Export the current (filtered/sorted) table to an .xls Excel file
+document.getElementById('pr-export').addEventListener('click', () => {
+  const tbl = document.getElementById('payroll-table').cloneNode(true);
+  if (!prTotals) {  // drop the delete (✕) column in the weeks grid
+    tbl.querySelectorAll('tr').forEach(tr => { if (tr.lastElementChild) tr.lastElementChild.remove(); });
+  }
+  tbl.querySelectorAll('button').forEach(b => b.remove());
+  const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+    'xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>' +
+    tbl.outerHTML + '</body></html>';
+  const blob = new Blob(['﻿' + html], {type: 'application/vnd.ms-excel'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = payrollTitle().replace(/[^\w]+/g, '_').replace(/^_|_$/g, '') + '.xls';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
 });
 
 // Boot
