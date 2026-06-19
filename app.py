@@ -830,6 +830,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
   #payroll-table, #payroll-table * { visibility:visible; }
   #payroll-table { position:absolute; left:0; top:0; width:auto; font-size:9pt; }
   #payroll-table .pr-del { display:none; }
+  /* keep maroon headers, row shading and symbol colors when printing */
+  #payroll-table, #payroll-table * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 }
 .card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:1.5rem 1.75rem;margin-bottom:1.1rem;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:box-shadow .2s}
 .card:hover{box-shadow:0 3px 12px rgba(109,31,47,.07)}
