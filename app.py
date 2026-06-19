@@ -438,6 +438,7 @@ def api_payroll_export():
     view   = request.args.get("view", "weeks")
     area   = request.args.get("area", "ALL")
     sort   = request.args.get("sort", "last")
+    extp   = request.args.get("extp", "ALL")
     try:
         period = int(request.args.get("period", "0"))
     except (TypeError, ValueError):
@@ -480,7 +481,12 @@ def api_payroll_export():
                 c.border = BORD; c.alignment = CTR if c.column == 3 else LEFT
         widths = {"A": 30, "B": 22, "C": 14}; fname = "Payroll_Totals.xlsx"
     elif view == "ext":
-        staff = [s for s in staff if s.get("ext")]
+        def _shift_ok(e):
+            e = e or ""
+            if extp == "AM": return "AM" in e.upper()
+            if extp == "PM": return "PM" in e.upper()
+            return bool(e)
+        staff = [s for s in staff if s.get("ext") and _shift_ok(s.get("ext"))]
         staff.sort(key=namekey)
         header(["Staff", "MON", "TUES", "WED", "THURS", "FRI"])
         for s in staff:
@@ -488,7 +494,9 @@ def api_payroll_export():
             ws.row_dimensions[ws.max_row].height = 26
             for c in ws[ws.max_row]:
                 c.border = BORD; c.alignment = LEFT if c.column == 1 else CTR
-        widths = {"A": 30, "B": 11, "C": 11, "D": 11, "E": 11, "F": 11}; fname = "Extended_Staff.xlsx"
+        widths = {"A": 30, "B": 11, "C": 11, "D": 11, "E": 11, "F": 11}
+        _sfx = {"AM": "_AM", "PM": "_PM"}.get(extp, "")
+        fname = f"Extended_Staff{_sfx}.xlsx"
     else:  # weeks
         days = days_all[period * 10:period * 10 + 10]
         staff.sort(key=(lambda s: (-cnt(s["id"], days), namekey(s))) if sort == "total"
@@ -815,8 +823,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td.st-half{color:#1A79BF}
 .payroll-table td.st-na{color:#888;font-size:1.05rem;font-weight:700}
 .payroll-table th.pr-day,.payroll-table td.pr-cell{width:42px;min-width:42px}
-.payroll-table th.pr-extra{width:42px;min-width:42px;background:#3f1119;color:#fff;white-space:normal;line-height:1.1}
-.payroll-table td.pr-xcell{width:42px;min-width:42px}
+.payroll-table th.pr-extra{width:42px;min-width:42px;max-width:42px;background:#3f1119;color:#fff;white-space:nowrap;font-size:.6rem;letter-spacing:-.02em;padding-left:.12rem;padding-right:.12rem;line-height:1.1}
+.payroll-table td.pr-xcell{width:42px;min-width:42px;max-width:42px}
 .pr-xsep{border-left:2px solid #6d1f2f !important}
 .payroll-table.pr-locked td.pr-cell,.payroll-table.pr-locked td.pr-xcell{cursor:not-allowed}
 .payroll-table .pr-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.95rem;padding:0}
@@ -1287,6 +1295,12 @@ header{padding:0 1rem;gap:.75rem;height:64px}
           <option value="area">Area</option>
           <option value="total">Total (high to low)</option>
         </select></label>
+      <label id="pr-ext-period-wrap" style="display:none">Shift:
+        <select id="pr-ext-period" class="pr-input" onchange="prExtPeriod=this.value;renderPayroll()">
+          <option value="ALL">AM &amp; PM</option>
+          <option value="AM">AM only</option>
+          <option value="PM">PM only</option>
+        </select></label>
       <button id="pr-export" class="pr-period-btn pr-sm" style="margin-left:auto">⬇ Excel</button>
       <button id="pr-print" class="pr-period-btn pr-sm">🖨 Print / PDF</button>
       <button id="pr-lock" class="pr-period-btn pr-sm">🔓 Unlocked</button>
@@ -1730,6 +1744,7 @@ let payroll = {staff: [], checks: {}, days: []};
 let prPeriod = 0;   // 0..3 → weeks 1&2, 3&4, 5&6, 7&8
 let prTotals = false;   // when true, show the cumulative Totals view
 let prExt = false;      // when true, show the blank Extended Staff sheet
+let prExtPeriod = 'ALL';// Extended Staff AM/PM filter: ALL | AM | PM
 
 async function loadPayroll() {
   try {
@@ -1804,7 +1819,12 @@ function renderPayroll() {
     const el = document.getElementById(id); if (el) el.disabled = payroll.locked;
   });
 
-  if (prExt) { renderExtTable(filterArea); return; }
+  // AM/PM shift selector is only relevant to the Extended Staff sheet
+  const extWrap = document.getElementById('pr-ext-period-wrap');
+  if (extWrap) extWrap.style.display = prExt ? '' : 'none';
+  document.getElementById('pr-ext-period').value = prExtPeriod;
+
+  if (prExt) { renderExtTable(filterArea, prExtPeriod); return; }
   if (prTotals) { renderTotalsTable(filterArea, sortKey); return; }
 
   // table
@@ -1924,11 +1944,16 @@ function totalChecks(id) {
 function isJC(s) { return (s.title || '').toLowerCase().includes('junior'); }
 
 // Extended Staff — blank printable check-in sheet (only AM/PM-extended staff)
-function renderExtTable(filterArea) {
+function renderExtTable(filterArea, extPeriod) {
+  extPeriod = extPeriod || 'ALL';
+  const matchShift = e => extPeriod === 'ALL'
+    || (extPeriod === 'AM' && /AM/i.test(e))
+    || (extPeriod === 'PM' && /PM/i.test(e));
   const staff = payroll.staff
-    .filter(s => s.ext && (filterArea === 'ALL' || s.area === filterArea))
+    .filter(s => s.ext && matchShift(s.ext) && (filterArea === 'ALL' || s.area === filterArea))
     .sort((a,b) => (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase()));
-  let html = `<caption>Extended Staff — daily check-in (${staff.length})</caption>` +
+  const shiftLbl = extPeriod === 'AM' ? 'AM' : extPeriod === 'PM' ? 'PM' : 'AM & PM';
+  let html = `<caption>Extended Staff (${shiftLbl}) — daily check-in (${staff.length})</caption>` +
     '<thead><tr><th>Staff</th>' +
     ['MON','TUES','WED','THURS','FRI'].map(d => `<th style="width:74px;min-width:74px">${d}</th>`).join('') +
     '</tr></thead><tbody>';
@@ -2013,7 +2038,7 @@ document.getElementById('pr-export').addEventListener('click', () => {
   const view = prTotals ? 'totals' : prExt ? 'ext' : 'weeks';
   const area = encodeURIComponent(document.getElementById('pr-filter-area').value);
   const sort = document.getElementById('pr-sort').value;
-  window.location = `/api/payroll/export?view=${view}&period=${prPeriod}&area=${area}&sort=${sort}`;
+  window.location = `/api/payroll/export?view=${view}&period=${prPeriod}&area=${area}&sort=${sort}&extp=${prExtPeriod}`;
 });
 
 // Boot
