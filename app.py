@@ -880,6 +880,51 @@ def api_users():
     return jsonify({"users": users})
 
 
+@app.route("/api/users", methods=["POST"])
+@admin_required
+def api_users_add():
+    body = request.get_json(force=True, silent=True) or {}
+    name = (body.get("name") or "").strip()
+    username = (body.get("username") or "").strip()
+    password = body.get("password") or ""
+    if not username or not password:
+        return jsonify({"error": "Username and password are required."}), 400
+    if len(password) < 4:
+        return jsonify({"error": "Password must be at least 4 characters."}), 400
+    data = _users_load()
+    if any(x.get("username", "").lower() == username.lower() for x in data["users"]):
+        return jsonify({"error": "That username is taken."}), 409
+    entry = {"username": username, "name": name or username,
+             "pw_hash": generate_password_hash(password),
+             "is_admin": bool(body.get("is_admin"))}
+    data["users"].append(entry)
+    _users_save(data)
+    return jsonify({"username": username, "name": entry["name"], "is_admin": entry["is_admin"]})
+
+
+@app.route("/api/users/<username>", methods=["PATCH"])
+@admin_required
+def api_users_edit(username):
+    body = request.get_json(force=True, silent=True) or {}
+    data = _users_load()
+    u = next((x for x in data["users"] if x.get("username", "").lower() == username.lower()), None)
+    if u is None:
+        return jsonify({"error": "not found"}), 404
+    if "name" in body:
+        u["name"] = (body.get("name") or "").strip() or u["username"]
+    if body.get("password"):
+        if len(body["password"]) < 4:
+            return jsonify({"error": "Password must be at least 4 characters."}), 400
+        u["pw_hash"] = generate_password_hash(body["password"])
+    if "is_admin" in body:
+        me = _current_user()
+        # Don't let an admin strip their own admin rights (avoid lockout)
+        if not (me and me["username"].lower() == username.lower() and not body["is_admin"]):
+            u["is_admin"] = bool(body["is_admin"])
+    _users_save(data)
+    return jsonify({"username": u["username"], "name": u.get("name"), "is_admin": bool(u.get("is_admin"))})
+
+
 @app.route("/api/users/<username>", methods=["DELETE"])
 @admin_required
 def api_users_del(username):
@@ -1758,6 +1803,15 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     </div>
     <div style="overflow-x:auto">
       <table class="fam-table" id="users-table"></table>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.8rem;padding-top:.8rem;border-top:1px solid #eee">
+      <strong style="font-size:.85rem;color:#555">Add user:</strong>
+      <input class="pr-input" id="usr-name"     placeholder="Name"     style="width:140px">
+      <input class="pr-input" id="usr-username" placeholder="Username" style="width:130px">
+      <input class="pr-input" id="usr-password" placeholder="Password" style="width:130px">
+      <label style="font-size:.8rem;color:#666"><input type="checkbox" id="usr-admin"> Admin</label>
+      <button class="pr-period-btn" id="usr-add">＋ Add User</button>
+      <span id="usr-msg" style="font-size:.82rem;color:#777"></span>
     </div>
   </div>
 
@@ -2742,9 +2796,10 @@ async function loadUsers() {
     let h = '<thead><tr><th>Name</th><th>Username</th><th>Role</th><th></th></tr></thead><tbody>';
     (d.users || []).forEach(u => {
       const isMe = currentUser && u.username.toLowerCase() === currentUser.username.toLowerCase();
-      h += `<tr><td>${famEsc(u.name)}</td><td>${famEsc(u.username)}</td>` +
+      h += `<tr><td>${famEsc(u.name)}</td><td>${famEsc(u.username)}${isMe ? ' (you)' : ''}</td>` +
            `<td>${u.is_admin ? 'Admin' : 'User'}</td>` +
-           `<td>${isMe ? '' : `<button class="pr-del usr-del" data-u="${famEsc(u.username)}" title="Remove">✕</button>`}</td></tr>`;
+           `<td style="white-space:nowrap"><button class="pr-period-btn pr-sm usr-pw" data-u="${famEsc(u.username)}">Reset PW</button> ` +
+           `${isMe ? '' : `<button class="pr-del usr-del" data-u="${famEsc(u.username)}" title="Remove">✕</button>`}</td></tr>`;
     });
     h += '</tbody>';
     tbl.innerHTML = h;
@@ -2757,8 +2812,39 @@ async function loadUsers() {
         loadUsers();
       });
     });
+    tbl.querySelectorAll('.usr-pw').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const un = btn.dataset.u;
+        const pw = prompt(`New password for "${un}" (min 4 characters):`);
+        if (!pw) return;
+        const r = await fetch('/api/users/' + encodeURIComponent(un), {method:'PATCH',
+          headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: pw})});
+        const dd = await r.json();
+        alert(r.ok && !dd.error ? `Password reset for ${un}.` : (dd.error || 'Could not reset password.'));
+      });
+    });
   } catch(e) { card.style.display = 'none'; }
 }
+
+document.getElementById('usr-add').addEventListener('click', async () => {
+  const msg = document.getElementById('usr-msg');
+  const body = {
+    name:     document.getElementById('usr-name').value.trim(),
+    username: document.getElementById('usr-username').value.trim(),
+    password: document.getElementById('usr-password').value,
+    is_admin: document.getElementById('usr-admin').checked,
+  };
+  if (!body.username || !body.password) { msg.style.color = '#c0392b'; msg.textContent = 'Username and password required.'; return; }
+  try {
+    const res = await fetch('/api/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const d = await res.json();
+    if (!res.ok || d.error) { msg.style.color = '#c0392b'; msg.textContent = d.error || 'Could not add user.'; return; }
+    msg.style.color = '#2e7d32'; msg.textContent = `✓ Added ${d.username}.`;
+    ['usr-name','usr-username','usr-password'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('usr-admin').checked = false;
+    loadUsers();
+  } catch(e) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + e.message; }
+});
 
 (function() {
   const overlay  = document.getElementById('pw-overlay');
