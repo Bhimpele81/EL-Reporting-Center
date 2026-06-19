@@ -815,8 +815,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td.st-half{color:#1A79BF}
 .payroll-table td.st-na{color:#888;font-size:1.05rem;font-weight:700}
 .payroll-table th.pr-day,.payroll-table td.pr-cell{width:42px;min-width:42px}
-.payroll-table th.pr-extra{width:66px;min-width:66px;background:#3f1119;color:#fff;white-space:nowrap}
-.payroll-table td.pr-xcell{width:66px;min-width:66px;background:#f3e7ea}
+.payroll-table th.pr-extra{width:42px;min-width:42px;background:#3f1119;color:#fff;white-space:normal;line-height:1.1}
+.payroll-table td.pr-xcell{width:42px;min-width:42px}
+.pr-xsep{border-left:2px solid #6d1f2f !important}
 .payroll-table.pr-locked td.pr-cell,.payroll-table.pr-locked td.pr-xcell{cursor:not-allowed}
 .payroll-table .pr-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.95rem;padding:0}
 .pr-week-sep{border-left:3px solid #6d1f2f !important}
@@ -1825,7 +1826,7 @@ function renderPayroll() {
     const cls = 'pr-day' + (i === 5 ? ' pr-week-sep' : '');
     html += `<th class="${cls}">${d.dow}<br>${d.md}</th>`;
   });
-  if (showExtra) html += '<th class="pr-extra">BS</th><th class="pr-extra">SP\\MTC</th>';
+  if (showExtra) html += '<th class="pr-extra pr-xsep">BS</th><th class="pr-extra">SP\\MTC</th>';
   html += '<th></th></tr></thead><tbody>';
   staff.forEach(s => {
     const c = payroll.checks[s.id] || {};
@@ -1845,7 +1846,8 @@ function renderPayroll() {
       for (let cc = 1; cc <= 2; cc++) {
         const key = `xtra:${prPeriod}:${cc}`;
         const xs = xtraState(s.id, key);
-        html += `<td class="pr-xcell st-${xs || 'none'}" data-id="${s.id}" data-key="${key}">${symFor(xs)}</td>`;
+        const xcls = 'pr-xcell st-' + (xs || 'none') + (cc === 1 ? ' pr-xsep' : '');
+        html += `<td class="${xcls}" data-id="${s.id}" data-key="${key}">${symFor(xs)}</td>`;
       }
     }
     html += `<td><button class="pr-del" data-id="${s.id}" title="Remove">✕</button></td>`;
