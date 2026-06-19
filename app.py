@@ -12,6 +12,7 @@ import json
 import uuid
 import threading
 import urllib.request
+from functools import wraps
 from datetime import datetime, date, timedelta
 try:
     from zoneinfo import ZoneInfo
@@ -20,7 +21,8 @@ except Exception:
     _EASTERN = None
 import boto3
 from botocore.exceptions import ClientError
-from flask import Flask, request, jsonify, send_file, render_template_string
+from flask import Flask, request, jsonify, send_file, render_template_string, session
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from report_processor import process_report, load_bunk_config, save_bunk_config, is_master
 
@@ -30,6 +32,12 @@ from report_processor import process_report, load_bunk_config, save_bunk_config,
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32 MB upload limit
+# Stable secret for signed-cookie sessions. Set SECRET_KEY in the environment
+# (esp. on multi-worker hosts); the fallback keeps sessions working otherwise.
+app.secret_key = os.environ.get("SECRET_KEY", "el-reporting-center-default-secret-change-me")
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=14)
+# Shared code required to register a new account (augments per-user logins)
+ACCESS_CODE = os.environ.get("ACCESS_CODE", "trial")
 
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "bunk_config.json")
@@ -135,20 +143,23 @@ SEED_PATH         = os.path.join(BASE_DIR, "payroll_seed.json")
 WEEK1_MONDAY      = date(2026, 6, 22)   # first Monday of the 2026 season
 FAMILIES_KEY      = "families.json"
 LOCAL_FAMILIES    = os.path.join(UPLOAD_DIR, "families.json")
+USERS_KEY         = "users.json"
+LOCAL_USERS       = os.path.join(UPLOAD_DIR, "users.json")
 # Fields stored for each family contact record
 FAMILY_FIELDS     = ["camper", "parent1", "phone1", "email1",
                      "parent2", "phone2", "email2", "address", "notes"]
 _PROTECTED_KEYS   = {"bunk_config.json", MASTER_KEY, MASTER_META_KEY,
-                     PAYROLL_KEY, FAMILIES_KEY}
+                     PAYROLL_KEY, FAMILIES_KEY, USERS_KEY}
 
 
-def _save_master(file_bytes: bytes, filename: str) -> dict:
+def _save_master(file_bytes: bytes, filename: str, uploaded_by: str = "") -> dict:
     """Persist the uploaded master sheet (S3 if configured, plus local copy)."""
     now = datetime.now(_EASTERN) if _EASTERN else datetime.now()
     fmt = "%#m/%#d/%Y %#I:%M %p %Z" if os.name == "nt" else "%-m/%-d/%Y %-I:%M %p %Z"
     meta = {
         "filename":    filename or "master",
         "uploaded_at": now.strftime(fmt).strip(),
+        "uploaded_by": uploaded_by or "",
         "size":        len(file_bytes),
     }
     try:
@@ -383,6 +394,93 @@ def _read_spreadsheet_rows(file_bytes: bytes, filename: str) -> list:
     return [row for row in csv.reader(io.StringIO(text), delimiter=delim)]
 
 
+# ---------------------------------------------------------------------------
+# User accounts (login) — username + hashed password, server-side sessions
+# ---------------------------------------------------------------------------
+
+def _users_save(data: dict) -> None:
+    try:
+        with open(LOCAL_USERS, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+    if _s3:
+        try:
+            _s3.put_object(Bucket=S3_BUCKET, Key=USERS_KEY,
+                           Body=json.dumps(data).encode("utf-8"),
+                           ContentType="application/json")
+        except ClientError:
+            pass
+
+
+def _users_load() -> dict:
+    data = None
+    if _s3:
+        buf = _s3_get_file(USERS_KEY)
+        if buf:
+            try:
+                data = json.load(buf)
+            except Exception:
+                data = None
+    if data is None and os.path.exists(LOCAL_USERS):
+        try:
+            with open(LOCAL_USERS, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = None
+    if data is None:
+        data = {"users": []}
+    data.setdefault("users", [])
+    return data
+
+
+def _find_user(username: str) -> dict | None:
+    u = (username or "").strip().lower()
+    return next((x for x in _users_load()["users"] if x.get("username", "").lower() == u), None)
+
+
+def _current_user() -> dict | None:
+    uname = session.get("user")
+    return _find_user(uname) if uname else None
+
+
+def login_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if _current_user() is None:
+            return jsonify({"error": "auth", "message": "Please sign in."}), 401
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        u = _current_user()
+        if u is None:
+            return jsonify({"error": "auth", "message": "Please sign in."}), 401
+        if not u.get("is_admin"):
+            return jsonify({"error": "forbidden", "message": "Admins only."}), 403
+        return f(*args, **kwargs)
+    return wrapper
+
+
+# Paths reachable without a session (the page shell + auth endpoints)
+_PUBLIC_PATHS = {"/", "/logo.png", "/health", "/healthz",
+                 "/api/me", "/api/login", "/api/register", "/api/logout"}
+
+
+@app.before_request
+def _require_login():
+    """Gate every /api/* route behind a valid session, except the auth ones."""
+    p = request.path
+    if p in _PUBLIC_PATHS or not p.startswith("/api/"):
+        return None
+    if _current_user() is None:
+        return jsonify({"error": "auth", "message": "Please sign in."}), 401
+    return None
+
+
 # In-memory job store  {job_id: {status, progress, result}}
 jobs: dict = {}
 jobs_lock = threading.Lock()
@@ -505,7 +603,8 @@ def api_master_save():
     if not is_master(file_bytes):
         return jsonify({"error": "That file doesn't look like a master sheet. "
                                  "Check that it has the expected camper columns."}), 400
-    meta = _save_master(file_bytes, f.filename)
+    u = _current_user() or {}
+    meta = _save_master(file_bytes, f.filename, uploaded_by=u.get("name") or u.get("username") or "")
     return jsonify({"loaded": True, **meta})
 
 
@@ -713,6 +812,83 @@ def api_payroll_del(sid):
     data["staff"] = [s for s in data["staff"] if s.get("id") != sid]
     data["checks"].pop(sid, None)
     _payroll_save(data)
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Auth routes
+# ---------------------------------------------------------------------------
+
+@app.route("/api/me", methods=["GET"])
+def api_me():
+    u = _current_user()
+    any_users = bool(_users_load()["users"])
+    if u is None:
+        return jsonify({"authenticated": False, "has_users": any_users})
+    return jsonify({"authenticated": True, "username": u["username"],
+                    "name": u.get("name") or u["username"], "is_admin": bool(u.get("is_admin"))})
+
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    body = request.get_json(force=True, silent=True) or {}
+    u = _find_user(body.get("username", ""))
+    if u is None or not check_password_hash(u.get("pw_hash", ""), body.get("password", "")):
+        return jsonify({"error": "Invalid username or password."}), 401
+    session.permanent = True
+    session["user"] = u["username"]
+    return jsonify({"username": u["username"], "name": u.get("name") or u["username"],
+                    "is_admin": bool(u.get("is_admin"))})
+
+
+@app.route("/api/register", methods=["POST"])
+def api_register():
+    body = request.get_json(force=True, silent=True) or {}
+    if (body.get("code") or "").strip() != ACCESS_CODE:
+        return jsonify({"error": "Incorrect access code."}), 403
+    name = (body.get("name") or "").strip()
+    username = (body.get("username") or "").strip()
+    password = body.get("password") or ""
+    if not username or not password:
+        return jsonify({"error": "Username and password are required."}), 400
+    if len(password) < 4:
+        return jsonify({"error": "Password must be at least 4 characters."}), 400
+    data = _users_load()
+    if any(x.get("username", "").lower() == username.lower() for x in data["users"]):
+        return jsonify({"error": "That username is taken."}), 409
+    entry = {"username": username, "name": name or username,
+             "pw_hash": generate_password_hash(password),
+             "is_admin": len(data["users"]) == 0}   # first account is the admin
+    data["users"].append(entry)
+    _users_save(data)
+    session.permanent = True
+    session["user"] = username
+    return jsonify({"username": username, "name": entry["name"], "is_admin": entry["is_admin"]})
+
+
+@app.route("/api/logout", methods=["POST"])
+def api_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/users", methods=["GET"])
+@admin_required
+def api_users():
+    users = [{"username": x["username"], "name": x.get("name") or x["username"],
+              "is_admin": bool(x.get("is_admin"))} for x in _users_load()["users"]]
+    return jsonify({"users": users})
+
+
+@app.route("/api/users/<username>", methods=["DELETE"])
+@admin_required
+def api_users_del(username):
+    me = _current_user()
+    if me and me["username"].lower() == username.lower():
+        return jsonify({"error": "You can't delete your own account."}), 400
+    data = _users_load()
+    data["users"] = [x for x in data["users"] if x.get("username", "").lower() != username.lower()]
+    _users_save(data)
     return jsonify({"ok": True})
 
 
@@ -1209,20 +1385,44 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 #pw-submit{padding:.7rem 1.2rem;background:var(--brand);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.95rem;cursor:pointer;transition:background .18s}
 #pw-submit:hover{background:var(--brand-dark)}
 #pw-error{font-size:.82rem;color:#c0392b;min-height:1.1rem;margin-top:.15rem}
+.pw-field{margin-bottom:.6rem}
+.pw-field input{width:100%;padding:.7rem 1rem;border:1.5px solid #ddd;border-radius:8px;font-size:.95rem;outline:none;transition:border .18s}
+.pw-field input:focus{border-color:var(--brand)}
+.pw-go{width:100%;padding:.75rem 1rem;background:var(--brand);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.95rem;cursor:pointer;transition:background .18s;margin-top:.3rem}
+.pw-go:hover{background:var(--brand-dark)}
+.pw-toggle{font-size:.82rem;color:#777;margin-top:.9rem}
+.pw-toggle a{color:var(--brand);font-weight:600;cursor:pointer;text-decoration:underline}
+.h-user{display:flex;align-items:center;gap:.5rem;font-size:.72rem;color:#fff;opacity:.95}
+.h-user button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.7rem;font-weight:600;padding:.3rem .7rem;border-radius:6px;cursor:pointer}
+.h-user button:hover{background:rgba(255,255,255,.28)}
 </style>
 </head>
 <body>
 
-<!-- Password gate -->
+<!-- Login / register gate -->
 <div id="pw-overlay">
   <div id="pw-box">
     <div class="pw-logo"><img src="/logo.png" alt="Elbow Lane Day Camp"></div>
     <h2>Elbow Lane Reporting Center</h2>
-    <p class="pw-sub">You have <strong>trial access</strong> to this reporting center at no cost.<br>Enter your access code to continue.</p>
-    <div id="pw-input-wrap">
-      <input id="pw-input" type="password" placeholder="Enter access code" autocomplete="off">
-      <button id="pw-submit">Enter</button>
+
+    <div id="login-view">
+      <p class="pw-sub">Sign in to continue.</p>
+      <div class="pw-field"><input id="login-username" placeholder="Username" autocomplete="username"></div>
+      <div class="pw-field"><input id="login-password" type="password" placeholder="Password" autocomplete="current-password"></div>
+      <button id="login-btn" class="pw-go">Sign In</button>
+      <div class="pw-toggle">No account yet? <a id="show-register">Create one</a></div>
     </div>
+
+    <div id="register-view" style="display:none">
+      <p class="pw-sub">Create your account.</p>
+      <div class="pw-field"><input id="reg-name" placeholder="Your name" autocomplete="name"></div>
+      <div class="pw-field"><input id="reg-username" placeholder="Choose a username" autocomplete="username"></div>
+      <div class="pw-field"><input id="reg-password" type="password" placeholder="Choose a password" autocomplete="new-password"></div>
+      <div class="pw-field"><input id="reg-code" placeholder="Access code" autocomplete="off"></div>
+      <button id="reg-btn" class="pw-go">Create Account &amp; Sign In</button>
+      <div class="pw-toggle">Already have an account? <a id="show-login">Sign in</a></div>
+    </div>
+
     <div id="pw-error"></div>
   </div>
 </div>
@@ -1299,6 +1499,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="h-sub">Reporting Center</div>
   </div>
   <div class="h-nav">
+    <span class="h-user" id="h-user" style="display:none"><span id="h-user-name"></span><button id="logout-btn">Sign out</button></span>
     <button class="h-pricing" id="pricing-btn">$ Pricing</button>
     <a class="h-support" href="mailto:bhimpele@gmail.com?subject=EL%20Reporting%20Center%20Support">✉ Support</a>
   </div>
@@ -1547,6 +1748,19 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div id="save-msg"></div>
   </div>
 
+  <!-- User accounts (admins only) -->
+  <div class="card" id="users-card" style="display:none">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">User Accounts</div>
+        <div class="card-hint">People sign in with their own username &amp; password. New users create an account with the shared access code on the sign-in screen. As an admin you can remove accounts here.</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="fam-table" id="users-table"></table>
+    </div>
+  </div>
+
 </div><!-- /tab-config -->
 
 <!-- ===== PAYROLL TAB ===== -->
@@ -1635,15 +1849,16 @@ async function loadMaster() {
     const banner = document.getElementById('master-banner');
     const status = document.getElementById('master-status');
     if (masterLoaded) {
+      const by = d.uploaded_by ? ` by <strong>${d.uploaded_by}</strong>` : '';
       document.getElementById('master-banner-text').innerHTML =
         `Using saved master: <strong>${d.filename || 'master sheet'}</strong>` +
-        (d.uploaded_at ? ` &middot; uploaded ${d.uploaded_at}` : '') +
+        (d.uploaded_at ? ` &middot; uploaded ${d.uploaded_at}${by}` : '') +
         `. Reports and Labels will use this data until an updated file is uploaded.`;
       banner.style.display = 'flex';
       if (status) {
         document.getElementById('master-status-text').innerHTML =
           `Current master: <strong>${d.filename || 'master sheet'}</strong>` +
-          (d.uploaded_at ? ` &middot; uploaded ${d.uploaded_at}` : '');
+          (d.uploaded_at ? ` &middot; uploaded ${d.uploaded_at}${by}` : '');
         status.style.display = 'flex';
       }
     } else {
@@ -2480,25 +2695,29 @@ famDrop.addEventListener('drop', e => {
 });
 famFile.addEventListener('change', e => { if (e.target.files[0]) { importFamilies(e.target.files[0]); e.target.value=''; } });
 
-// Boot
-loadConfig();
-loadRecent();
-loadWeather();
-loadMaster();
-loadPayroll();
-loadFamilies();
+// Load all data for the app (only after the user is signed in)
+function loadAllData() {
+  loadConfig();
+  loadRecent();
+  loadWeather();
+  loadMaster();
+  loadPayroll();
+  loadFamilies();
+  loadUsers();
+}
 
-// ---- First-time "Utilities" notice (shows once per browser) ----
-(function() {
+// ---- First-time "Utilities" notice (shows once per browser, after sign-in) ----
+function maybeShowNotice() {
   const KEY = 'el_seen_utilities_notice_v1';
   const overlay = document.getElementById('notice-overlay');
   const close = () => { overlay.classList.add('hidden'); try { localStorage.setItem(KEY, '1'); } catch(e) {} };
   try {
-    if (!localStorage.getItem(KEY)) overlay.classList.remove('hidden');
+    if (localStorage.getItem(KEY)) return;
   } catch(e) {}
-  document.getElementById('notice-ok').addEventListener('click', close);
+  overlay.classList.remove('hidden');
+  document.getElementById('notice-ok').onclick = close;
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-})();
+}
 
 // ---- Pricing modal ----
 (function() {
@@ -2508,36 +2727,114 @@ loadFamilies();
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.add('hidden'); });
 })();
 
-// ---- Password gate ----
+// ---- Authentication (per-user login accounts) ----
+let currentUser = null;
+
+async function loadUsers() {
+  // Admin-only; the endpoint 403s for non-admins, in which case we hide the card.
+  const card = document.getElementById('users-card');
+  if (!currentUser || !currentUser.is_admin) { if (card) card.style.display = 'none'; return; }
+  try {
+    const res = await fetch('/api/users');
+    if (!res.ok) { card.style.display = 'none'; return; }
+    const d = await res.json();
+    const tbl = document.getElementById('users-table');
+    let h = '<thead><tr><th>Name</th><th>Username</th><th>Role</th><th></th></tr></thead><tbody>';
+    (d.users || []).forEach(u => {
+      const isMe = currentUser && u.username.toLowerCase() === currentUser.username.toLowerCase();
+      h += `<tr><td>${famEsc(u.name)}</td><td>${famEsc(u.username)}</td>` +
+           `<td>${u.is_admin ? 'Admin' : 'User'}</td>` +
+           `<td>${isMe ? '' : `<button class="pr-del usr-del" data-u="${famEsc(u.username)}" title="Remove">✕</button>`}</td></tr>`;
+    });
+    h += '</tbody>';
+    tbl.innerHTML = h;
+    card.style.display = '';
+    tbl.querySelectorAll('.usr-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const un = btn.dataset.u;
+        if (!confirm(`Remove user "${un}"?`)) return;
+        try { await fetch('/api/users/' + encodeURIComponent(un), {method:'DELETE'}); } catch(e) {}
+        loadUsers();
+      });
+    });
+  } catch(e) { card.style.display = 'none'; }
+}
+
 (function() {
   const overlay  = document.getElementById('pw-overlay');
-  const input    = document.getElementById('pw-input');
-  const btn      = document.getElementById('pw-submit');
   const errEl    = document.getElementById('pw-error');
-  const KEY      = 'el_rc_auth';
-  const TTL_MS   = 3 * 60 * 60 * 1000; // 3 hours
+  const loginView = document.getElementById('login-view');
+  const regView   = document.getElementById('register-view');
 
-  // Skip gate if still within the 3-hour window
-  const saved = localStorage.getItem(KEY);
-  if (saved && (Date.now() - parseInt(saved, 10)) < TTL_MS) {
+  function showApp(user) {
+    currentUser = user;
     overlay.classList.add('hidden');
-    return;
+    document.getElementById('h-user').style.display = 'flex';
+    document.getElementById('h-user-name').textContent = user.name || user.username;
+    loadAllData();
+    maybeShowNotice();
   }
 
-  function attempt() {
-    if (input.value.trim().toLowerCase() === 'trial') {
-      localStorage.setItem(KEY, Date.now().toString());
-      overlay.classList.add('hidden');
-    } else {
-      errEl.textContent = 'Incorrect access code. Please try again.';
-      input.value = '';
-      input.focus();
-    }
+  document.getElementById('show-register').addEventListener('click', () => {
+    loginView.style.display = 'none'; regView.style.display = ''; errEl.textContent = '';
+  });
+  document.getElementById('show-login').addEventListener('click', () => {
+    regView.style.display = 'none'; loginView.style.display = ''; errEl.textContent = '';
+  });
+
+  async function doLogin() {
+    errEl.textContent = '';
+    const body = {
+      username: document.getElementById('login-username').value.trim(),
+      password: document.getElementById('login-password').value,
+    };
+    if (!body.username || !body.password) { errEl.textContent = 'Enter your username and password.'; return; }
+    try {
+      const res = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+      const d = await res.json();
+      if (!res.ok || d.error) { errEl.textContent = d.error || 'Sign-in failed.'; return; }
+      showApp(d);
+    } catch(e) { errEl.textContent = 'Network error: ' + e.message; }
   }
 
-  btn.addEventListener('click', attempt);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') attempt(); });
-  input.focus();
+  async function doRegister() {
+    errEl.textContent = '';
+    const body = {
+      name:     document.getElementById('reg-name').value.trim(),
+      username: document.getElementById('reg-username').value.trim(),
+      password: document.getElementById('reg-password').value,
+      code:     document.getElementById('reg-code').value.trim(),
+    };
+    if (!body.username || !body.password) { errEl.textContent = 'Choose a username and password.'; return; }
+    try {
+      const res = await fetch('/api/register', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+      const d = await res.json();
+      if (!res.ok || d.error) { errEl.textContent = d.error || 'Could not create account.'; return; }
+      showApp(d);
+    } catch(e) { errEl.textContent = 'Network error: ' + e.message; }
+  }
+
+  document.getElementById('login-btn').addEventListener('click', doLogin);
+  document.getElementById('reg-btn').addEventListener('click', doRegister);
+  document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('reg-code').addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
+
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    try { await fetch('/api/logout', {method:'POST'}); } catch(e) {}
+    location.reload();
+  });
+
+  // On load: if already signed in, go straight in; otherwise show the gate.
+  (async () => {
+    try {
+      const res = await fetch('/api/me');
+      const d = await res.json();
+      if (d.authenticated) { showApp(d); return; }
+      // No accounts yet → default to the create-account view
+      if (!d.has_users) { loginView.style.display = 'none'; regView.style.display = ''; }
+    } catch(e) {}
+    document.getElementById('login-username').focus();
+  })();
 })();
 </script>
 </body>
