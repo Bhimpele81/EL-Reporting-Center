@@ -714,7 +714,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td{height:42px}
 .payroll-table thead th{background:var(--brand);color:#fff;font-weight:700;white-space:nowrap}
 .payroll-table td.pr-name{text-align:left;font-weight:600;white-space:nowrap}
-.payroll-table td.pr-area{color:#555;width:104px;white-space:normal;line-height:1.15}
+.payroll-table td.pr-area{color:#555;width:92px;white-space:normal;line-height:1.15}
 .payroll-table td.pr-count{font-weight:700;color:var(--brand);width:34px}
 .payroll-table tbody tr:nth-child(even){background:#f4eef0}
 .payroll-table td.pr-cell{cursor:pointer;font-weight:800;font-size:1.6rem;user-select:none;line-height:1}
@@ -722,8 +722,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td.pr-cell.st-x{color:#c0392b}
 .payroll-table td.pr-cell.st-half{color:#1A79BF;font-size:1.1rem;font-weight:700}
 .payroll-table td.pr-cell.st-na{color:#888;font-size:.95rem;font-weight:700}
-.payroll-table th.pr-day,.payroll-table td.pr-cell{width:48px;min-width:48px}
-.payroll-table th.pr-extra,.payroll-table td.pr-xcell{width:52px;min-width:52px;background:#faf4f0}
+.payroll-table th.pr-day,.payroll-table td.pr-cell{width:44px;min-width:44px}
+.payroll-table th.pr-extra{width:58px;min-width:58px;background:#3f1119;color:#fff}
+.payroll-table td.pr-xcell{width:58px;min-width:58px;background:#f3e7ea}
 .payroll-table.pr-locked td.pr-cell,.payroll-table.pr-locked td.pr-xcell{cursor:not-allowed}
 .payroll-table .pr-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.95rem;padding:0}
 .pr-week-sep{border-left:3px solid #6d1f2f !important}
