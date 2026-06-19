@@ -773,7 +773,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 </header>
 
 <div class="tab-bar">
-  <div class="tab active" data-tab="upload">📂 <span>Upload Report</span></div>
+  <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Bunks &amp; Camps</span></div>
 </div>
 
