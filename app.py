@@ -846,7 +846,6 @@ def api_register():
     body = request.get_json(force=True, silent=True) or {}
     if (body.get("code") or "").strip() != ACCESS_CODE:
         return jsonify({"error": "Incorrect access code."}), 403
-    name = (body.get("name") or "").strip()
     username = (body.get("username") or "").strip()
     password = body.get("password") or ""
     if not username or not password:
@@ -856,7 +855,7 @@ def api_register():
     data = _users_load()
     if any(x.get("username", "").lower() == username.lower() for x in data["users"]):
         return jsonify({"error": "That username is taken."}), 409
-    entry = {"username": username, "name": name or username,
+    entry = {"username": username, "name": username,
              "pw_hash": generate_password_hash(password),
              "is_admin": len(data["users"]) == 0}   # first account is the admin
     data["users"].append(entry)
@@ -884,7 +883,6 @@ def api_users():
 @admin_required
 def api_users_add():
     body = request.get_json(force=True, silent=True) or {}
-    name = (body.get("name") or "").strip()
     username = (body.get("username") or "").strip()
     password = body.get("password") or ""
     if not username or not password:
@@ -894,7 +892,7 @@ def api_users_add():
     data = _users_load()
     if any(x.get("username", "").lower() == username.lower() for x in data["users"]):
         return jsonify({"error": "That username is taken."}), 409
-    entry = {"username": username, "name": name or username,
+    entry = {"username": username, "name": username,
              "pw_hash": generate_password_hash(password),
              "is_admin": bool(body.get("is_admin"))}
     data["users"].append(entry)
@@ -1459,9 +1457,8 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     </div>
 
     <div id="register-view" style="display:none">
-      <p class="pw-sub">Create your account.</p>
-      <div class="pw-field"><input id="reg-name" placeholder="Your name" autocomplete="name"></div>
-      <div class="pw-field"><input id="reg-username" placeholder="Choose a username" autocomplete="username"></div>
+      <p class="pw-sub">Create your account. Your username is shown on reports you upload.</p>
+      <div class="pw-field"><input id="reg-username" placeholder="Choose a username (e.g. your name)" autocomplete="username"></div>
       <div class="pw-field"><input id="reg-password" type="password" placeholder="Choose a password" autocomplete="new-password"></div>
       <div class="pw-field"><input id="reg-code" placeholder="Access code" autocomplete="off"></div>
       <button id="reg-btn" class="pw-go">Create Account &amp; Sign In</button>
@@ -1806,8 +1803,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.8rem;padding-top:.8rem;border-top:1px solid #eee">
       <strong style="font-size:.85rem;color:#555">Add user:</strong>
-      <input class="pr-input" id="usr-name"     placeholder="Name"     style="width:140px">
-      <input class="pr-input" id="usr-username" placeholder="Username" style="width:130px">
+      <input class="pr-input" id="usr-username" placeholder="Username" style="width:150px">
       <input class="pr-input" id="usr-password" placeholder="Password" style="width:130px">
       <label style="font-size:.8rem;color:#666"><input type="checkbox" id="usr-admin"> Admin</label>
       <button class="pr-period-btn" id="usr-add">＋ Add User</button>
@@ -2793,10 +2789,10 @@ async function loadUsers() {
     if (!res.ok) { card.style.display = 'none'; return; }
     const d = await res.json();
     const tbl = document.getElementById('users-table');
-    let h = '<thead><tr><th>Name</th><th>Username</th><th>Role</th><th></th></tr></thead><tbody>';
+    let h = '<thead><tr><th>Username</th><th>Role</th><th></th></tr></thead><tbody>';
     (d.users || []).forEach(u => {
       const isMe = currentUser && u.username.toLowerCase() === currentUser.username.toLowerCase();
-      h += `<tr><td>${famEsc(u.name)}</td><td>${famEsc(u.username)}${isMe ? ' (you)' : ''}</td>` +
+      h += `<tr><td>${famEsc(u.username)}${isMe ? ' (you)' : ''}</td>` +
            `<td>${u.is_admin ? 'Admin' : 'User'}</td>` +
            `<td style="white-space:nowrap"><button class="pr-period-btn pr-sm usr-pw" data-u="${famEsc(u.username)}">Reset PW</button> ` +
            `${isMe ? '' : `<button class="pr-del usr-del" data-u="${famEsc(u.username)}" title="Remove">✕</button>`}</td></tr>`;
@@ -2829,7 +2825,6 @@ async function loadUsers() {
 document.getElementById('usr-add').addEventListener('click', async () => {
   const msg = document.getElementById('usr-msg');
   const body = {
-    name:     document.getElementById('usr-name').value.trim(),
     username: document.getElementById('usr-username').value.trim(),
     password: document.getElementById('usr-password').value,
     is_admin: document.getElementById('usr-admin').checked,
@@ -2840,7 +2835,7 @@ document.getElementById('usr-add').addEventListener('click', async () => {
     const d = await res.json();
     if (!res.ok || d.error) { msg.style.color = '#c0392b'; msg.textContent = d.error || 'Could not add user.'; return; }
     msg.style.color = '#2e7d32'; msg.textContent = `✓ Added ${d.username}.`;
-    ['usr-name','usr-username','usr-password'].forEach(id => document.getElementById(id).value = '');
+    ['usr-username','usr-password'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('usr-admin').checked = false;
     loadUsers();
   } catch(e) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + e.message; }
@@ -2886,7 +2881,6 @@ document.getElementById('usr-add').addEventListener('click', async () => {
   async function doRegister() {
     errEl.textContent = '';
     const body = {
-      name:     document.getElementById('reg-name').value.trim(),
       username: document.getElementById('reg-username').value.trim(),
       password: document.getElementById('reg-password').value,
       code:     document.getElementById('reg-code').value.trim(),
