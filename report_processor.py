@@ -1332,6 +1332,10 @@ def build_extend_sheet(ws, campers: list, period: str, week_num: int = None) -> 
         ws.page_margins.footer = 0.25
         ws.print_options.horizontalCentered = False
 
+        # Page header (repeats at the top of every printed page)
+        ws.oddHeader.center.text  = "&14&BPM EXTENDED HOURS SIGN-OUT"
+        ws.evenHeader.center.text = "&14&BPM EXTENDED HOURS SIGN-OUT"
+
         # Footer: page number (center) + printed date (bottom-right, small)
         ws.oddFooter.center.text  = "&12&P of &N"
         ws.evenFooter.center.text = "&12&P of &N"
@@ -1345,6 +1349,10 @@ def build_extend_sheet(ws, campers: list, period: str, week_num: int = None) -> 
         ws.page_margins.header = 0.3
         ws.page_margins.footer = 0.2
         ws.print_options.horizontalCentered = True
+
+        # Page header (repeats at the top of every printed page)
+        ws.oddHeader.center.text  = "&14&BAM EXTENDED HOURS SIGN-IN"
+        ws.evenHeader.center.text = "&14&BAM EXTENDED HOURS SIGN-IN"
 
         # Small page number (center) + printed date (bottom-right), same size
         ws.oddFooter.center.text  = "&8&P of &N"
