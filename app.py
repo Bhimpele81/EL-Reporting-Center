@@ -1954,7 +1954,9 @@ async function loadMaster() {
     const banner = document.getElementById('master-banner');
     const status = document.getElementById('master-status');
     if (masterLoaded) {
-      const by = d.uploaded_by ? ` by <strong>${d.uploaded_by}</strong>` : '';
+      // If the username is an email, show only the part before the @
+      const uploader = (d.uploaded_by || '').replace(/@.*$/, '');
+      const by = uploader ? ` by <strong>${uploader}</strong>` : '';
       document.getElementById('master-banner-text').innerHTML =
         `Using saved master: <strong>${d.filename || 'master sheet'}</strong>` +
         (d.uploaded_at ? ` &middot; uploaded ${d.uploaded_at}${by}` : '') +
