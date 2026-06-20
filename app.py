@@ -1747,7 +1747,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <div class="px-price">$34.99<span>/mo</span></div>
         <p class="px-desc">Great for smaller camps getting started with digital reporting.</p>
         <ul class="px-features">
-          <li>Up to 30 reports per month</li>
+          <li>Up to 50 reports per month</li>
           <li>1 staff login</li>
           <li>Core reports: Bunk Snapshot, Group Attendance, AM/PM &amp; Group Extended, Driver Totals</li>
           <li>Upload-once master sheet &amp; season calendar</li>
@@ -1764,7 +1764,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <p class="px-desc">For active camps running reports and payroll all season long.</p>
         <ul class="px-features">
           <li class="px-feat-head">Everything in Starter, plus:</li>
-          <li>Up to 30 reports per month</li>
+          <li>Up to 50 reports per month</li>
           <li>Up to 10 staff logins</li>
           <li>Payroll &amp; staff attendance tracking</li>
           <li>Family contacts + Mailing, Inter &amp; Junior labels</li>
@@ -1779,6 +1779,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <p class="px-desc">Full access for large or multi-camp operations.</p>
         <ul class="px-features">
           <li class="px-feat-head">Everything in Pro, plus:</li>
+          <li>Unlimited reports</li>
           <li>Unlimited staff logins</li>
           <li>Multi-camp &amp; unlimited bunks</li>
           <li>Onboarding &amp; setup assistance</li>
