@@ -99,6 +99,43 @@ def _s3_load_config() -> dict | None:
     except ClientError:
         return None
 
+
+def _save_config_meta(saved_by: str) -> dict:
+    """Record who/when last saved the bunk config (for the audit box)."""
+    meta = {"saved_at": _now_eastern_stamp(), "saved_by": saved_by or ""}
+    try:
+        with open(LOCAL_CONFIG_META, "w", encoding="utf-8") as f:
+            json.dump(meta, f)
+    except Exception:
+        pass
+    if _s3:
+        try:
+            _s3.put_object(Bucket=S3_BUCKET, Key=CONFIG_META_KEY,
+                           Body=json.dumps(meta).encode("utf-8"),
+                           ContentType="application/json")
+        except ClientError:
+            pass
+    return meta
+
+
+def _load_config_meta() -> dict:
+    data = None
+    if _s3:
+        buf = _s3_get_file(CONFIG_META_KEY)
+        if buf:
+            try:
+                data = json.load(buf)
+            except Exception:
+                data = None
+    if data is None and os.path.exists(LOCAL_CONFIG_META):
+        try:
+            with open(LOCAL_CONFIG_META, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = None
+    return data or {}
+
+
 def _s3_list_recent(limit: int = 10) -> list:
     if not _s3:
         return []
@@ -146,6 +183,8 @@ FAMILIES_KEY      = "families.json"
 LOCAL_FAMILIES    = os.path.join(UPLOAD_DIR, "families.json")
 USERS_KEY         = "users.json"
 LOCAL_USERS       = os.path.join(UPLOAD_DIR, "users.json")
+CONFIG_META_KEY   = "bunk_config_meta.json"
+LOCAL_CONFIG_META = os.path.join(UPLOAD_DIR, "bunk_config_meta.json")
 SEASON_KEY        = "season.json"
 LOCAL_SEASON      = os.path.join(UPLOAD_DIR, "season.json")
 # Default season: Monday of each of the 8 camp weeks (2026)
@@ -158,7 +197,7 @@ FAMILY_FIELDS     = ["last", "first", "bunk",
                      "address", "address2", "city", "state", "zip",
                      "pu1_name", "pu1_auth", "pu2_name", "pu2_auth",
                      "pu3_name", "pu3_auth", "pu4_name", "pu4_auth"]
-_PROTECTED_KEYS   = {"bunk_config.json", MASTER_KEY, MASTER_META_KEY,
+_PROTECTED_KEYS   = {"bunk_config.json", CONFIG_META_KEY, MASTER_KEY, MASTER_META_KEY,
                      PAYROLL_KEY, FAMILIES_KEY, USERS_KEY, SEASON_KEY}
 
 
@@ -668,13 +707,24 @@ def get_config():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/config/meta", methods=["GET"])
+def get_config_meta():
+    """Audit info for the camp/bunk config: who/when last saved + whether
+    persistent (S3) storage is active."""
+    m = _load_config_meta()
+    return jsonify({"saved_at": m.get("saved_at", ""), "saved_by": m.get("saved_by", ""),
+                    "persistent": bool(_s3)})
+
+
 @app.route("/api/config", methods=["POST"])
 def save_config():
     try:
         data = request.get_json(force=True)
         save_bunk_config(CONFIG_PATH, data)  # save locally as backup
         _s3_save_config(data)                # save to S3 for persistence
-        return jsonify({"ok": True})
+        u = _current_user() or {}
+        meta = _save_config_meta(u.get("name") or u.get("username") or "")
+        return jsonify({"ok": True, **meta})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -2006,6 +2056,14 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       </div>
     </div>
 
+    <div id="config-status" style="display:none;align-items:center;gap:.6rem;padding:.6rem .85rem;background:#eef4fb;border:1px solid #b9d2ec;border-radius:8px;margin-bottom:.9rem;font-size:.83rem;color:#1A79BF;font-weight:500">
+      <span>🗂️</span>
+      <span id="config-status-text" style="flex:1">—</span>
+    </div>
+    <div id="config-warn" style="display:none;padding:.6rem .85rem;background:#fdf0e6;border:1px solid #f0c79b;border-radius:8px;margin-bottom:.9rem;font-size:.82rem;color:#9a5b00">
+      ⚠ Persistent storage is not configured, so this configuration can reset to the bundled default when the app redeploys or restarts. Set the AWS S3 environment variables on the server to keep it saved.
+    </div>
+
     <div id="camp-list"><!-- rendered by JS --></div>
 
     <button class="add-camp-btn" id="add-camp-btn">＋ Add Camp Group</button>
@@ -2337,10 +2395,30 @@ async function loadConfig() {
     campConfig = data;
     collapsedCamps = new Set(campConfig.camps.map((_, i) => i));   // start collapsed
     renderCamps();
+    loadConfigMeta();
   } catch(e) {
     document.getElementById('camp-list').innerHTML =
       `<div style="padding:1rem;color:#c0392b;font-size:.85rem">⚠ Could not load configuration: ${e.message}</div>`;
   }
+}
+
+async function loadConfigMeta() {
+  try {
+    const res = await fetch('/api/config/meta');
+    const m = await res.json();
+    const box = document.getElementById('config-status');
+    const txt = document.getElementById('config-status-text');
+    if (m.saved_at) {
+      const by = (m.saved_by || '').replace(/@.*$/, '');
+      const when = m.saved_at.replace(/\s*[A-Z]{2,4}\s*$/, '').replace(/\s+(\d{1,2}:\d{2}\s*[AP]M)/i, ' @ $1');
+      txt.innerHTML = `Last saved on <strong>${when}</strong>` + (by ? ` by <strong>${by}</strong>` : '') +
+                      '. The configuration only changes when someone clicks Save below.';
+    } else {
+      txt.innerHTML = 'No save recorded yet — this is the current configuration.';
+    }
+    box.style.display = 'flex';
+    document.getElementById('config-warn').style.display = m.persistent ? 'none' : 'block';
+  } catch(e) {}
 }
 
 function renderCamps() {
@@ -2437,6 +2515,7 @@ document.getElementById('add-camp-btn').addEventListener('click', addCamp);
 
 document.getElementById('save-config-btn').addEventListener('click', async () => {
   const msg = document.getElementById('save-msg');
+  if (!confirm('Save this camp / bunk configuration? This overwrites the saved version used by all reports.')) return;
   msg.className = '';
   msg.style.display = 'none';
   try {
@@ -2451,6 +2530,7 @@ document.getElementById('save-config-btn').addEventListener('click', async () =>
       msg.className   = 'ok';
       msg.style.display = '';
       msg.style.opacity = '1';
+      loadConfigMeta();   // refresh the "last saved" audit box
       clearTimeout(msg._fadeTimer);
       msg._fadeTimer = setTimeout(() => {
         msg.classList.add('fade-out');
