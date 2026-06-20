@@ -759,9 +759,9 @@ def api_payroll_export():
     from openpyxl.utils import get_column_letter
 
     view   = request.args.get("view", "weeks")
-    area   = request.args.get("area", "ALL")
     sort   = request.args.get("sort", "last")
     extp   = request.args.get("extp", "ALL")
+    sel_areas = [a for a in (request.args.get("areas", "") or "").split(",") if a]
     try:
         period = int(request.args.get("period", "0"))
     except (TypeError, ValueError):
@@ -770,7 +770,7 @@ def api_payroll_export():
     data = _payroll_load()
     checks = data["checks"]
     days_all = _payroll_days()
-    staff = [s for s in data["staff"] if area == "ALL" or s.get("area") == area]
+    staff = [s for s in data["staff"] if not sel_areas or s.get("area") in sel_areas]
 
     SYM = {"check": "✓", "x": "✗", "half": "½", "na": "N/A", True: "✓"}
     def namekey(s): return (s.get("last", "") + s.get("first", "")).lower()
@@ -1406,6 +1406,14 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .pr-period-btn.active{background:var(--brand);color:#fff}
 .pr-period-btn.pr-sm{padding:.28rem .55rem;font-size:.72rem;font-weight:600}
 .pr-input{padding:.45rem .6rem;border:1px solid var(--border);border-radius:8px;font-size:.85rem}
+.pr-multi{position:relative;display:inline-block}
+.pr-multi-btn{cursor:pointer;background:#fff;display:flex;align-items:center;gap:.5rem;min-width:120px;justify-content:space-between}
+.pr-multi-btn .caret{font-size:.65rem;color:#888}
+.pr-multi-menu{position:absolute;top:100%;left:0;margin-top:.25rem;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:170px;max-height:260px;overflow-y:auto;z-index:50;padding:.3rem}
+.pr-multi-menu.hidden{display:none}
+.pr-multi-menu label{display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-radius:6px;cursor:pointer;font-size:.85rem;color:#333;white-space:nowrap}
+.pr-multi-menu label:hover{background:#f4eef0}
+.pr-multi-menu .pr-multi-sep{border-top:1px solid #eee;margin:.25rem 0}
 .payroll-table caption{caption-side:top;text-align:left;font-weight:700;font-size:1rem;padding:.3rem 0 .5rem;color:var(--brand)}
 @media print {
   body * { visibility:hidden; }
@@ -2009,8 +2017,11 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div id="payroll-periods" style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.3rem 0 .9rem"></div>
 
     <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin:0 0 .8rem;font-size:.82rem;color:#555">
-      <label>Filter area:
-        <select id="pr-filter-area" class="pr-input" onchange="renderPayroll()"></select></label>
+      <span id="pr-area-filter" style="display:flex;align-items:center;gap:.45rem">Filter area:
+        <span class="pr-multi" id="pr-area-wrap">
+          <button type="button" class="pr-input pr-multi-btn" id="pr-area-btn">All areas <span class="caret">▾</span></button>
+          <div class="pr-multi-menu hidden" id="pr-area-menu"></div>
+        </span></span>
       <label>Sort by:
         <select id="pr-sort" class="pr-input" onchange="renderPayroll()">
           <option value="last">Last name</option>
@@ -2483,6 +2494,42 @@ let prPeriod = 0;   // 0..3 → weeks 1&2, 3&4, 5&6, 7&8
 let prTotals = false;   // when true, show the cumulative Totals view
 let prExt = false;      // when true, show the blank Extended Staff sheet
 let prExtPeriod = 'ALL';// Extended Staff AM/PM filter: ALL | AM | PM
+let prAreas = [];       // selected areas to filter by ([] = all areas)
+
+// True if a staff member passes the current area filter
+function prAreaMatch(s) { return prAreas.length === 0 || prAreas.includes(s.area || ''); }
+
+// Build the multi-select area dropdown (button label + checkbox menu)
+function renderAreaFilter(areas) {
+  prAreas = prAreas.filter(a => areas.includes(a));   // drop areas that no longer exist
+  const btn = document.getElementById('pr-area-btn');
+  btn.firstChild.textContent =
+    (prAreas.length === 0 ? 'All areas'
+     : prAreas.length === 1 ? prAreas[0]
+     : prAreas.length + ' areas') + ' ';
+  const menu = document.getElementById('pr-area-menu');
+  menu.innerHTML =
+    `<label><input type="checkbox" id="pr-area-all" ${prAreas.length === 0 ? 'checked' : ''}> All areas</label>` +
+    `<div class="pr-multi-sep"></div>` +
+    areas.map(a => `<label><input type="checkbox" class="pr-area-cb" value="${a}" ${prAreas.includes(a) ? 'checked' : ''}> ${a}</label>`).join('');
+  menu.querySelector('#pr-area-all').addEventListener('change', () => { prAreas = []; renderPayroll(); });
+  menu.querySelectorAll('.pr-area-cb').forEach(cb => {
+    cb.addEventListener('change', () => {
+      prAreas = Array.from(menu.querySelectorAll('.pr-area-cb:checked')).map(x => x.value);
+      renderPayroll();
+    });
+  });
+}
+
+// Open/close the area dropdown (set up once)
+(function() {
+  const btn = document.getElementById('pr-area-btn');
+  const menu = document.getElementById('pr-area-menu');
+  if (!btn || !menu) return;
+  btn.addEventListener('click', e => { e.stopPropagation(); menu.classList.toggle('hidden'); });
+  menu.addEventListener('click', e => e.stopPropagation());
+  document.addEventListener('click', () => menu.classList.add('hidden'));
+})();
 
 async function loadPayroll() {
   try {
@@ -2540,15 +2587,9 @@ function renderPayroll() {
   eb.style.marginLeft = '.5rem';
   eb.onclick = () => { prExt = true; prTotals = false; renderPayroll(); };
   pb.appendChild(eb);
-  // area filter dropdown (preserve current selection)
-  const fsel = document.getElementById('pr-filter-area');
+  // area filter (multi-select dropdown)
   const areas = [...new Set(payroll.staff.map(s => s.area).filter(Boolean))].sort();
-  const cur = fsel.value || 'ALL';
-  fsel.innerHTML = '<option value="ALL">All areas</option>' +
-    areas.map(a => `<option value="${a}">${a}</option>`).join('');
-  fsel.value = (cur === 'ALL' || areas.includes(cur)) ? cur : 'ALL';
-
-  const filterArea = fsel.value;
+  renderAreaFilter(areas);
   const sortKey = document.getElementById('pr-sort').value;
 
   // Lock button + add-staff controls reflect lock state (both views)
@@ -2562,17 +2603,17 @@ function renderPayroll() {
   const extWrap = document.getElementById('pr-ext-period-wrap');
   if (extWrap) extWrap.style.display = prExt ? '' : 'none';
   document.getElementById('pr-ext-period').value = prExtPeriod;
-  const areaWrap = fsel.closest('label');
-  if (areaWrap) areaWrap.style.display = prExt ? 'none' : '';
+  const areaWrap = document.getElementById('pr-area-filter');
+  if (areaWrap) areaWrap.style.display = prExt ? 'none' : 'flex';
   const sortWrap = document.getElementById('pr-sort').closest('label');
   if (sortWrap) sortWrap.style.display = (prExt || prTotals) ? 'none' : '';
 
   if (prExt) { renderExtTable('ALL', prExtPeriod); return; }
-  if (prTotals) { renderTotalsTable(filterArea, 'last'); return; }
+  if (prTotals) { renderTotalsTable('last'); return; }
 
   // table
   const days = prPeriodDays();
-  let staff = payroll.staff.filter(s => filterArea === 'ALL' || s.area === filterArea);
+  let staff = payroll.staff.filter(prAreaMatch);
   staff.sort((a,b) => {
     if (sortKey === 'total') {
       const d = prCount(b.id) - prCount(a.id);
@@ -2740,8 +2781,8 @@ function renderExtTable(filterArea, extPeriod) {
 }
 
 // Totals view (rendered into the same Payroll table when the Totals button is on)
-function renderTotalsTable(filterArea, sortKey) {
-  let staff = payroll.staff.filter(s => filterArea === 'ALL' || s.area === filterArea)
+function renderTotalsTable(sortKey) {
+  let staff = payroll.staff.filter(prAreaMatch)
                            .map(s => ({...s, _total: totalChecks(s.id)}));
   staff.sort((a,b) => {
     if (sortKey === 'total') return b._total - a._total ||
@@ -2791,8 +2832,7 @@ document.getElementById('pr-add').addEventListener('click', async () => {
 function payrollTitle() {
   let t = prTotals ? 'Payroll Totals — All 8 Weeks'
                    : `Payroll — Weeks ${prPeriod*2+1} & ${prPeriod*2+2}`;
-  const fa = document.getElementById('pr-filter-area').value;
-  if (fa && fa !== 'ALL') t += '  —  ' + fa;
+  if (prAreas.length) t += '  —  ' + prAreas.join(', ');
   return t;
 }
 
@@ -2810,9 +2850,9 @@ document.getElementById('pr-print').addEventListener('click', () => {
 // Export the current (filtered/sorted) view to a real .xlsx (server-built)
 document.getElementById('pr-export').addEventListener('click', () => {
   const view = prTotals ? 'totals' : prExt ? 'ext' : 'weeks';
-  const area = encodeURIComponent(prExt ? 'ALL' : document.getElementById('pr-filter-area').value);
+  const areas = encodeURIComponent(prExt ? '' : prAreas.join(','));
   const sort = document.getElementById('pr-sort').value;
-  window.location = `/api/payroll/export?view=${view}&period=${prPeriod}&area=${area}&sort=${sort}&extp=${prExtPeriod}`;
+  window.location = `/api/payroll/export?view=${view}&period=${prPeriod}&areas=${areas}&sort=${sort}&extp=${prExtPeriod}`;
 });
 
 // ---- Family contacts ----
