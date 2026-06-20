@@ -1629,7 +1629,8 @@ def _label_days_text(sched: str) -> str:
     return ", ".join(_DAY_FULL[c] for c in "MTWRF" if c in sched)
 
 
-def _avery5960_docx(rows3: list, l3_size: int = 12) -> bytes:
+def _avery5960_docx(rows3: list, l1_size: int = 15, l2_size: int = 17,
+                    l3_size: int = 12, l3_bold: bool = False) -> bytes:
     """Render a list of (line1, line2, line3) tuples onto an Avery 5960 sheet
     (3 x 10, 2.625" x 1"). Returns the .docx bytes."""
     import io as _io
@@ -1660,7 +1661,7 @@ def _avery5960_docx(rows3: list, l3_size: int = 12) -> bytes:
 
     def _fill(cell, l1, l2, l3):
         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-        for i, (text, sz, bold) in enumerate([(l1, 15, True), (l2, 17, True), (l3, l3_size, False)]):
+        for i, (text, sz, bold) in enumerate([(l1, l1_size, True), (l2, l2_size, True), (l3, l3_size, l3_bold)]):
             p = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             pf = p.paragraph_format
@@ -1757,7 +1758,8 @@ def build_jr_transport_labels_docx(records: list, config: dict) -> tuple:
             flat.extend([("", "", "")] * (npages * PER_PAGE - len(rows)))
 
     counts = {"Trans": len(trans), "Pm ext": len(pmext), "Car line": len(carline)}
-    return _avery5960_docx(flat, l3_size=14), counts, pages
+    # Bottom line (driver / transport type) is the largest + bold; bunk & name smaller above it
+    return _avery5960_docx(flat, l1_size=11, l2_size=13, l3_size=20, l3_bold=True), counts, pages
 
 
 def build_pm_grp_extend_sheet(ws, campers: list, week_num: int = None) -> None:
