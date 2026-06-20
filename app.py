@@ -7,6 +7,7 @@ Shares the same design system as Transport Pro.
 
 import os
 import io
+import re
 import csv
 import json
 import uuid
@@ -150,9 +151,13 @@ LOCAL_SEASON      = os.path.join(UPLOAD_DIR, "season.json")
 # Default season: Monday of each of the 8 camp weeks (2026)
 _DEFAULT_SEASON_MONDAYS = ["2026-06-22", "2026-06-29", "2026-07-06", "2026-07-13",
                            "2026-07-20", "2026-07-27", "2026-08-03", "2026-08-10"]
-# Fields stored for each family contact record
-FAMILY_FIELDS     = ["camper", "parent1", "phone1", "email1",
-                     "parent2", "phone2", "email2", "address", "notes"]
+# Fields stored for each family contact record (matches the contact master export)
+FAMILY_FIELDS     = ["last", "first", "bunk",
+                     "p1_first", "p1_last", "p1_phone",
+                     "p2_first", "p2_last", "p2_phone",
+                     "address", "city", "state", "zip",
+                     "pu1_name", "pu1_auth", "pu2_name", "pu2_auth",
+                     "pu3_name", "pu3_auth", "pu4_name", "pu4_auth"]
 _PROTECTED_KEYS   = {"bunk_config.json", MASTER_KEY, MASTER_META_KEY,
                      PAYROLL_KEY, FAMILIES_KEY, USERS_KEY, SEASON_KEY}
 
@@ -410,32 +415,44 @@ def _family_next_id(families: list) -> str:
     return "f" + str((max(nums) if nums else 0) + 1)
 
 
-# Header aliases → our canonical field names (best-effort import mapping)
+def _norm_header(h) -> str:
+    """Lowercase, collapse whitespace, drop a leading '2026 >' prefix."""
+    s = re.sub(r"\s+", " ", str(h or "").strip().lower())
+    s = re.sub(r"^20\d\d\s*>\s*", "", s)   # strip '2026 >' / '2026 > ' prefixes
+    return s.strip()
+
+
+# Normalized header → canonical field (best-effort import mapping)
 _FAMILY_ALIASES = {
-    "camper":  ["camper", "camper name", "child", "child name", "student", "name"],
-    "parent1": ["parent1", "parent 1", "guardian1", "guardian 1", "parent", "guardian",
-                "mother", "father", "parent/guardian", "primary contact", "contact 1", "contact1"],
-    "phone1":  ["phone1", "phone 1", "phone", "cell", "cell phone", "mobile",
-                "primary phone", "parent1 phone", "contact 1 phone"],
-    "email1":  ["email1", "email 1", "email", "e-mail", "parent1 email",
-                "primary email", "contact 1 email"],
-    "parent2": ["parent2", "parent 2", "guardian2", "guardian 2", "secondary contact",
-                "contact 2", "contact2"],
-    "phone2":  ["phone2", "phone 2", "secondary phone", "parent2 phone", "contact 2 phone"],
-    "email2":  ["email2", "email 2", "secondary email", "parent2 email", "contact 2 email"],
-    "address": ["address", "home address", "street", "mailing address"],
-    "notes":   ["notes", "note", "comments", "comment", "remarks"],
+    "last":     ["last name", "last", "camper last name", "camper last"],
+    "first":    ["first name", "first", "camper first name", "camper first"],
+    "bunk":     ["bunk name", "bunk"],
+    "p1_first": ["p1 first name", "parent 1 first name", "guardian 1 first name"],
+    "p1_last":  ["p1 last name", "parent 1 last name", "guardian 1 last name"],
+    "p1_phone": ["p1 cell phone", "p1 phone", "parent 1 phone", "parent 1 cell phone"],
+    "p2_first": ["p2 first name", "parent 2 first name", "guardian 2 first name"],
+    "p2_last":  ["p2 last name", "parent 2 last name", "guardian 2 last name"],
+    "p2_phone": ["p2 cell phone", "p2 phone", "parent 2 phone", "parent 2 cell phone"],
+    "address":  ["primary family address 1", "primary family address", "address", "home address", "street"],
+    "city":     ["primary family city", "city"],
+    "state":    ["primary family state", "state"],
+    "zip":      ["primary family zip", "zip", "zip code", "postal code"],
+    "pu1_name": ["authorized pick-up/emergency contact: 1 - first & last name", "pickup 1 name"],
+    "pu1_auth": ["authorized pick-up/emergency contact: 1 - authorization", "pickup 1 authorization"],
+    "pu2_name": ["authorized pick-up/emergency contact: 2 - first & last name", "pickup 2 name"],
+    "pu2_auth": ["authorized pick-up/emergency contact: 2 - authorization", "pickup 2 authorization"],
+    "pu3_name": ["authorized pick-up/emergency contact: 3 - first & last name", "pickup 3 name"],
+    "pu3_auth": ["authorized pick-up/emergency contact: 3 - authorization", "pickup 3 authorization"],
+    "pu4_name": ["authorized pick-up/emergency contact: 4 - first & last name", "pickup 4 name"],
+    "pu4_auth": ["authorized pick-up/emergency contact: 4 - authorization", "pickup 4 authorization"],
 }
 
 
 def _families_from_rows(rows: list) -> list:
-    """Map a list of header→value dicts (or header row + data rows) into family records."""
+    """Map a header row + data rows into family records."""
     if not rows:
         return []
-    # rows is a list of lists: first row = headers
-    headers = [str(h or "").strip() for h in rows[0]]
-    hl = [h.lower() for h in headers]
-    # Build column index for each canonical field
+    hl = [_norm_header(h) for h in rows[0]]
     col_for = {}
     for field, aliases in _FAMILY_ALIASES.items():
         for a in aliases:
@@ -448,7 +465,6 @@ def _families_from_rows(rows: list) -> list:
         for field in FAMILY_FIELDS:
             ci = col_for.get(field)
             rec[field] = (str(r[ci]).strip() if (ci is not None and ci < len(r) and r[ci] is not None) else "")
-        # Skip wholly blank rows
         if any(rec.get(f) for f in FAMILY_FIELDS):
             out.append(rec)
     return out
@@ -1930,11 +1946,14 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.8rem;padding-top:.8rem;border-top:1px solid #eee">
       <strong style="font-size:.85rem;color:#555">Add family:</strong>
-      <input class="pr-input" id="fam-camper"  placeholder="Camper"  style="width:130px">
-      <input class="pr-input" id="fam-parent1" placeholder="Parent/Guardian" style="width:140px">
-      <input class="pr-input" id="fam-phone1"  placeholder="Phone"   style="width:120px">
-      <input class="pr-input" id="fam-email1"  placeholder="Email"   style="width:160px">
+      <input class="pr-input" id="fam-last"     placeholder="Last name"  style="width:120px">
+      <input class="pr-input" id="fam-first"    placeholder="First name" style="width:120px">
+      <input class="pr-input" id="fam-bunk"     placeholder="Bunk"       style="width:120px">
+      <input class="pr-input" id="fam-p1first"  placeholder="P1 first"   style="width:100px">
+      <input class="pr-input" id="fam-p1last"   placeholder="P1 last"    style="width:100px">
+      <input class="pr-input" id="fam-p1phone"  placeholder="P1 phone"   style="width:120px">
       <button class="pr-period-btn" id="fam-add">＋ Add</button>
+      <span style="font-size:.78rem;color:#999">(add the rest by clicking cells)</span>
     </div>
   </div>
 
@@ -2858,9 +2877,14 @@ document.getElementById('pr-export').addEventListener('click', () => {
 // ---- Family contacts ----
 let families = [];
 const FAM_COLS = [
-  ['camper','Camper'], ['parent1','Parent/Guardian'], ['phone1','Phone'], ['email1','Email'],
-  ['parent2','Parent/Guardian 2'], ['phone2','Phone 2'], ['email2','Email 2'],
-  ['address','Address'], ['notes','Notes'],
+  ['last','Last'], ['first','First'], ['bunk','Bunk'],
+  ['p1_first','P1 First'], ['p1_last','P1 Last'], ['p1_phone','P1 Phone'],
+  ['p2_first','P2 First'], ['p2_last','P2 Last'], ['p2_phone','P2 Phone'],
+  ['address','Address'], ['city','City'], ['state','State'], ['zip','Zip'],
+  ['pu1_name','Pickup 1'], ['pu1_auth','Auth 1'],
+  ['pu2_name','Pickup 2'], ['pu2_auth','Auth 2'],
+  ['pu3_name','Pickup 3'], ['pu3_auth','Auth 3'],
+  ['pu4_name','Pickup 4'], ['pu4_auth','Auth 4'],
 ];
 const famEsc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
@@ -2920,7 +2944,8 @@ function renderFamilies() {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.id;
       const f = families.find(x => x.id === id);
-      if (!confirm(`Remove ${f && f.camper ? f.camper : 'this family'}?`)) return;
+      const who = f ? `${f.last || ''}, ${f.first || ''}`.trim().replace(/^,\s*/, '') : '';
+      if (!confirm(`Remove ${who || 'this family'}?`)) return;
       families = families.filter(x => x.id !== id);
       renderFamilies();
       try { await fetch('/api/families/' + id, {method:'DELETE'}); } catch(e) {}
@@ -2930,10 +2955,12 @@ function renderFamilies() {
 
 document.getElementById('fam-add').addEventListener('click', async () => {
   const body = {
-    camper:  document.getElementById('fam-camper').value.trim(),
-    parent1: document.getElementById('fam-parent1').value.trim(),
-    phone1:  document.getElementById('fam-phone1').value.trim(),
-    email1:  document.getElementById('fam-email1').value.trim(),
+    last:     document.getElementById('fam-last').value.trim(),
+    first:    document.getElementById('fam-first').value.trim(),
+    bunk:     document.getElementById('fam-bunk').value.trim(),
+    p1_first: document.getElementById('fam-p1first').value.trim(),
+    p1_last:  document.getElementById('fam-p1last').value.trim(),
+    p1_phone: document.getElementById('fam-p1phone').value.trim(),
   };
   if (!Object.values(body).some(v => v)) return;
   try {
@@ -2942,7 +2969,7 @@ document.getElementById('fam-add').addEventListener('click', async () => {
     const d = await res.json();
     if (res.ok && d.id) {
       families.push(d);
-      ['fam-camper','fam-parent1','fam-phone1','fam-email1'].forEach(id => document.getElementById(id).value = '');
+      ['fam-last','fam-first','fam-bunk','fam-p1first','fam-p1last','fam-p1phone'].forEach(id => document.getElementById(id).value = '');
       renderFamilies();
     }
   } catch(e) {}
