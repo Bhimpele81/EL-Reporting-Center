@@ -1493,7 +1493,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table thead th{background:var(--brand);color:#fff;font-weight:700;white-space:nowrap}
 .payroll-table td.pr-name{text-align:left;font-weight:600;min-width:160px;white-space:normal;line-height:1.15}
 .payroll-table .pr-delcol{width:36px;min-width:36px}
-.payroll-table td.pr-area{color:#555;width:86px;white-space:normal;line-height:1.15}
+.payroll-table td.pr-area{color:#555;min-width:92px;white-space:normal;line-height:1.15}
 .payroll-table td.pr-area-edit{cursor:pointer}
 .payroll-table td.pr-area-edit:hover{background:#f4eef0;outline:1px dashed var(--brand)}
 .pr-area-input{width:80px;font-size:.8rem;padding:2px 3px;border:1px solid var(--brand);border-radius:4px;text-align:center}
@@ -1517,7 +1517,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td.st-x{color:#c0392b}
 .payroll-table td.st-half{color:#1A79BF}
 .payroll-table td.st-na{color:#888;font-size:1.05rem;font-weight:700}
-.payroll-table th.pr-day,.payroll-table td.pr-cell{width:42px;min-width:42px}
+.payroll-table th.pr-day,.payroll-table td.pr-cell{min-width:48px}
 .payroll-table th.pr-extra{width:42px;min-width:42px;max-width:42px;background:#3f1119;color:#fff;white-space:nowrap;font-size:.6rem;letter-spacing:-.02em;padding-left:.12rem;padding-right:.12rem;line-height:1.1}
 .payroll-table td.pr-xcell{width:42px;min-width:42px;max-width:42px}
 .pr-xsep{border-left:2px solid #6d1f2f !important}
@@ -1541,6 +1541,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
   body * { visibility:hidden; }
   #payroll-table, #payroll-table * { visibility:visible; }
   #payroll-table { position:absolute; left:0; top:0; width:100%; font-size:9pt; }
+  #payroll-table th, #payroll-table td { min-width:0 }   /* shrink to fit the page */
   #payroll-table .pr-del { display:none; }
   /* keep maroon headers, row shading and symbol colors when printing */
   #payroll-table, #payroll-table * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
