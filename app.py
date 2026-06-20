@@ -1928,34 +1928,21 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="card-hd">
       <div>
         <div class="card-title">Family Contacts</div>
-        <div class="card-hint">Contact information for camper families. Import a spreadsheet to load them in bulk, or add &amp; edit families below. Used to source family-contact reports.</div>
+        <div class="card-hint">Import the camper family-contact spreadsheet. It's stored on the server and used to source family-contact reports &amp; labels (not displayed here). Re-import to refresh.</div>
       </div>
     </div>
     <div class="drop-zone" id="fam-drop" style="padding:.75rem">
       <input type="file" id="fam-file" accept=".csv,.xlsx,.xls,.tsv">
       <div class="drop-icon" style="font-size:1.4rem">📇</div>
       <div class="drop-text"><strong>Click to choose</strong> or drag &amp; drop a family contact spreadsheet</div>
-      <div class="drop-meta">Columns are auto-detected (camper, parent, phone, email, address, notes)</div>
+      <div class="drop-meta">Columns are auto-detected (last/first, bunk, parents, address, pickups)</div>
     </div>
     <div style="display:flex;align-items:center;gap:1rem;margin:.5rem 0 .2rem;font-size:.8rem;color:#666">
       <label><input type="radio" name="fam-import-mode" value="replace" checked> Replace all</label>
       <label><input type="radio" name="fam-import-mode" value="append"> Add to existing</label>
       <span id="fam-msg" style="margin-left:auto"></span>
     </div>
-    <div style="overflow-x:auto;margin-top:.6rem">
-      <table class="fam-table" id="fam-table"></table>
-    </div>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.8rem;padding-top:.8rem;border-top:1px solid #eee">
-      <strong style="font-size:.85rem;color:#555">Add family:</strong>
-      <input class="pr-input" id="fam-last"     placeholder="Last name"  style="width:120px">
-      <input class="pr-input" id="fam-first"    placeholder="First name" style="width:120px">
-      <input class="pr-input" id="fam-bunk"     placeholder="Bunk"       style="width:120px">
-      <input class="pr-input" id="fam-p1first"  placeholder="P1 first"   style="width:100px">
-      <input class="pr-input" id="fam-p1last"   placeholder="P1 last"    style="width:100px">
-      <input class="pr-input" id="fam-p1phone"  placeholder="P1 phone"   style="width:120px">
-      <button class="pr-period-btn" id="fam-add">＋ Add</button>
-      <span style="font-size:.78rem;color:#999">(add the rest by clicking cells)</span>
-    </div>
+    <div id="fam-count" style="font-size:.83rem;color:#555;margin-top:.5rem"></div>
   </div>
 
   <!-- Season calendar: the 8 camp weeks -->
@@ -2877,104 +2864,21 @@ document.getElementById('pr-export').addEventListener('click', () => {
 
 // ---- Family contacts ----
 let families = [];
-const FAM_COLS = [
-  ['last','Last'], ['first','First'], ['bunk','Bunk'],
-  ['p1_first','P1 First'], ['p1_last','P1 Last'], ['p1_phone','P1 Phone'],
-  ['p2_first','P2 First'], ['p2_last','P2 Last'], ['p2_phone','P2 Phone'],
-  ['address','Address'], ['address2','Address 2'], ['city','City'], ['state','State'], ['zip','Zip'],
-  ['pu1_name','Pickup 1'], ['pu1_auth','Auth 1'],
-  ['pu2_name','Pickup 2'], ['pu2_auth','Auth 2'],
-  ['pu3_name','Pickup 3'], ['pu3_auth','Auth 3'],
-  ['pu4_name','Pickup 4'], ['pu4_auth','Auth 4'],
-];
 const famEsc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 async function loadFamilies() {
+  let n = 0;
   try {
     const res = await fetch('/api/families');
     const d = await res.json();
     families = d.families || [];
+    n = families.length;
   } catch(e) { families = []; }
-  renderFamilies();
+  const el = document.getElementById('fam-count');
+  if (el) el.textContent = n
+    ? `${n} family contact records stored.`
+    : 'No family contacts imported yet.';
 }
-
-function renderFamilies() {
-  const tbl = document.getElementById('fam-table');
-  if (!tbl) return;
-  if (!families.length) {
-    tbl.innerHTML = '<tbody><tr><td style="color:#aaa;padding:.6rem">No families yet. Import a spreadsheet or add one below.</td></tr></tbody>';
-    return;
-  }
-  let h = '<thead><tr>' + FAM_COLS.map(c => `<th>${c[1]}</th>`).join('') + '<th></th></tr></thead><tbody>';
-  families.forEach(f => {
-    h += `<tr data-id="${f.id}">` +
-      FAM_COLS.map(c => `<td class="fam-cell" data-id="${f.id}" data-field="${c[0]}" title="Click to edit">${famEsc(f[c[0]])}</td>`).join('') +
-      `<td><button class="pr-del fam-del" data-id="${f.id}" title="Remove">✕</button></td></tr>`;
-  });
-  h += '</tbody>';
-  tbl.innerHTML = h;
-
-  tbl.querySelectorAll('td.fam-cell').forEach(td => {
-    td.addEventListener('click', () => {
-      if (td.querySelector('input')) return;
-      const id = td.dataset.id, field = td.dataset.field;
-      const fam = families.find(x => x.id === id); if (!fam) return;
-      const orig = fam[field] || '';
-      td.innerHTML = `<input class="pr-area-input" style="width:96%;text-align:left" value="${famEsc(orig)}">`;
-      const inp = td.querySelector('input'); inp.focus(); inp.select();
-      let done = false;
-      const commit = async (save) => {
-        if (done) return; done = true;
-        const val = inp.value.trim();
-        if (save && val !== orig) {
-          fam[field] = val;
-          try { await fetch('/api/families/' + id, {method:'PATCH',
-                headers:{'Content-Type':'application/json'}, body: JSON.stringify({[field]: val})}); } catch(e) {}
-        }
-        renderFamilies();
-      };
-      inp.addEventListener('keydown', e => {
-        if (e.key === 'Enter')  { e.preventDefault(); commit(true);  }
-        if (e.key === 'Escape') { e.preventDefault(); commit(false); }
-      });
-      inp.addEventListener('blur', () => commit(true));
-    });
-  });
-
-  tbl.querySelectorAll('.fam-del').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      const f = families.find(x => x.id === id);
-      const who = f ? `${f.last || ''}, ${f.first || ''}`.trim().replace(/^,\s*/, '') : '';
-      if (!confirm(`Remove ${who || 'this family'}?`)) return;
-      families = families.filter(x => x.id !== id);
-      renderFamilies();
-      try { await fetch('/api/families/' + id, {method:'DELETE'}); } catch(e) {}
-    });
-  });
-}
-
-document.getElementById('fam-add').addEventListener('click', async () => {
-  const body = {
-    last:     document.getElementById('fam-last').value.trim(),
-    first:    document.getElementById('fam-first').value.trim(),
-    bunk:     document.getElementById('fam-bunk').value.trim(),
-    p1_first: document.getElementById('fam-p1first').value.trim(),
-    p1_last:  document.getElementById('fam-p1last').value.trim(),
-    p1_phone: document.getElementById('fam-p1phone').value.trim(),
-  };
-  if (!Object.values(body).some(v => v)) return;
-  try {
-    const res = await fetch('/api/families', {method:'POST',
-      headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-    const d = await res.json();
-    if (res.ok && d.id) {
-      families.push(d);
-      ['fam-last','fam-first','fam-bunk','fam-p1first','fam-p1last','fam-p1phone'].forEach(id => document.getElementById(id).value = '');
-      renderFamilies();
-    }
-  } catch(e) {}
-});
 
 const famDrop = document.getElementById('fam-drop');
 const famFile = document.getElementById('fam-file');
