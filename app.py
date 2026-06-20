@@ -1370,23 +1370,34 @@ def api_weather():
         url = (
             "https://api.open-meteo.com/v1/forecast"
             "?latitude=40.2479&longitude=-75.1330"
-            "&daily=temperature_2m_max,temperature_2m_min,weathercode"
-            "&temperature_unit=fahrenheit"
+            "&daily=temperature_2m_max,temperature_2m_min,weathercode,"
+            "precipitation_probability_max,windspeed_10m_max"
+            "&current_weather=true"
+            "&temperature_unit=fahrenheit&windspeed_unit=mph"
             "&timezone=America%2FNew_York"
             "&forecast_days=5"
         )
         with urllib.request.urlopen(url, timeout=5) as resp:
             data = json.loads(resp.read())
         daily = data["daily"]
-        days  = []
+        def _num(arr, i):
+            try:
+                return round(arr[i]) if arr[i] is not None else None
+            except (KeyError, IndexError, TypeError):
+                return None
+        days = []
         for i in range(5):
             days.append({
                 "date":    daily["time"][i],
                 "high":    round(daily["temperature_2m_max"][i]),
                 "low":     round(daily["temperature_2m_min"][i]),
                 "code":    daily["weathercode"][i],
+                "pop":     _num(daily.get("precipitation_probability_max", []), i),
+                "wind":    _num(daily.get("windspeed_10m_max", []), i),
             })
-        return jsonify({"days": days})
+        cw = data.get("current_weather") or {}
+        current = {"temp": round(cw["temperature"]), "code": cw.get("weathercode")} if cw.get("temperature") is not None else None
+        return jsonify({"days": days, "current": current})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1668,6 +1679,10 @@ label.lbl{display:block;font-size:.75rem;font-weight:600;color:var(--brand-dark)
 .wx-hi{font-size:.95rem;font-weight:700;color:var(--ink)}
 .wx-lo{font-size:.78rem;color:#999}
 .wx-desc{font-size:.65rem;color:#aaa;margin-top:.1rem}
+.wx-pop{font-size:.65rem;color:#1A79BF;font-weight:600;margin-top:.15rem}
+.wx-now{font-size:.85rem;color:var(--ink);font-weight:500;margin-bottom:.7rem}
+.wx-row{display:flex;gap:.5rem;flex-wrap:wrap}
+.wx-note{margin-top:.9rem;padding:.6rem .8rem;background:var(--mist);border:1px solid var(--border);border-radius:8px;font-size:.82rem;color:#555}
 /* Week selector buttons */
 .week-btn{padding:.55rem 1.1rem;border:1.5px solid var(--border);border-radius:8px;background:#fff;color:#888;font-family:'Roboto Slab',serif;font-size:.78rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap}
 .week-btn.active{background:var(--gold);border-color:var(--gold);color:#1a1018}
@@ -1956,7 +1971,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <div class="card-title">5-Day Forecast — Warrington, PA</div>
       </div>
     </div>
-    <div id="weather-body" style="display:flex;gap:.5rem;flex-wrap:wrap">
+    <div id="weather-body">
       <div style="color:#bbb;font-size:.82rem">Loading forecast…</div>
     </div>
   </div>
@@ -2665,19 +2680,44 @@ async function loadWeather() {
     const res  = await fetch('/api/weather');
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    body.innerHTML = data.days.map(d => {
+
+    const daysHtml = data.days.map(d => {
       const dt   = new Date(d.date + 'T12:00:00');
       const dow  = DAYS_SHORT[dt.getDay()];
       const icon = WX_ICONS[d.code] || '🌡️';
       const desc = WX_DESC[d.code]  || '';
+      const pop  = (d.pop != null) ? `<div class="wx-pop">💧 ${d.pop}%</div>` : '';
       return `<div class="wx-day">
         <div class="wx-dow">${dow}</div>
         <div class="wx-icon">${icon}</div>
         <div class="wx-hi">${d.high}°</div>
         <div class="wx-lo">${d.low}°</div>
         <div class="wx-desc">${desc}</div>
+        ${pop}
       </div>`;
     }).join('');
+
+    // "Right now" line
+    let nowHtml = '';
+    if (data.current) {
+      nowHtml = `<div class="wx-now">Right now: <strong>${data.current.temp}°</strong> ` +
+                `${WX_ICONS[data.current.code] || ''} ${WX_DESC[data.current.code] || ''}</div>`;
+    }
+
+    // Camp planning note based on rain chance
+    const RAINY = [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99];
+    const wet = data.days.filter(d => (d.pop != null && d.pop >= 50) || RAINY.includes(d.code));
+    let note;
+    if (!wet.length) {
+      note = '☀️ Looks dry all week — great for outdoor activities.';
+    } else {
+      const names = wet.map(d => DAYS_SHORT[new Date(d.date + 'T12:00:00').getDay()]);
+      note = `🌂 Rain likely ${names.join(', ')} — plan indoor backups.`;
+    }
+
+    body.innerHTML = nowHtml +
+      `<div class="wx-row">${daysHtml}</div>` +
+      `<div class="wx-note">${note}</div>`;
   } catch(e) {
     body.innerHTML = `<div style="color:#aaa;font-size:.82rem">Forecast unavailable</div>`;
   }
