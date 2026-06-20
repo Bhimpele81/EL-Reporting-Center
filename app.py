@@ -1581,6 +1581,21 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 @media(max-width:900px){.card-grid{grid-template-columns:1fr}}
 .util-col{display:flex;flex-direction:column;gap:1.1rem}
 .util-col > .card{margin-bottom:0}
+/* Help / FAQ accordion */
+.faq{border:1px solid var(--border);border-radius:10px;margin-bottom:.7rem;overflow:hidden;background:#fff}
+.faq>summary{cursor:pointer;list-style:none;padding:.85rem 1.1rem;font-family:'Roboto Slab',serif;font-weight:700;font-size:.92rem;color:var(--brand-dark);display:flex;align-items:center;gap:.6rem}
+.faq>summary::-webkit-details-marker{display:none}
+.faq>summary::before{content:"▸";color:var(--brand);font-size:.8rem;transition:transform .15s}
+.faq[open]>summary::before{transform:rotate(90deg)}
+.faq[open]>summary{border-bottom:1px solid var(--border);background:var(--brand-light)}
+.faq-body{padding:.9rem 1.2rem 1.1rem;font-size:.88rem;color:#444;line-height:1.6}
+.faq-body p{margin:0 0 .7rem}
+.faq-body ul{margin:.2rem 0 .7rem;padding-left:1.2rem}
+.faq-body li{margin-bottom:.35rem}
+.faq-body strong{color:var(--brand-dark)}
+.faq-q{font-weight:700;color:var(--brand-dark);margin-top:.6rem}
+.help-sub{font-size:.8rem;color:var(--brand);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin:1.4rem 0 .5rem}
+.help-sub:first-of-type{margin-top:.3rem}
 .card-hd{display:flex;align-items:center;gap:.7rem;margin-bottom:1.1rem}
 .card-num{width:26px;height:26px;background:var(--brand);color:#fff;border-radius:50%;font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .card-title{font-family:'Roboto Slab',serif;font-size:1.05rem;font-weight:700;color:var(--brand-dark);letter-spacing:.01em;text-transform:uppercase}
@@ -1891,6 +1906,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
+  <div class="tab" data-tab="help">🛟 <span>Help</span></div>
 </nav>
 
 <div class="container">
@@ -2241,6 +2257,144 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     </div>
   </div>
 </div><!-- /tab-payroll -->
+
+<!-- ===== HELP TAB ===== -->
+<div class="tab-panel" id="tab-help">
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Help &amp; FAQ</div>
+        <div class="card-hint">Quick answers for running reports, payroll, contacts, and accounts. Tap a question to expand it.</div>
+      </div>
+    </div>
+
+    <div class="help-sub">Getting started</div>
+
+    <details class="faq" open>
+      <summary>How do I run a report?</summary>
+      <div class="faq-body">
+        <p>1. In the <strong>Utilities</strong> tab, upload the camper <strong>Master Sheet</strong> (you only do this once — it's saved on the server).</p>
+        <p>2. Go to <strong>Run Report</strong>, choose a report, and pick a <strong>week</strong> if it asks.</p>
+        <p>3. Click <strong>Run Report</strong> — the file builds and downloads automatically.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>What is the Master Sheet and how often do I upload it?</summary>
+      <div class="faq-body">
+        <p>It's the camper data export that feeds <strong>every</strong> report. Upload it in <strong>Utilities → Master Sheet</strong>. Re-upload only when the camper data changes — you don't upload it separately for each report.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>First-time setup checklist (admins)</summary>
+      <div class="faq-body">
+        <ul>
+          <li>Create your account on the sign-in screen (you'll be the admin).</li>
+          <li>Set the <strong>Season Calendar</strong> start date (Utilities) — it drives report week dates and the payroll columns.</li>
+          <li>Upload the <strong>Master Sheet</strong> (Utilities).</li>
+          <li>Import <strong>Family Contacts</strong> (Utilities) if you'll use contact reports/labels.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div class="help-sub">Reports</div>
+
+    <details class="faq">
+      <summary>What does each report do?</summary>
+      <div class="faq-body">
+        <ul>
+          <li><strong>Bunk Snapshot</strong> — roster by bunk with week/day attendance + a totals tab.</li>
+          <li><strong>Group Attendance</strong> — one page per bunk with Mon–Fri sign-in cells. <em>(week-specific)</em></li>
+          <li><strong>AM / PM Extend</strong> — extended-hours sign-in / sign-out sheets. <em>(week-specific)</em></li>
+          <li><strong>PM GRP Extend</strong> — PM extended care grouped, one group per page. <em>(week-specific)</em></li>
+          <li><strong>Driver Totals</strong> — per-driver transportation sheet. <em>(week-specific)</em></li>
+          <li><strong>Labels (Word):</strong> Inter, Junior, and Mailing (one per address). <em>(Inter/Junior are week-specific)</em></li>
+        </ul>
+        <p>Reports marked <em>week-specific</em> ask you to pick a camp week before running.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>My report is empty or missing campers — why?</summary>
+      <div class="faq-body">
+        <p>Usually the <strong>selected week</strong> (the report only includes campers enrolled that week) or an <strong>out-of-date master sheet</strong>. Re-upload the latest master in Utilities and try again.</p>
+      </div>
+    </details>
+
+    <div class="help-sub">Staff Attendance (Payroll)</div>
+
+    <details class="faq">
+      <summary>How do the attendance cells work?</summary>
+      <div class="faq-body">
+        <p>Click a day cell to cycle <strong>blank → ✓ (present) → ✗</strong>. The count on the left totals the ✓ marks for the two-week block. Changes <strong>save automatically</strong> and are shared across devices.</p>
+        <p>The <strong>BS</strong> and <strong>SP\MTC</strong> columns appear on the Weeks 1 &amp; 2 block only and cycle ✓ / ✗ / ½ / N/A (they're never counted).</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Searching, filtering, totals &amp; printing</summary>
+      <div class="faq-body">
+        <ul>
+          <li><strong>Search</strong> matches name or area; <strong>Filter area</strong> lets you pick one or more areas; <strong>Sort</strong> by name/area/total.</li>
+          <li><strong>Totals</strong> shows cumulative days across all 8 weeks; <strong>Extended Staff</strong> is a blank AM/PM check-in sheet.</li>
+          <li><strong>Print / PDF</strong> and <strong>Excel</strong> both export exactly what's on screen (current search/filter/sort).</li>
+          <li><strong>Lock</strong> freezes the sheet so no one can change it accidentally.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div class="help-sub">Family contacts &amp; labels</div>
+
+    <details class="faq">
+      <summary>How do I load family contacts?</summary>
+      <div class="faq-body">
+        <p>In <strong>Utilities → Family Contacts</strong>, drop in the contact spreadsheet. Columns are auto-detected (name, bunk, parents, address, pickups), and new columns are kept automatically. Use <strong>Replace all</strong> to refresh, or <strong>Add to existing</strong> to append.</p>
+        <p><strong>Mailing labels</strong> print one label per address using the <strong>Family last name</strong> field.</p>
+      </div>
+    </details>
+
+    <div class="help-sub">Accounts</div>
+
+    <details class="faq">
+      <summary>Accounts &amp; passwords</summary>
+      <div class="faq-body">
+        <ul>
+          <li>Everyone signs in with their own <strong>username + password</strong>; new users register with the shared <strong>access code</strong>.</li>
+          <li>Change your own password by clicking <strong>your name</strong> in the top-right.</li>
+          <li>Admins manage accounts (add / rename / reset password / remove) in <strong>Utilities → User Accounts</strong>.</li>
+        </ul>
+      </div>
+    </details>
+
+    <div class="help-sub">Troubleshooting</div>
+
+    <details class="faq">
+      <summary>My Bunks &amp; Camps config reset itself</summary>
+      <div class="faq-body">
+        <p>That happens when persistent storage isn't configured — the configuration can reset to the default when the app restarts/redeploys. If you see the orange warning on the Bunks &amp; Camps card, the server's <strong>AWS S3 environment variables</strong> need to be set so everything stays saved.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Colors don't print on my PDF</summary>
+      <div class="faq-body">
+        <p>In the browser's print dialog, turn on <strong>"Background graphics"</strong> (Chrome: under <em>More settings</em>) so the maroon headers and check colors print.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Where do my past reports go?</summary>
+      <div class="faq-body">
+        <p>The most recent ones are listed under <strong>Recent Reports</strong> on the Run Report tab, each with a Download button.</p>
+      </div>
+    </details>
+
+    <div style="margin-top:1.4rem;padding-top:1rem;border-top:1px solid #eee;font-size:.85rem;color:#666">
+      Still stuck? <a class="h-support" style="background:var(--brand);border:none" href="mailto:bhimpele@gmail.com?subject=EL%20Reporting%20Center%20Help">✉ Email Support</a>
+    </div>
+  </div>
+</div><!-- /tab-help -->
 
 </div><!-- /container -->
 
