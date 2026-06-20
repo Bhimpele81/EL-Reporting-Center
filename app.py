@@ -1435,7 +1435,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .pr-multi{position:relative;display:inline-block}
 .pr-multi-btn{cursor:pointer;background:#fff;display:flex;align-items:center;gap:.5rem;min-width:120px;justify-content:space-between}
 .pr-multi-btn .caret{font-size:.65rem;color:#888}
-.pr-multi-menu{position:absolute;top:100%;left:0;margin-top:.25rem;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:170px;max-height:260px;overflow-y:auto;z-index:50;padding:.3rem}
+.pr-multi-menu{position:absolute;top:100%;left:0;margin-top:.25rem;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:170px;max-height:460px;overflow-y:auto;z-index:50;padding:.3rem}
 .pr-multi-menu.hidden{display:none}
 .pr-multi-menu label{display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-radius:6px;cursor:pointer;font-size:.85rem;color:#333;white-space:nowrap}
 .pr-multi-menu label:hover{background:#f4eef0}
