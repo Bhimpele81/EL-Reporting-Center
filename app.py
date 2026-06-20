@@ -2027,9 +2027,9 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 <!-- ===== UTILITIES TAB ===== -->
 <div class="tab-panel" id="tab-config">
 
-  <!-- Master Sheet + Season Calendar (two tiles side by side) -->
+  <!-- Master Sheet + Family Contacts (two tiles side by side) -->
   <div class="card-grid">
-  <div class="card" style="margin-bottom:0">
+  <div class="card">
     <div class="card-hd">
       <div>
         <div class="card-title">Master Sheet</div>
@@ -2050,25 +2050,6 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     </div>
     <div id="master-msg" style="font-size:.82rem;margin-top:.5rem"></div>
   </div>
-  <div class="card" style="margin-bottom:0">
-    <div class="card-hd">
-      <div>
-        <div class="card-title">Season Calendar</div>
-        <div class="card-hint">Set the first day of camp (Week 1 Monday). The 8 camp weeks are calculated from it and used for report week #/date ranges and the Payroll day columns.</div>
-      </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">
-      <label style="font-size:.85rem;color:#555">Camp starts:
-        <input type="date" id="season-start" style="padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.85rem;margin-left:.4rem">
-      </label>
-      <button class="pr-period-btn" id="season-save">💾 Save</button>
-      <span id="season-msg" style="font-size:.82rem;color:#777"></span>
-    </div>
-    <div id="season-summary" style="font-size:.82rem;color:#666;margin-top:.6rem"></div>
-  </div>
-  </div><!-- /card-grid master+season -->
-
-  <!-- Family contacts -->
   <div class="card">
     <div class="card-hd">
       <div>
@@ -2092,8 +2073,26 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       <span id="fam-status-text" style="flex:1">—</span>
     </div>
   </div>
+  </div><!-- /card-grid master+family -->
 
-  <!-- Bunks & Camps (rarely change once the season starts) -->
+  <!-- Season Calendar + Bunks & Camps (two tiles side by side) -->
+  <div class="card-grid">
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Season Calendar</div>
+        <div class="card-hint">Set the first day of camp (Week 1 Monday). The 8 camp weeks are calculated from it and used for report week #/date ranges and the Payroll day columns.</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">
+      <label style="font-size:.85rem;color:#555">Camp starts:
+        <input type="date" id="season-start" style="padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.85rem;margin-left:.4rem">
+      </label>
+      <button class="pr-period-btn" id="season-save">💾 Save</button>
+      <span id="season-msg" style="font-size:.82rem;color:#777"></span>
+    </div>
+    <div id="season-summary" style="font-size:.82rem;color:#666;margin-top:.6rem"></div>
+  </div>
   <div class="card">
     <div class="card-hd">
       <span class="card-num" style="background:var(--gold);color:#1a1018">★</span>
@@ -2118,6 +2117,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <button class="save-config-btn" id="save-config-btn">💾 Save Configuration</button>
     <div id="save-msg"></div>
   </div>
+  </div><!-- /card-grid season+bunks -->
 
   <!-- User accounts (admins only) -->
   <div class="card" id="users-card" style="display:none">
