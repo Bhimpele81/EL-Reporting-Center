@@ -1478,12 +1478,14 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .h-title{font-family:'Roboto Slab',serif;font-size:1.25rem;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
 .h-sub{font-size:.72rem;opacity:.75;font-weight:400;margin-top:2px;letter-spacing:.08em;text-transform:uppercase}
 .h-badge{margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.68rem;font-family:'Roboto Slab',serif;font-weight:500;letter-spacing:.12em;text-transform:uppercase;padding:.35rem .9rem;border-radius:20px;white-space:nowrap}
-.tab-bar{display:flex;background:#fff;border-bottom:2px solid var(--border);position:sticky;top:80px;z-index:100}
-.tab{padding:.85rem 1.75rem;font-size:.82rem;font-weight:500;font-family:'Roboto Slab',serif;letter-spacing:.07em;text-transform:uppercase;color:#999;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;white-space:nowrap;display:flex;align-items:center;gap:.5rem}
-.tab:hover{color:var(--brand-mid)}
-.tab.active{color:var(--brand);border-bottom-color:var(--brand)}
-.tab-badge{background:var(--brand);color:#fff;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:10px;min-width:18px;text-align:center}
-.container{max-width:960px;margin:0 auto;padding:2rem 1.5rem 4rem}
+/* Left sidebar navigation */
+.layout{display:flex;align-items:flex-start}
+.sidebar{position:sticky;top:80px;align-self:flex-start;width:210px;flex-shrink:0;background:#fff;border-right:2px solid var(--border);min-height:calc(100vh - 80px);padding:.9rem .6rem;display:flex;flex-direction:column;gap:.3rem;z-index:100}
+.tab{display:flex;align-items:center;gap:.7rem;padding:.7rem .85rem;font-size:.82rem;font-weight:500;font-family:'Roboto Slab',serif;letter-spacing:.04em;text-transform:uppercase;color:#777;cursor:pointer;border-radius:8px;border-left:3px solid transparent;transition:background .15s,color .15s;white-space:nowrap}
+.tab:hover{background:var(--brand-light);color:var(--brand)}
+.tab.active{background:var(--brand-light);color:var(--brand);border-left-color:var(--brand);font-weight:700}
+.tab-badge{background:var(--brand);color:#fff;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:10px;min-width:18px;text-align:center;margin-left:auto}
+.container{flex:1;min-width:0;max-width:960px;margin:0 auto;padding:2rem 1.5rem 4rem;box-sizing:border-box}
 .tab-panel{display:none}.tab-panel.active{display:block}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
@@ -1661,7 +1663,13 @@ label.lbl{display:block;font-size:.75rem;font-weight:600;color:var(--brand-dark)
 .week-btn:hover:not(.active){border-color:var(--gold);color:var(--gold)}
 /* Responsive */
 @media(max-width:640px){
+/* sidebar becomes a horizontal icon rail across the top */
+.layout{flex-direction:column}
+.sidebar{flex-direction:row;width:auto;min-height:0;border-right:none;border-bottom:2px solid var(--border);position:sticky;top:64px;padding:.4rem .5rem;gap:.3rem;justify-content:center;overflow-x:auto}
+.tab{border-left:none;border-bottom:3px solid transparent;border-radius:6px;padding:.55rem .7rem;font-size:1.1rem}
+.tab.active{border-left:none;border-bottom-color:var(--brand)}
 .tab span:not(.tab-badge){display:none}
+.tab-badge{margin-left:.15rem}
 header{padding:0 1rem;gap:.75rem;height:64px}
 .h-logo{width:46px;height:46px}
 .h-title{font-size:1rem}
@@ -1838,11 +1846,13 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   </div>
 </header>
 
-<div class="tab-bar">
+<div class="layout">
+
+<nav class="sidebar">
   <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
-</div>
+</nav>
 
 <div class="container">
 
@@ -2188,6 +2198,8 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 </div><!-- /tab-payroll -->
 
 </div><!-- /container -->
+
+</div><!-- /layout -->
 
 <script>
 // ─────────────────────────────────────────────
