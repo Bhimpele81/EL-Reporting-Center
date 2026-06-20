@@ -162,13 +162,18 @@ _PROTECTED_KEYS   = {"bunk_config.json", MASTER_KEY, MASTER_META_KEY,
                      PAYROLL_KEY, FAMILIES_KEY, USERS_KEY, SEASON_KEY}
 
 
-def _save_master(file_bytes: bytes, filename: str, uploaded_by: str = "") -> dict:
-    """Persist the uploaded master sheet (S3 if configured, plus local copy)."""
+def _now_eastern_stamp() -> str:
+    """Formatted Eastern-time timestamp, e.g. '6/19/2026 4:00 PM EDT'."""
     now = datetime.now(_EASTERN) if _EASTERN else datetime.now()
     fmt = "%#m/%#d/%Y %#I:%M %p %Z" if os.name == "nt" else "%-m/%-d/%Y %-I:%M %p %Z"
+    return now.strftime(fmt).strip()
+
+
+def _save_master(file_bytes: bytes, filename: str, uploaded_by: str = "") -> dict:
+    """Persist the uploaded master sheet (S3 if configured, plus local copy)."""
     meta = {
         "filename":    filename or "master",
-        "uploaded_at": now.strftime(fmt).strip(),
+        "uploaded_at": _now_eastern_stamp(),
         "uploaded_by": uploaded_by or "",
         "size":        len(file_bytes),
     }
@@ -1134,6 +1139,10 @@ def api_families_import():
         rec = {"id": _family_next_id(out), **rec}
         out.append(rec)
     data["families"] = out
+    u = _current_user() or {}
+    data["uploaded_at"] = _now_eastern_stamp()
+    data["uploaded_by"] = u.get("name") or u.get("username") or ""
+    data["filename"] = f.filename
     _families_save(data)
     return jsonify({"ok": True, "count": len(parsed), "total": len(out), "mode": mode})
 
@@ -1942,7 +1951,10 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       <label><input type="radio" name="fam-import-mode" value="append"> Add to existing</label>
       <span id="fam-msg" style="margin-left:auto"></span>
     </div>
-    <div id="fam-count" style="font-size:.83rem;color:#555;margin-top:.5rem"></div>
+    <div id="fam-status" style="display:none;align-items:center;gap:.6rem;padding:.6rem .85rem;background:#eef4fb;border:1px solid #b9d2ec;border-radius:8px;margin-top:.6rem;font-size:.83rem;color:#1A79BF;font-weight:500">
+      <span>📇</span>
+      <span id="fam-status-text" style="flex:1">—</span>
+    </div>
   </div>
 
   <!-- Season calendar: the 8 camp weeks -->
@@ -2867,17 +2879,26 @@ let families = [];
 const famEsc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 async function loadFamilies() {
-  let n = 0;
+  let d = {};
   try {
     const res = await fetch('/api/families');
-    const d = await res.json();
+    d = await res.json();
     families = d.families || [];
-    n = families.length;
   } catch(e) { families = []; }
-  const el = document.getElementById('fam-count');
-  if (el) el.textContent = n
-    ? `${n} family contact records stored.`
-    : 'No family contacts imported yet.';
+  const box = document.getElementById('fam-status');
+  const txt = document.getElementById('fam-status-text');
+  if (!box) return;
+  if (families.length) {
+    const uploader = (d.uploaded_by || '').replace(/@.*$/, '');
+    let when = (d.uploaded_at || '').replace(/\s*[A-Z]{2,4}\s*$/, '')
+                                    .replace(/\s+(\d{1,2}:\d{2}\s*[AP]M)/i, ' @ $1');
+    txt.innerHTML = `<strong>${families.length}</strong> family records stored` +
+      (when ? ` &middot; uploaded on ${when}` : '') +
+      (uploader ? ` by <strong>${uploader}</strong>` : '') + '.';
+    box.style.display = 'flex';
+  } else {
+    box.style.display = 'none';
+  }
 }
 
 const famDrop = document.getElementById('fam-drop');
