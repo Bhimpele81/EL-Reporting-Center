@@ -2036,12 +2036,6 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <div class="card-hint">Upload the camper master sheet. It's saved on the server and used for every report — re-upload here whenever the camper data changes.</div>
       </div>
     </div>
-    <div id="master-status" style="display:none;align-items:center;gap:.6rem;padding:.6rem .85rem;background:#eef4fb;border:1px solid #b9d2ec;border-radius:8px;margin:0 0 .8rem;font-size:.83rem;color:#1A79BF;font-weight:500">
-      <span>📋</span>
-      <span id="master-status-text" style="flex:1">—</span>
-      <a id="master-status-dl" href="/api/master/download" style="cursor:pointer;font-size:.75rem;color:#1A79BF;background:#fff;border:1px solid #b9d2ec;border-radius:6px;padding:.2rem .55rem;text-decoration:none">⬇ Download</a>
-      <button id="master-status-clear" style="cursor:pointer;font-size:.75rem;color:#777;background:#fff;border:1px solid #ccd;border-radius:6px;padding:.2rem .55rem">Clear</button>
-    </div>
     <div class="drop-zone" id="master-drop">
       <input type="file" id="master-file" accept=".csv,.xlsx,.xls">
       <div class="drop-icon">📊</div>
@@ -2049,6 +2043,12 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       <div class="drop-meta">Accepted formats: .csv, .xlsx, .xls</div>
     </div>
     <div id="master-msg" style="font-size:.82rem;margin-top:.5rem"></div>
+    <div id="master-status" style="display:none;align-items:center;gap:.6rem;padding:.6rem .85rem;background:#eef4fb;border:1px solid #b9d2ec;border-radius:8px;margin-top:.6rem;font-size:.83rem;color:#1A79BF;font-weight:500">
+      <span>📋</span>
+      <span id="master-status-text" style="flex:1">—</span>
+      <a id="master-status-dl" href="/api/master/download" style="cursor:pointer;font-size:.75rem;color:#1A79BF;background:#fff;border:1px solid #b9d2ec;border-radius:6px;padding:.2rem .55rem;text-decoration:none">⬇ Download</a>
+      <button id="master-status-clear" style="cursor:pointer;font-size:.75rem;color:#777;background:#fff;border:1px solid #ccd;border-radius:6px;padding:.2rem .55rem">Clear</button>
+    </div>
   </div>
   <div class="card">
     <div class="card-hd">
