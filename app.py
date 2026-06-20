@@ -1487,11 +1487,12 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .tab-badge{background:var(--brand);color:#fff;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:10px;min-width:18px;text-align:center;margin-left:auto}
 .container{flex:1;min-width:0;max-width:1400px;padding:2rem 2rem 4rem;box-sizing:border-box}
 .tab-panel{display:none}.tab-panel.active{display:block}
-.payroll-table{border-collapse:collapse;width:auto;font-size:.85rem}
+.payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
 .payroll-table td{height:42px}
 .payroll-table thead th{background:var(--brand);color:#fff;font-weight:700;white-space:nowrap}
-.payroll-table td.pr-name{text-align:left;font-weight:600;width:150px;white-space:normal;line-height:1.15}
+.payroll-table td.pr-name{text-align:left;font-weight:600;min-width:160px;white-space:normal;line-height:1.15}
+.payroll-table .pr-delcol{width:36px;min-width:36px}
 .payroll-table td.pr-area{color:#555;width:86px;white-space:normal;line-height:1.15}
 .payroll-table td.pr-area-edit{cursor:pointer}
 .payroll-table td.pr-area-edit:hover{background:#f4eef0;outline:1px dashed var(--brand)}
@@ -1539,7 +1540,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 @media print {
   body * { visibility:hidden; }
   #payroll-table, #payroll-table * { visibility:visible; }
-  #payroll-table { position:absolute; left:0; top:0; width:auto; font-size:9pt; }
+  #payroll-table { position:absolute; left:0; top:0; width:100%; font-size:9pt; }
   #payroll-table .pr-del { display:none; }
   /* keep maroon headers, row shading and symbol colors when printing */
   #payroll-table, #payroll-table * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
@@ -2814,7 +2815,7 @@ function renderPayroll() {
     html += `<th class="${cls}">${d.dow}<br>${d.md}</th>`;
   });
   if (showExtra) html += '<th class="pr-extra pr-xsep">BS</th><th class="pr-extra">SP\\MTC</th>';
-  html += '<th></th></tr></thead><tbody>';
+  html += '<th class="pr-delcol"></th></tr></thead><tbody>';
   staff.forEach(s => {
     const c = payroll.checks[s.id] || {};
     html += `<tr data-id="${s.id}">`;
@@ -2837,7 +2838,7 @@ function renderPayroll() {
         html += `<td class="${xcls}" data-id="${s.id}" data-key="${key}">${symFor(xs)}</td>`;
       }
     }
-    html += `<td><button class="pr-del" data-id="${s.id}" title="Remove">✕</button></td>`;
+    html += `<td class="pr-delcol"><button class="pr-del" data-id="${s.id}" title="Remove">✕</button></td>`;
     html += '</tr>';
   });
   html += '</tbody>';
