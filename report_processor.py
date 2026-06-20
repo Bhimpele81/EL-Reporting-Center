@@ -1660,7 +1660,7 @@ def _avery5960_docx(rows3: list) -> bytes:
 
     def _fill(cell, l1, l2, l3):
         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-        for i, (text, sz, bold) in enumerate([(l1, 12, True), (l2, 17, True), (l3, 12, False)]):
+        for i, (text, sz, bold) in enumerate([(l1, 15, True), (l2, 17, True), (l3, 12, False)]):
             p = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             pf = p.paragraph_format
