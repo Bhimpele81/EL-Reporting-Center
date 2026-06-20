@@ -678,29 +678,32 @@ def save_config():
         return jsonify({"error": str(e)}), 500
 
 
+def _season_summary() -> dict:
+    mondays = _season_mondays()
+    start = _season_load()["mondays"][0]
+    last_fri = (mondays[-1] + timedelta(days=4)) if mondays[-1] else None
+    end_str = last_fri.strftime("%B %#d, %Y" if os.name == "nt" else "%B %-d, %Y") if last_fri else ""
+    return {"start": start, "end": end_str,
+            "weeks": [{"week": i + 1, "range": _week_range_str(m)} for i, m in enumerate(mondays)]}
+
+
 @app.route("/api/season", methods=["GET"])
 def api_season():
-    mondays = _season_load()["mondays"]
-    weeks = [{"week": i + 1, "monday": mondays[i], "range": _week_range_str(m)}
-             for i, m in enumerate(_season_mondays())]
-    return jsonify({"weeks": weeks})
+    return jsonify(_season_summary())
 
 
 @app.route("/api/season", methods=["POST"])
 def api_season_save():
     body = request.get_json(force=True, silent=True) or {}
-    mondays = body.get("mondays") or []
-    clean = []
-    for i in range(8):
-        iso = mondays[i] if i < len(mondays) else ""
-        try:
-            date.fromisoformat(iso)   # validate
-            clean.append(iso)
-        except (ValueError, TypeError):
-            clean.append(_DEFAULT_SEASON_MONDAYS[i])
+    start = (body.get("start") or "").strip()
+    try:
+        d0 = date.fromisoformat(start)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Enter a valid camp-start date."}), 400
+    # Derive 8 consecutive Mondays from the start date
+    clean = [(d0 + timedelta(days=7 * i)).isoformat() for i in range(8)]
     _season_save({"mondays": clean})
-    return jsonify({"ok": True, "weeks": [{"week": i + 1, "monday": clean[i],
-                    "range": _week_range_str(date.fromisoformat(clean[i]))} for i in range(8)]})
+    return jsonify({"ok": True, **_season_summary()})
 
 
 # --- Report processing ---
@@ -1957,19 +1960,22 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     </div>
   </div>
 
-  <!-- Season calendar: the 8 camp weeks -->
+  <!-- Season calendar: just the first day of camp -->
   <div class="card">
     <div class="card-hd">
       <div>
         <div class="card-title">Season Calendar</div>
-        <div class="card-hint">Set the Monday that starts each of the 8 camp weeks. These drive the week #/date ranges on reports and the day columns in Payroll.</div>
+        <div class="card-hint">Set the first day of camp (Week 1 Monday). The 8 camp weeks are calculated from it and used for report week #/date ranges and the Payroll day columns.</div>
       </div>
     </div>
-    <div id="season-rows"></div>
-    <div style="display:flex;align-items:center;gap:.8rem;margin-top:.6rem">
-      <button class="pr-period-btn" id="season-save">💾 Save Calendar</button>
+    <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">
+      <label style="font-size:.85rem;color:#555">Camp starts:
+        <input type="date" id="season-start" style="padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.85rem;margin-left:.4rem">
+      </label>
+      <button class="pr-period-btn" id="season-save">💾 Save</button>
       <span id="season-msg" style="font-size:.82rem;color:#777"></span>
     </div>
+    <div id="season-summary" style="font-size:.82rem;color:#666;margin-top:.6rem"></div>
   </div>
 
   <!-- Bunks & Camps (rarely change once the season starts) -->
@@ -2925,85 +2931,47 @@ famDrop.addEventListener('drop', e => {
 });
 famFile.addEventListener('change', e => { if (e.target.files[0]) { importFamilies(e.target.files[0]); e.target.value=''; } });
 
-// ---- Season calendar ----
-let seasonWeeks = [];
+// ---- Season calendar (single start date) ----
+let seasonStart = '';
 
 async function loadSeason() {
   try {
     const res = await fetch('/api/season');
     const d = await res.json();
-    seasonWeeks = d.weeks || [];
-  } catch(e) { seasonWeeks = []; }
-  renderSeason();
+    seasonStart = d.start || '';
+    const inp = document.getElementById('season-start');
+    if (inp) inp.value = seasonStart;
+    renderSeasonSummary(d);
+  } catch(e) {}
 }
 
-function renderSeason() {
-  const box = document.getElementById('season-rows');
-  if (!box) return;
-  box.innerHTML = seasonWeeks.map(w =>
-    `<div class="season-row">` +
-    `<span class="sr-wk">Week ${w.week}</span>` +
-    `<input type="date" data-wk="${w.week}" value="${w.monday}">` +
-    `<span class="sr-range" id="sr-range-${w.week}">${w.range || ''}</span>` +
-    (w.week === 1 ? `<span style="font-size:.75rem;color:#999">← sets the next 7 weeks automatically</span>` : '') +
-    `</div>`).join('');
-  box.querySelectorAll('input[type=date]').forEach(inp => {
-    inp.addEventListener('change', () => {
-      const wk = parseInt(inp.dataset.wk, 10);
-      const setRange = (n, iso) => { const s = document.getElementById('sr-range-' + n); if (s) s.textContent = rangeFromMonday(iso); };
-      setRange(wk, inp.value);
-      // Setting Week 1 auto-fills the next 7 weeks with consecutive Mondays
-      if (wk === 1 && inp.value) {
-        box.querySelectorAll('input[type=date]').forEach(other => {
-          const owk = parseInt(other.dataset.wk, 10);
-          if (owk > 1) {
-            const iso = addDaysIso(inp.value, 7 * (owk - 1));
-            other.value = iso;
-            setRange(owk, iso);
-          }
-        });
-      }
-    });
-  });
-}
-
-function addDaysIso(iso, days) {
-  const d = new Date(iso + 'T00:00:00');
-  d.setDate(d.getDate() + days);
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${dd}`;
-}
-
-function rangeFromMonday(iso) {
-  if (!iso) return '';
-  const mon = new Date(iso + 'T00:00:00');
-  const fri = new Date(mon); fri.setDate(fri.getDate() + 4);
-  const M = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  return mon.getMonth() === fri.getMonth()
-    ? `${M[mon.getMonth()]} ${mon.getDate()} – ${fri.getDate()}`
-    : `${M[mon.getMonth()]} ${mon.getDate()} – ${M[fri.getMonth()]} ${fri.getDate()}`;
+function renderSeasonSummary(d) {
+  const el = document.getElementById('season-summary');
+  if (!el) return;
+  const w1 = (d.weeks && d.weeks[0] && d.weeks[0].range) || '';
+  el.innerHTML = (w1 && d.end)
+    ? `8 weeks: <strong>Week 1</strong> ${w1} &hellip; through <strong>${d.end}</strong>.`
+    : '';
 }
 
 document.getElementById('season-save').addEventListener('click', async () => {
   const msg = document.getElementById('season-msg');
-  const mondays = Array.from(document.querySelectorAll('#season-rows input[type=date]')).map(i => i.value);
-  if (mondays.some(m => !m)) { msg.style.color = '#c0392b'; msg.textContent = 'Set a Monday for every week.'; return; }
-  // Warn only if the dates actually changed — Payroll checks are keyed to dates
-  const changed = seasonWeeks.some((w, i) => w.monday !== mondays[i]);
-  if (changed && !confirm(
-      'Changing the week dates will re-date the Payroll day columns. Any attendance ' +
+  const start = document.getElementById('season-start').value;
+  if (!start) { msg.style.color = '#c0392b'; msg.textContent = 'Pick the first day of camp.'; return; }
+  // Warn only if the start actually changed — Payroll checks are keyed to dates
+  if (seasonStart && start !== seasonStart && !confirm(
+      'Changing the start date will re-date the Payroll day columns. Any attendance ' +
       'checks already entered are tied to the old dates and will NOT carry over to the ' +
       'new ones.\n\nThis is safe before the season starts. Continue?')) {
     return;
   }
   msg.style.color = '#666'; msg.textContent = 'Saving…';
   try {
-    const res = await fetch('/api/season', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mondays})});
+    const res = await fetch('/api/season', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({start})});
     const d = await res.json();
     if (!res.ok || d.error) { msg.style.color = '#c0392b'; msg.textContent = d.error || 'Could not save.'; return; }
-    seasonWeeks = d.weeks || seasonWeeks;
-    renderSeason();
+    seasonStart = d.start || start;
+    renderSeasonSummary(d);
     msg.style.color = '#2e7d32'; msg.textContent = '✓ Saved. Reports & Payroll now use these dates.';
     loadPayroll();   // refresh payroll day columns
   } catch(e) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + e.message; }
