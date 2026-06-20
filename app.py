@@ -1487,7 +1487,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-note{text-align:center;font-size:.75rem;color:#aaa;margin-top:1.4rem}
 @media(max-width:640px){.px-grid{grid-template-columns:1fr}.h-nav{gap:.4rem}}
 .h-logo{width:60px;height:60px;flex-shrink:0;border-radius:50%;background-image:url("/logo.png");background-size:90%;background-position:center;background-repeat:no-repeat;background-color:var(--brand-dark)}
-.h-title{font-family:'Roboto Slab',serif;font-size:1.25rem;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
+.h-titlewrap{min-width:0;overflow:hidden}
+.h-title{font-family:'Roboto Slab',serif;font-size:1.25rem;font-weight:700;letter-spacing:.02em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .h-sub{font-size:.72rem;opacity:.75;font-weight:400;margin-top:2px;letter-spacing:.08em;text-transform:uppercase}
 .h-badge{margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:.68rem;font-family:'Roboto Slab',serif;font-weight:500;letter-spacing:.12em;text-transform:uppercase;padding:.35rem .9rem;border-radius:20px;white-space:nowrap}
 /* Left sidebar navigation */
@@ -1697,10 +1698,13 @@ label.lbl{display:block;font-size:.75rem;font-weight:600;color:var(--brand-dark)
 .tab.active{border-left:none;border-bottom-color:var(--brand)}
 .tab span:not(.tab-badge){display:none}
 .tab-badge{margin-left:.15rem}
-header{padding:0 1rem;gap:.75rem;height:64px}
-.h-logo{width:46px;height:46px}
-.h-title{font-size:1rem}
+header{padding:0 .8rem;gap:.6rem;height:64px}
+.h-logo{width:42px;height:42px}
+.h-title{font-size:.95rem}
 .h-sub{display:none}
+/* Pricing/Support collapse to icon-only so the camp name fits on one line */
+.h-lbl{display:none}
+.h-pricing,.h-support{padding:.45rem .6rem}
 .h-badge{display:none}
 .container{padding:1rem .75rem 3rem}
 .card{padding:1.1rem 1rem}
@@ -1856,7 +1860,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 
 <header>
   <div class="h-logo" role="img" aria-label="Elbow Lane Day Camp"></div>
-  <div>
+  <div class="h-titlewrap">
     <div class="h-title">Elbow Lane Day Camp</div>
     <div class="h-sub">Reporting Center</div>
   </div>
@@ -1868,8 +1872,8 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <button id="menu-logout" class="menu-sep">↩ Sign Out</button>
       </div>
     </span>
-    <button class="h-pricing" id="pricing-btn">$ Pricing</button>
-    <a class="h-support" href="mailto:bhimpele@gmail.com?subject=EL%20Reporting%20Center%20Support">✉ Support</a>
+    <button class="h-pricing" id="pricing-btn">$ <span class="h-lbl">Pricing</span></button>
+    <a class="h-support" href="mailto:bhimpele@gmail.com?subject=EL%20Reporting%20Center%20Support">✉ <span class="h-lbl">Support</span></a>
   </div>
 </header>
 
