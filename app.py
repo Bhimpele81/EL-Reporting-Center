@@ -1424,6 +1424,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .fam-table td.fam-cell{cursor:pointer;min-width:70px}
 .fam-table td.fam-cell:hover{background:#f4eef0;outline:1px dashed var(--brand)}
 .fam-table .fam-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.9rem;padding:0}
+.usr-ic{cursor:pointer;border:none;background:none;color:#1A79BF;font-size:1rem;padding:0 .3rem;line-height:1}
+.usr-ic:hover{color:var(--brand)}
 .season-row{display:flex;align-items:center;gap:.7rem;padding:.3rem 0}
 .season-row .sr-wk{font-weight:700;color:var(--brand);width:64px;font-size:.85rem}
 .season-row input[type=date]{padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.85rem}
@@ -3038,7 +3040,7 @@ async function loadUsers() {
       const isMe = currentUser && u.username.toLowerCase() === currentUser.username.toLowerCase();
       h += `<tr><td>${famEsc(u.username)}${isMe ? ' (you)' : ''}</td>` +
            `<td>${u.is_admin ? 'Admin' : 'User'}</td>` +
-           `<td style="white-space:nowrap"><button class="pr-period-btn pr-sm usr-rename" data-u="${famEsc(u.username)}">Rename</button> ` +
+           `<td style="white-space:nowrap"><button class="usr-ic usr-rename" data-u="${famEsc(u.username)}" title="Rename">✎</button> ` +
            `<button class="pr-period-btn pr-sm usr-pw" data-u="${famEsc(u.username)}">Reset PW</button> ` +
            `${isMe ? '' : `<button class="pr-del usr-del" data-u="${famEsc(u.username)}" title="Remove">✕</button>`}</td></tr>`;
     });
