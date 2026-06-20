@@ -1485,7 +1485,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .tab:hover{background:var(--brand-light);color:var(--brand)}
 .tab.active{background:var(--brand-light);color:var(--brand);border-left-color:var(--brand);font-weight:700}
 .tab-badge{background:var(--brand);color:#fff;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:10px;min-width:18px;text-align:center;margin-left:auto}
-.container{flex:1;min-width:0;max-width:960px;margin:0 auto;padding:2rem 1.5rem 4rem;box-sizing:border-box}
+.container{flex:1;min-width:0;max-width:1400px;padding:2rem 2rem 4rem;box-sizing:border-box}
 .tab-panel{display:none}.tab-panel.active{display:block}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
