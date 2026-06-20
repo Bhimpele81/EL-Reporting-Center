@@ -40,7 +40,7 @@ Week-aware reports filter/annotate to a selected week (1–8): Group Attendance,
 - **PM Extend** — page header `PM EXTENDED HOURS SIGN-OUT` + week/dates
 - **PM GRP Extend** — group-per-page; page header `PM EXTENDED GROUP ATTENDANCE` + week/dates; non-attending days marked with a bold em dash (—); footer legend ✓ / O only (the "C = Confirmed Absent" legend was removed)
 - **Driver Totals** — driver-name banner, week highlight, booster/walk legend footer
-- **Labels (Word/Avery 5960)**: **Inter** labels, **Junior** transport labels (3 sections, page-boundary padded)
+- **Labels (Word/Avery 5960)**: **Inter** labels, **Junior** transport labels (3 sections, page-boundary padded), **Mailing** labels (one per unique address from family contacts: Last / Address 1 / Address 2 / City, State Zip — sources `families.json`, deduped by address)
 
 Master-sheet workflow: upload once (Utilities), auto-detected, de-duplicated, persisted, reused, week-filtered.
 

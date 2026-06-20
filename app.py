@@ -600,7 +600,8 @@ def run_job(job_id: str, file_bytes: bytes, report_type: str, week_num: int = No
 
         log(f"Processing report type: {report_type}…")
         result = process_report(file_bytes, report_type, config, job_id, OUTPUT_DIR,
-                                week_num=week_num, week_dates=_season_week_strings())
+                                week_num=week_num, week_dates=_season_week_strings(),
+                                families=_families_load()["families"])
 
         if result["success"]:
             log(result["message"], "ok")
@@ -1789,6 +1790,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <div class="report-types">
         <button class="rtype-btn" data-rtype="inter_labels">Inter</button>
         <button class="rtype-btn" data-rtype="jr_transport_labels">Junior</button>
+        <button class="rtype-btn" data-rtype="mailing_labels">Mailing</button>
     </div>
   </div>
 

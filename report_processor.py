@@ -1687,6 +1687,95 @@ def _avery5960_docx(rows3: list, l1_size: int = 15, l2_size: int = 17,
     return buf.read()
 
 
+def _avery5960_lines_docx(labels: list, size: int = 12, bold_first: bool = True) -> bytes:
+    """Render address-style labels onto an Avery 5960 sheet. Each label is a list
+    of text lines, left-aligned and vertically centered. Returns .docx bytes."""
+    import io as _io
+    from docx import Document
+    from docx.shared import Inches, Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.table import WD_ALIGN_VERTICAL
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    doc = Document()
+    sec = doc.sections[0]
+    sec.page_width    = Inches(8.5)
+    sec.page_height   = Inches(11)
+    sec.top_margin    = Inches(0.5)
+    sec.bottom_margin = Inches(0.5)
+    sec.left_margin   = Inches(0.19)
+    sec.right_margin  = Inches(0.19)
+
+    COLS = 3
+    n = len(labels)
+    nrows = max(1, (n + COLS - 1) // COLS)
+    col_w = [Inches(2.625), Inches(0.125), Inches(2.625), Inches(0.125), Inches(2.625)]
+    table = doc.add_table(rows=nrows, cols=5)
+    table.allow_autofit = False
+    layout = OxmlElement("w:tblLayout"); layout.set(qn("w:type"), "fixed")
+    table._tbl.tblPr.append(layout)
+
+    def _fill(cell, lines):
+        cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+        shown = [l for l in lines if (l or "").strip()] or [""]
+        for i, text in enumerate(shown):
+            p = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            pf = p.paragraph_format
+            pf.space_before = Pt(0); pf.space_after = Pt(0); pf.line_spacing = 1.0
+            pf.left_indent = Inches(0.18)
+            run = p.add_run(text)
+            run.font.size = Pt(size); run.font.bold = (bold_first and i == 0)
+
+    li = 0
+    for ri in range(nrows):
+        row = table.rows[ri]
+        trPr = row._tr.get_or_add_trPr()
+        trH = OxmlElement("w:trHeight"); trH.set(qn("w:val"), "1440"); trH.set(qn("w:hRule"), "exact")
+        trPr.append(trH)
+        for ci in range(5):
+            cell = row.cells[ci]
+            cell.width = col_w[ci]
+            if ci % 2 == 1:
+                continue
+            if li < n:
+                _fill(cell, labels[li]); li += 1
+
+    buf = _io.BytesIO(); doc.save(buf); buf.seek(0)
+    return buf.read()
+
+
+def build_mailing_labels_docx(families: list) -> tuple:
+    """One Avery 5960 mailing label per unique address from the family contacts:
+       Last Name / Address 1 / Address 2 / City, State Zip.
+    Returns (docx_bytes, count)."""
+    seen, labels = set(), []
+    for f in (families or []):
+        a1 = (f.get("address") or "").strip()
+        a2 = (f.get("address2") or "").strip()
+        city = (f.get("city") or "").strip()
+        state = (f.get("state") or "").strip()
+        zp = (f.get("zip") or "").strip()
+        last = (f.get("last") or "").strip()
+        if not (a1 or city):           # no address → skip
+            continue
+        key = (a1.lower(), a2.lower(), city.lower(), state.lower(), zp.lower())
+        if key in seen:                # one label per address
+            continue
+        seen.add(key)
+        loc = city
+        if state: loc = (loc + ", " if loc else "") + state
+        if zp:    loc = (loc + " " if loc else "") + zp
+        lines = [last, a1]
+        if a2:
+            lines.append(a2)
+        lines.append(loc)
+        labels.append(((last.lower(), a1.lower()), lines))
+    labels.sort(key=lambda x: x[0])
+    return _avery5960_lines_docx([ln for _, ln in labels], size=12), len(labels)
+
+
 def _group_bunks(config: dict, group_name: str):
     """Return a predicate: does this bunk belong to the named camp/group?"""
     bunk_camp = {}
@@ -2113,12 +2202,12 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
 
 def process_report(file_bytes: bytes, report_type: str,
                    config: dict, job_id: str, output_dir: str,
-                   week_num: int = None, week_dates=None) -> dict:
+                   week_num: int = None, week_dates=None, families=None) -> dict:
 
     if week_dates:
         set_week_dates(week_dates)
 
-    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend", "driver_totals", "inter_labels", "jr_transport_labels")
+    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend", "driver_totals", "inter_labels", "jr_transport_labels", "mailing_labels")
     if report_type not in supported:
         return {
             "success": False,
@@ -2310,6 +2399,26 @@ def process_report(file_bytes: bytes, report_type: str,
             "message":  f"Processed {len(campers)} campers across drivers successfully.",
             "filename": out_filename,
             "rows":     len(campers),
+        }
+
+    # ---- Mailing Labels (Word / Avery 5960, one per address from family contacts) ----
+    if report_type == "mailing_labels":
+        try:
+            docx_bytes, count = build_mailing_labels_docx(families)
+        except Exception as e:
+            return {"success": False, "message": f"Could not build labels: {e}"}
+        if not count:
+            return {"success": False, "message": "No family addresses found. "
+                                                  "Import family contacts in the Utilities tab first."}
+        out_filename = f"Mailing Labels {report_date.strftime('%m%d%Y')}.docx"
+        out_path = os.path.join(output_dir, out_filename)
+        with open(out_path, "wb") as f:
+            f.write(docx_bytes)
+        return {
+            "success":  True,
+            "message":  f"Created {count} mailing labels (one per address).",
+            "filename": out_filename,
+            "rows":     count,
         }
 
     # ---- Inter Labels (Word / Avery 5960) ----
