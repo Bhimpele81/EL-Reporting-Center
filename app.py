@@ -1543,6 +1543,9 @@ label.lbl{display:block;font-size:.75rem;font-weight:600;color:var(--brand-dark)
 .camp-name-input:focus{background:#fff;border-radius:4px;padding:0 .4rem}
 .camp-rm{background:none;border:none;cursor:pointer;color:#bbb;font-size:1rem;padding:.2rem;transition:color .15s;flex-shrink:0}
 .camp-rm:hover{color:var(--brand)}
+.camp-toggle{background:none;border:none;cursor:pointer;color:var(--brand);font-size:.8rem;padding:.1rem .35rem;flex-shrink:0;line-height:1}
+.camp-count{font-size:.72rem;color:#999;flex-shrink:0;white-space:nowrap}
+.camp-header{cursor:default}
 .bunk-table{width:100%;border-collapse:collapse}
 .bunk-table th{font-size:.7rem;font-weight:600;color:#999;letter-spacing:.05em;text-transform:uppercase;padding:.5rem .9rem;border-bottom:1px solid var(--border);text-align:left}
 .bunk-table td{padding:.45rem .9rem;border-bottom:1px solid #f5f0f1;vertical-align:middle}
@@ -2322,6 +2325,7 @@ function showError(msg) {
 // Config tab
 // ─────────────────────────────────────────────
 let campConfig = {camps: []};
+let collapsedCamps = new Set();   // camp indices currently collapsed
 
 async function loadConfig() {
   try {
@@ -2329,6 +2333,7 @@ async function loadConfig() {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     campConfig = data;
+    collapsedCamps = new Set(campConfig.camps.map((_, i) => i));   // start collapsed
     renderCamps();
   } catch(e) {
     document.getElementById('camp-list').innerHTML =
@@ -2347,31 +2352,46 @@ function renderCamps() {
       return minA - minB;
     });
   sorted.forEach(({ camp, ci }) => {
+    const collapsed = collapsedCamps.has(ci);
     const block = document.createElement('div');
     block.className = 'camp-block';
     block.innerHTML = `
       <div class="camp-header">
+        <button class="camp-toggle" id="camp-caret-${ci}" title="Expand/collapse" onclick="toggleCamp(${ci})">${collapsed ? '▸' : '▾'}</button>
         <input class="camp-name-input" value="${escHtml(camp.name)}" placeholder="Camp Name"
           oninput="campConfig.camps[${ci}].name = this.value">
+        <span class="camp-count">${camp.bunks.length} bunk${camp.bunks.length === 1 ? '' : 's'}</span>
         <button class="camp-rm" title="Remove camp" onclick="removeCamp(${ci})">✕</button>
       </div>
-      <table class="bunk-table">
-        <thead>
-          <tr>
-            <th>Bunk Name</th>
-            <th style="width:70px">Number</th>
-            <th style="width:100px">Grp</th>
-            <th style="width:36px"></th>
-          </tr>
-        </thead>
-        <tbody id="bunk-body-${ci}">
-          ${[...camp.bunks].sort((a,b) => a.number - b.number).map((b, bi) => bunkRow(ci, camp.bunks.indexOf(b), b)).join('')}
-        </tbody>
-      </table>
-      <button class="add-bunk-btn" onclick="addBunk(${ci})">＋ Add Bunk</button>
+      <div class="camp-body" id="camp-body-wrap-${ci}" style="display:${collapsed ? 'none' : 'block'}">
+        <table class="bunk-table">
+          <thead>
+            <tr>
+              <th>Bunk Name</th>
+              <th style="width:70px">Number</th>
+              <th style="width:100px">Grp</th>
+              <th style="width:36px"></th>
+            </tr>
+          </thead>
+          <tbody id="bunk-body-${ci}">
+            ${[...camp.bunks].sort((a,b) => a.number - b.number).map((b, bi) => bunkRow(ci, camp.bunks.indexOf(b), b)).join('')}
+          </tbody>
+        </table>
+        <button class="add-bunk-btn" onclick="addBunk(${ci})">＋ Add Bunk</button>
+      </div>
     `;
     list.appendChild(block);
   });
+}
+
+function toggleCamp(ci) {
+  const wrap  = document.getElementById('camp-body-wrap-' + ci);
+  const caret = document.getElementById('camp-caret-' + ci);
+  if (collapsedCamps.has(ci)) {
+    collapsedCamps.delete(ci); wrap.style.display = 'block'; caret.textContent = '▾';
+  } else {
+    collapsedCamps.add(ci); wrap.style.display = 'none'; caret.textContent = '▸';
+  }
 }
 
 function bunkRow(ci, bi, b) {
@@ -2393,6 +2413,8 @@ function addCamp() {
 
 function removeCamp(ci) {
   campConfig.camps.splice(ci, 1);
+  // indices shifted — recollapse all so states stay aligned
+  collapsedCamps = new Set(campConfig.camps.map((_, i) => i));
   renderCamps();
 }
 
