@@ -896,7 +896,7 @@ def api_payroll_export():
         staff.sort(key=(lambda s: (-cnt(s["id"], days_all), namekey(s))) if sort == "total"
                    else (lambda s: (s.get("area", "").lower(), namekey(s))) if sort == "area"
                    else namekey)
-        header(["Staff", "Area", "Total Checks (all 8 weeks)"])
+        header(["Staff", "Area", "Total Days (all 8 weeks)"])
         for s in staff:
             jc = " (JC)" if "junior" in (s.get("title", "").lower()) else ""
             a = area_txt(s) + (f" — {s['bunk']}" if s.get("bunk") else "")
@@ -3036,7 +3036,7 @@ function renderTotalsTable(sortKey) {
     return (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase());
   });
 
-  let html = `<caption>${payrollTitle()}</caption><thead><tr><th>Staff</th><th>Area</th><th>Total Checks<br><small style="font-weight:400">(all 8 weeks)</small></th></tr></thead><tbody>`;
+  let html = `<caption>${payrollTitle()}</caption><thead><tr><th>Staff</th><th>Area</th><th>Total Days<br><small style="font-weight:400">(all 8 weeks)</small></th></tr></thead><tbody>`;
   staff.forEach(s => {
     const jc = isJC(s) ? ' <small style="color:#1A79BF;font-weight:700">JC</small>' : '';
     const areaTxt = (s.area === 'Support' && s.title) ? s.title : (s.area || '');
