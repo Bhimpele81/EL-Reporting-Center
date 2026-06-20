@@ -2945,14 +2945,34 @@ function renderSeason() {
     `<span class="sr-wk">Week ${w.week}</span>` +
     `<input type="date" data-wk="${w.week}" value="${w.monday}">` +
     `<span class="sr-range" id="sr-range-${w.week}">${w.range || ''}</span>` +
+    (w.week === 1 ? `<span style="font-size:.75rem;color:#999">← sets the next 7 weeks automatically</span>` : '') +
     `</div>`).join('');
-  // Live-update the shown range as the Monday changes
   box.querySelectorAll('input[type=date]').forEach(inp => {
     inp.addEventListener('change', () => {
-      const span = document.getElementById('sr-range-' + inp.dataset.wk);
-      if (span) span.textContent = rangeFromMonday(inp.value);
+      const wk = parseInt(inp.dataset.wk, 10);
+      const setRange = (n, iso) => { const s = document.getElementById('sr-range-' + n); if (s) s.textContent = rangeFromMonday(iso); };
+      setRange(wk, inp.value);
+      // Setting Week 1 auto-fills the next 7 weeks with consecutive Mondays
+      if (wk === 1 && inp.value) {
+        box.querySelectorAll('input[type=date]').forEach(other => {
+          const owk = parseInt(other.dataset.wk, 10);
+          if (owk > 1) {
+            const iso = addDaysIso(inp.value, 7 * (owk - 1));
+            other.value = iso;
+            setRange(owk, iso);
+          }
+        });
+      }
     });
   });
+}
+
+function addDaysIso(iso, days) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${dd}`;
 }
 
 function rangeFromMonday(iso) {
