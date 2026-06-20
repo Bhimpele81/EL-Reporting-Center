@@ -1747,6 +1747,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <div class="px-price">$34.99<span>/mo</span></div>
         <p class="px-desc">Great for smaller camps getting started with digital reporting.</p>
         <ul class="px-features">
+          <li>Up to 30 reports per month</li>
           <li>1 staff login</li>
           <li>Core reports: Bunk Snapshot, Group Attendance, AM/PM &amp; Group Extended, Driver Totals</li>
           <li>Upload-once master sheet &amp; season calendar</li>
