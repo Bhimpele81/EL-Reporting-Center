@@ -1054,6 +1054,17 @@ def api_users_edit(username):
     u = next((x for x in data["users"] if x.get("username", "").lower() == username.lower()), None)
     if u is None:
         return jsonify({"error": "not found"}), 404
+    new_u = (body.get("username") or "").strip()
+    if new_u and new_u != u["username"]:
+        if new_u.lower() != u["username"].lower() and \
+           any(x.get("username", "").lower() == new_u.lower() for x in data["users"]):
+            return jsonify({"error": "That username is taken."}), 409
+        old = u["username"]
+        if u.get("name", "") == old:   # name mirrors username in our model
+            u["name"] = new_u
+        u["username"] = new_u
+        if session.get("user", "") == old:
+            session["user"] = new_u
     if "name" in body:
         u["name"] = (body.get("name") or "").strip() or u["username"]
     if body.get("password"):
@@ -3027,7 +3038,8 @@ async function loadUsers() {
       const isMe = currentUser && u.username.toLowerCase() === currentUser.username.toLowerCase();
       h += `<tr><td>${famEsc(u.username)}${isMe ? ' (you)' : ''}</td>` +
            `<td>${u.is_admin ? 'Admin' : 'User'}</td>` +
-           `<td style="white-space:nowrap"><button class="pr-period-btn pr-sm usr-pw" data-u="${famEsc(u.username)}">Reset PW</button> ` +
+           `<td style="white-space:nowrap"><button class="pr-period-btn pr-sm usr-rename" data-u="${famEsc(u.username)}">Rename</button> ` +
+           `<button class="pr-period-btn pr-sm usr-pw" data-u="${famEsc(u.username)}">Reset PW</button> ` +
            `${isMe ? '' : `<button class="pr-del usr-del" data-u="${famEsc(u.username)}" title="Remove">✕</button>`}</td></tr>`;
     });
     h += '</tbody>';
@@ -3050,6 +3062,23 @@ async function loadUsers() {
           headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: pw})});
         const dd = await r.json();
         alert(r.ok && !dd.error ? `Password reset for ${un}.` : (dd.error || 'Could not reset password.'));
+      });
+    });
+    tbl.querySelectorAll('.usr-rename').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const un = btn.dataset.u;
+        const nu = prompt(`New username for "${un}":`, un);
+        if (!nu || nu.trim() === un) return;
+        const r = await fetch('/api/users/' + encodeURIComponent(un), {method:'PATCH',
+          headers:{'Content-Type':'application/json'}, body: JSON.stringify({username: nu.trim()})});
+        const dd = await r.json();
+        if (!r.ok || dd.error) { alert(dd.error || 'Could not rename.'); return; }
+        // If we renamed ourselves, update the header chip
+        if (currentUser && currentUser.username.toLowerCase() === un.toLowerCase()) {
+          currentUser.username = dd.username;
+          document.getElementById('h-user-name').textContent = dd.username;
+        }
+        loadUsers();
       });
     });
   } catch(e) { card.style.display = 'none'; }
