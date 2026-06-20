@@ -1757,7 +1757,8 @@ def build_mailing_labels_docx(families: list) -> tuple:
         city = (f.get("city") or "").strip()
         state = (f.get("state") or "").strip()
         zp = (f.get("zip") or "").strip()
-        last = (f.get("last") or "").strip()
+        # Use the 'Family' field when present, otherwise fall back to last name
+        name = (f.get("family") or "").strip() or (f.get("last") or "").strip()
         if not (a1 or city):           # no address → skip
             continue
         key = (a1.lower(), a2.lower(), city.lower(), state.lower(), zp.lower())
@@ -1767,11 +1768,11 @@ def build_mailing_labels_docx(families: list) -> tuple:
         loc = city
         if state: loc = (loc + ", " if loc else "") + state
         if zp:    loc = (loc + " " if loc else "") + zp
-        lines = [last, a1]
+        lines = [name, a1]
         if a2:
             lines.append(a2)
         lines.append(loc)
-        labels.append(((last.lower(), a1.lower()), lines))
+        labels.append(((name.lower(), a1.lower()), lines))
     labels.sort(key=lambda x: x[0])
     return _avery5960_lines_docx([ln for _, ln in labels], size=12), len(labels)
 

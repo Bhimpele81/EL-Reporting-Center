@@ -493,8 +493,15 @@ _FAMILY_ALIASES = {
 }
 
 
+def _field_slug(header: str) -> str:
+    """Stable key for an unrecognized column, e.g. 'Family' -> 'family'."""
+    return re.sub(r"[^a-z0-9]+", "_", _norm_header(header)).strip("_")
+
+
 def _families_from_rows(rows: list) -> list:
-    """Map a header row + data rows into family records."""
+    """Map a header row + data rows into family records. Known columns map to
+    their canonical field; any UNRECOGNIZED column is auto-captured under a slug
+    of its header so new fields are kept (not dropped)."""
     if not rows:
         return []
     hl = [_norm_header(h) for h in rows[0]]
@@ -504,13 +511,30 @@ def _families_from_rows(rows: list) -> list:
             if a in hl:
                 col_for[field] = hl.index(a)
                 break
+    mapped_cols = set(col_for.values())
+    # Auto-capture extra columns (skip blank headers like the leading index col)
+    extra, used = [], set(FAMILY_FIELDS)
+    for ci, h in enumerate(hl):
+        if ci in mapped_cols or not h:
+            continue
+        slug = _field_slug(h)
+        if not slug:
+            continue
+        base, k = slug, 2
+        while slug in used:
+            slug = f"{base}_{k}"; k += 1
+        used.add(slug)
+        extra.append((ci, slug))
+
+    def _val(r, ci):
+        return str(r[ci]).strip() if (ci is not None and ci < len(r) and r[ci] is not None) else ""
+
     out = []
     for r in rows[1:]:
-        rec = {}
-        for field in FAMILY_FIELDS:
-            ci = col_for.get(field)
-            rec[field] = (str(r[ci]).strip() if (ci is not None and ci < len(r) and r[ci] is not None) else "")
-        if any(rec.get(f) for f in FAMILY_FIELDS):
+        rec = {f: _val(r, col_for.get(f)) for f in FAMILY_FIELDS}
+        for ci, slug in extra:
+            rec[slug] = _val(r, ci)
+        if any(rec.values()):
             out.append(rec)
     return out
 
