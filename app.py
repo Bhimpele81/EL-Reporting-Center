@@ -1763,6 +1763,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
         <p class="px-desc">For active camps running reports and payroll all season long.</p>
         <ul class="px-features">
           <li class="px-feat-head">Everything in Starter, plus:</li>
+          <li>Up to 30 reports per month</li>
           <li>Up to 10 staff logins</li>
           <li>Payroll &amp; staff attendance tracking</li>
           <li>Family contacts + Mailing, Inter &amp; Junior labels</li>
