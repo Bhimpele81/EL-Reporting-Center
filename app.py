@@ -191,7 +191,7 @@ LOCAL_SEASON      = os.path.join(UPLOAD_DIR, "season.json")
 _DEFAULT_SEASON_MONDAYS = ["2026-06-22", "2026-06-29", "2026-07-06", "2026-07-13",
                            "2026-07-20", "2026-07-27", "2026-08-03", "2026-08-10"]
 # Fields stored for each family contact record (matches the contact master export)
-FAMILY_FIELDS     = ["last", "first", "bunk",
+FAMILY_FIELDS     = ["last", "first", "family", "bunk",
                      "primary_first", "primary_last", "primary_phone",
                      "secondary_first", "secondary_last", "secondary_phone",
                      "address", "address2", "city", "state", "zip",
@@ -471,6 +471,7 @@ _FAMILY_ALIASES = {
     "last":     ["last name", "last", "camper last name", "camper last"],
     "first":    ["first name", "first", "camper first name", "camper first"],
     "bunk":     ["bunk name", "bunk"],
+    "family":   ["family last name", "family name", "family"],
     "primary_first":   ["p1 first name", "parent 1 first name", "guardian 1 first name", "primary first name"],
     "primary_last":    ["p1 last name", "parent 1 last name", "guardian 1 last name", "primary last name"],
     "primary_phone":   ["p1 cell phone", "p1 phone", "parent 1 phone", "parent 1 cell phone", "primary phone"],
