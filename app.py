@@ -1542,6 +1542,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
   #payroll-table, #payroll-table * { visibility:visible; }
   #payroll-table { position:absolute; left:0; top:0; width:100%; font-size:9pt; }
   #payroll-table th, #payroll-table td { min-width:0 }   /* shrink to fit the page */
+  /* uniform day + extra columns so they print the same width */
+  #payroll-table th.pr-day, #payroll-table td.pr-cell,
+  #payroll-table th.pr-extra, #payroll-table td.pr-xcell { width:42px; min-width:42px; max-width:42px }
   #payroll-table .pr-del { display:none; }
   /* keep maroon headers, row shading and symbol colors when printing */
   #payroll-table, #payroll-table * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
@@ -1555,6 +1558,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .card-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;align-items:stretch}
 .card-grid > .card{margin-bottom:0}
 @media(max-width:900px){.card-grid{grid-template-columns:1fr}}
+.util-col{display:flex;flex-direction:column;gap:1.1rem}
+.util-col > .card{margin-bottom:0}
 .card-hd{display:flex;align-items:center;gap:.7rem;margin-bottom:1.1rem}
 .card-num{width:26px;height:26px;background:var(--brand);color:#fff;border-radius:50%;font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .card-title{font-family:'Roboto Slab',serif;font-size:1.05rem;font-weight:700;color:var(--brand-dark);letter-spacing:.01em;text-transform:uppercase}
@@ -2075,8 +2080,9 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   </div>
   </div><!-- /card-grid master+family -->
 
-  <!-- Season Calendar + Bunks & Camps (two tiles side by side) -->
-  <div class="card-grid">
+  <!-- Season Calendar + User Accounts (left) | Bunks & Camps (right) -->
+  <div class="card-grid" style="align-items:start">
+  <div class="util-col">
   <div class="card">
     <div class="card-hd">
       <div>
@@ -2093,32 +2099,6 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     </div>
     <div id="season-summary" style="font-size:.82rem;color:#666;margin-top:.6rem"></div>
   </div>
-  <div class="card">
-    <div class="card-hd">
-      <span class="card-num" style="background:var(--gold);color:#1a1018">★</span>
-      <div>
-        <div class="card-title">Bunks &amp; Camps</div>
-        <div class="card-hint">Manage bunk names, their numbers, and the camp group they belong to. Changes are saved to the server and used when processing all future reports.</div>
-      </div>
-    </div>
-
-    <div id="config-status" style="display:none;align-items:center;gap:.6rem;padding:.6rem .85rem;background:#eef4fb;border:1px solid #b9d2ec;border-radius:8px;margin-bottom:.9rem;font-size:.83rem;color:#1A79BF;font-weight:500">
-      <span>🗂️</span>
-      <span id="config-status-text" style="flex:1">—</span>
-    </div>
-    <div id="config-warn" style="display:none;padding:.6rem .85rem;background:#fdf0e6;border:1px solid #f0c79b;border-radius:8px;margin-bottom:.9rem;font-size:.82rem;color:#9a5b00">
-      ⚠ Persistent storage is not configured, so this configuration can reset to the bundled default when the app redeploys or restarts. Set the AWS S3 environment variables on the server to keep it saved.
-    </div>
-
-    <div id="camp-list"><!-- rendered by JS --></div>
-
-    <button class="add-camp-btn" id="add-camp-btn">＋ Add Camp Group</button>
-
-    <button class="save-config-btn" id="save-config-btn">💾 Save Configuration</button>
-    <div id="save-msg"></div>
-  </div>
-  </div><!-- /card-grid season+bunks -->
-
   <!-- User accounts (admins only) -->
   <div class="card" id="users-card" style="display:none">
     <div class="card-hd">
@@ -2149,6 +2129,32 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       </div>
     </div>
   </div>
+  </div><!-- /util-col -->
+  <div class="card">
+    <div class="card-hd">
+      <span class="card-num" style="background:var(--gold);color:#1a1018">★</span>
+      <div>
+        <div class="card-title">Bunks &amp; Camps</div>
+        <div class="card-hint">Manage bunk names, their numbers, and the camp group they belong to. Changes are saved to the server and used when processing all future reports.</div>
+      </div>
+    </div>
+
+    <div id="config-status" style="display:none;align-items:center;gap:.6rem;padding:.6rem .85rem;background:#eef4fb;border:1px solid #b9d2ec;border-radius:8px;margin-bottom:.9rem;font-size:.83rem;color:#1A79BF;font-weight:500">
+      <span>🗂️</span>
+      <span id="config-status-text" style="flex:1">—</span>
+    </div>
+    <div id="config-warn" style="display:none;padding:.6rem .85rem;background:#fdf0e6;border:1px solid #f0c79b;border-radius:8px;margin-bottom:.9rem;font-size:.82rem;color:#9a5b00">
+      ⚠ Persistent storage is not configured, so this configuration can reset to the bundled default when the app redeploys or restarts. Set the AWS S3 environment variables on the server to keep it saved.
+    </div>
+
+    <div id="camp-list"><!-- rendered by JS --></div>
+
+    <button class="add-camp-btn" id="add-camp-btn">＋ Add Camp Group</button>
+
+    <button class="save-config-btn" id="save-config-btn">💾 Save Configuration</button>
+    <div id="save-msg"></div>
+  </div>
+  </div><!-- /card-grid season+users | bunks -->
 
 </div><!-- /tab-config -->
 
