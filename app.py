@@ -1550,6 +1550,10 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 }
 .card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:1.5rem 1.75rem;margin-bottom:1.1rem;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:box-shadow .2s}
 .card:hover{box-shadow:0 3px 12px rgba(109,31,47,.07)}
+/* Two tiles side by side (collapses to one column on narrow screens) */
+.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;align-items:start}
+.card-grid > .card{margin-bottom:0}
+@media(max-width:900px){.card-grid{grid-template-columns:1fr}}
 .card-hd{display:flex;align-items:center;gap:.7rem;margin-bottom:1.1rem}
 .card-num{width:26px;height:26px;background:var(--brand);color:#fff;border-radius:50%;font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .card-title{font-family:'Roboto Slab',serif;font-size:1.05rem;font-weight:700;color:var(--brand-dark);letter-spacing:.01em;text-transform:uppercase}
@@ -1937,8 +1941,9 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     <span id="error-msg"></span>
   </div>
 
-  <!-- ===== WEATHER TILE ===== -->
-  <div class="card" id="weather-card" style="margin-top:2.5rem">
+  <!-- ===== WEATHER + CALENDAR (two tiles side by side) ===== -->
+  <div class="card-grid" style="margin-top:2.5rem;margin-bottom:1.1rem">
+  <div class="card" id="weather-card" style="margin-bottom:0">
     <div class="card-hd" style="margin-bottom:.75rem">
       <span class="card-num">🌤</span>
       <div>
@@ -1950,7 +1955,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     </div>
   </div>
 
-  <div class="card" id="calendar-card" style="margin-top:1.1rem">
+  <div class="card" id="calendar-card" style="margin-bottom:0">
     <div class="card-hd">
       <span class="card-num">📅</span>
       <div>
@@ -2009,6 +2014,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       </div>
     </div>
   </div>
+  </div><!-- /card-grid weather+calendar -->
 
   <div id="recent-card" class="card">
     <div class="recent-hd">Recent Reports</div>
@@ -2020,8 +2026,9 @@ header{padding:0 1rem;gap:.75rem;height:64px}
 <!-- ===== UTILITIES TAB ===== -->
 <div class="tab-panel" id="tab-config">
 
-  <!-- Master sheet upload -->
-  <div class="card">
+  <!-- Master Sheet + Season Calendar (two tiles side by side) -->
+  <div class="card-grid">
+  <div class="card" style="margin-bottom:0">
     <div class="card-hd">
       <div>
         <div class="card-title">Master Sheet</div>
@@ -2042,6 +2049,23 @@ header{padding:0 1rem;gap:.75rem;height:64px}
     </div>
     <div id="master-msg" style="font-size:.82rem;margin-top:.5rem"></div>
   </div>
+  <div class="card" style="margin-bottom:0">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Season Calendar</div>
+        <div class="card-hint">Set the first day of camp (Week 1 Monday). The 8 camp weeks are calculated from it and used for report week #/date ranges and the Payroll day columns.</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">
+      <label style="font-size:.85rem;color:#555">Camp starts:
+        <input type="date" id="season-start" style="padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.85rem;margin-left:.4rem">
+      </label>
+      <button class="pr-period-btn" id="season-save">💾 Save</button>
+      <span id="season-msg" style="font-size:.82rem;color:#777"></span>
+    </div>
+    <div id="season-summary" style="font-size:.82rem;color:#666;margin-top:.6rem"></div>
+  </div>
+  </div><!-- /card-grid master+season -->
 
   <!-- Family contacts -->
   <div class="card">
@@ -2066,24 +2090,6 @@ header{padding:0 1rem;gap:.75rem;height:64px}
       <span>📇</span>
       <span id="fam-status-text" style="flex:1">—</span>
     </div>
-  </div>
-
-  <!-- Season calendar: just the first day of camp -->
-  <div class="card">
-    <div class="card-hd">
-      <div>
-        <div class="card-title">Season Calendar</div>
-        <div class="card-hint">Set the first day of camp (Week 1 Monday). The 8 camp weeks are calculated from it and used for report week #/date ranges and the Payroll day columns.</div>
-      </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">
-      <label style="font-size:.85rem;color:#555">Camp starts:
-        <input type="date" id="season-start" style="padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.85rem;margin-left:.4rem">
-      </label>
-      <button class="pr-period-btn" id="season-save">💾 Save</button>
-      <span id="season-msg" style="font-size:.82rem;color:#777"></span>
-    </div>
-    <div id="season-summary" style="font-size:.82rem;color:#666;margin-top:.6rem"></div>
   </div>
 
   <!-- Bunks & Camps (rarely change once the season starts) -->
