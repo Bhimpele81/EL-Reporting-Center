@@ -1555,7 +1555,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:1.5rem 1.75rem;margin-bottom:1.1rem;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:box-shadow .2s}
 .card:hover{box-shadow:0 3px 12px rgba(109,31,47,.07)}
 /* Two tiles side by side (collapses to one column on narrow screens) */
-.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;align-items:stretch}
+.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.3rem;align-items:stretch;margin-bottom:1.6rem}
 .card-grid > .card{margin-bottom:0}
 @media(max-width:900px){.card-grid{grid-template-columns:1fr}}
 .util-col{display:flex;flex-direction:column;gap:1.1rem}
