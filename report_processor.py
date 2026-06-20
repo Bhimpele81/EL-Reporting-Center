@@ -1757,8 +1757,10 @@ def build_mailing_labels_docx(families: list) -> tuple:
         city = (f.get("city") or "").strip()
         state = (f.get("state") or "").strip()
         zp = (f.get("zip") or "").strip()
-        # Use the 'Family' field when present, otherwise fall back to last name
-        name = (f.get("family") or "").strip() or (f.get("last") or "").strip()
+        # Use the Family-last-name field when present (also the auto-captured
+        # slug from an earlier import), otherwise fall back to the last name
+        name = ((f.get("family") or f.get("family_last_name") or "").strip()
+                or (f.get("last") or "").strip())
         if not (a1 or city):           # no address → skip
             continue
         key = (a1.lower(), a2.lower(), city.lower(), state.lower(), zp.lower())
