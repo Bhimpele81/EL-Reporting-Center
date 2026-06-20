@@ -863,6 +863,7 @@ def api_payroll_export():
     sort   = request.args.get("sort", "last")
     extp   = request.args.get("extp", "ALL")
     sel_areas = [a for a in (request.args.get("areas", "") or "").split(",") if a]
+    q = (request.args.get("q", "") or "").strip().lower()
     try:
         period = int(request.args.get("period", "0"))
     except (TypeError, ValueError):
@@ -871,7 +872,14 @@ def api_payroll_export():
     data = _payroll_load()
     checks = data["checks"]
     days_all = _payroll_days()
-    staff = [s for s in data["staff"] if not sel_areas or s.get("area") in sel_areas]
+
+    def _q_ok(s):
+        if not q:
+            return True
+        hay = " ".join(str(s.get(k, "")) for k in ("last", "first", "area", "bunk", "title")).lower()
+        return q in hay
+    staff = [s for s in data["staff"]
+             if (not sel_areas or s.get("area") in sel_areas) and _q_ok(s)]
 
     SYM = {"check": "✓", "x": "✗", "half": "½", "na": "N/A", True: "✓"}
     def namekey(s): return (s.get("last", "") + s.get("first", "")).lower()
@@ -2191,6 +2199,9 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <div id="payroll-periods" style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.3rem 0 .9rem"></div>
 
     <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin:0 0 .8rem;font-size:.82rem;color:#555">
+      <label id="pr-search-wrap">Search:
+        <input type="search" id="pr-search" class="pr-input" placeholder="Name or area…" style="width:180px;margin-left:.4rem"
+               oninput="prSearch=this.value;renderPayroll()"></label>
       <span id="pr-area-filter" style="display:flex;align-items:center;gap:.45rem">Filter area:
         <span class="pr-multi" id="pr-area-wrap">
           <button type="button" class="pr-input pr-multi-btn" id="pr-area-btn">All areas <span class="caret">▾</span></button>
@@ -2737,9 +2748,17 @@ let prTotals = false;   // when true, show the cumulative Totals view
 let prExt = false;      // when true, show the blank Extended Staff sheet
 let prExtPeriod = 'ALL';// Extended Staff AM/PM filter: ALL | AM | PM
 let prAreas = [];       // selected areas to filter by ([] = all areas)
+let prSearch = '';      // free-text search across name + area
 
 // True if a staff member passes the current area filter
 function prAreaMatch(s) { return prAreas.length === 0 || prAreas.includes(s.area || ''); }
+
+// True if a staff member matches the search box (name, area, bunk, title)
+function prSearchMatch(s) {
+  const q = prSearch.trim().toLowerCase();
+  if (!q) return true;
+  return [s.last, s.first, s.area, s.bunk, s.title].filter(Boolean).join(' ').toLowerCase().includes(q);
+}
 
 // Build the multi-select area dropdown (button label + checkbox menu)
 function renderAreaFilter(areas) {
@@ -2849,13 +2868,15 @@ function renderPayroll() {
   if (areaWrap) areaWrap.style.display = prExt ? 'none' : 'flex';
   const sortWrap = document.getElementById('pr-sort').closest('label');
   if (sortWrap) sortWrap.style.display = (prExt || prTotals) ? 'none' : '';
+  const searchWrap = document.getElementById('pr-search-wrap');
+  if (searchWrap) searchWrap.style.display = prExt ? 'none' : '';
 
   if (prExt) { renderExtTable('ALL', prExtPeriod); return; }
   if (prTotals) { renderTotalsTable('last'); return; }
 
   // table
   const days = prPeriodDays();
-  let staff = payroll.staff.filter(prAreaMatch);
+  let staff = payroll.staff.filter(s => prAreaMatch(s) && prSearchMatch(s));
   staff.sort((a,b) => {
     if (sortKey === 'total') {
       const d = prCount(b.id) - prCount(a.id);
@@ -3024,7 +3045,7 @@ function renderExtTable(filterArea, extPeriod) {
 
 // Totals view (rendered into the same Payroll table when the Totals button is on)
 function renderTotalsTable(sortKey) {
-  let staff = payroll.staff.filter(prAreaMatch)
+  let staff = payroll.staff.filter(s => prAreaMatch(s) && prSearchMatch(s))
                            .map(s => ({...s, _total: totalChecks(s.id)}));
   staff.sort((a,b) => {
     if (sortKey === 'total') return b._total - a._total ||
@@ -3094,7 +3115,8 @@ document.getElementById('pr-export').addEventListener('click', () => {
   const view = prTotals ? 'totals' : prExt ? 'ext' : 'weeks';
   const areas = encodeURIComponent(prExt ? '' : prAreas.join(','));
   const sort = document.getElementById('pr-sort').value;
-  window.location = `/api/payroll/export?view=${view}&period=${prPeriod}&areas=${areas}&sort=${sort}&extp=${prExtPeriod}`;
+  const q = encodeURIComponent(prExt ? '' : prSearch.trim());
+  window.location = `/api/payroll/export?view=${view}&period=${prPeriod}&areas=${areas}&sort=${sort}&extp=${prExtPeriod}&q=${q}`;
 });
 
 // ---- Family contacts ----
