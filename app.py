@@ -2178,7 +2178,7 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   <div class="card">
     <div class="card-hd">
       <div>
-        <div class="card-title">Payroll — Staff Attendance</div>
+        <div class="card-title">Staff Attendance</div>
         <div class="card-hint">Check each day a staff member is present. The count on the left totals the checks for the two-week period. Changes save automatically.</div>
       </div>
     </div>
@@ -3067,8 +3067,8 @@ document.getElementById('pr-add').addEventListener('click', async () => {
 });
 
 function payrollTitle() {
-  let t = prTotals ? 'Payroll Totals — All 8 Weeks'
-                   : `Payroll — Weeks ${prPeriod*2+1} & ${prPeriod*2+2}`;
+  let t = prTotals ? 'Staff Attendance Totals — All 8 Weeks'
+                   : `Staff Attendance — Weeks ${prPeriod*2+1} & ${prPeriod*2+2}`;
   if (prAreas.length) t += '  —  ' + prAreas.join(', ');
   return t;
 }
