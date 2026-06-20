@@ -1467,6 +1467,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-features{list-style:none;display:flex;flex-direction:column;gap:.45rem;margin-top:.4rem}
 .px-features li{font-size:.8rem;color:#555;display:flex;align-items:flex-start;gap:.5rem}
 .px-features li::before{content:"✓";color:var(--brand);font-weight:700;flex-shrink:0}
+.px-features li.px-feat-head{font-weight:700;color:var(--brand-dark);margin-top:.2rem}
+.px-features li.px-feat-head::before{content:""}
 .px-cta{margin-top:1rem;padding:.65rem 1rem;background:var(--brand);color:#fff;border:none;border-radius:8px;font-family:'Roboto Slab',serif;font-size:.82rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:background .18s;text-align:center}
 .px-cta:hover{background:var(--brand-dark)}
 .px-card.featured .px-cta{background:var(--brand-dark)}
@@ -1738,52 +1740,52 @@ header{padding:0 1rem;gap:.75rem;height:64px}
   <div id="pricing-box">
     <button class="px-close" id="pricing-close">&#x2715;</button>
     <h2>Simple, Transparent Pricing</h2>
-    <p class="px-sub">Choose the plan that fits your camp&rsquo;s needs. No contracts, cancel anytime.</p>
+    <p class="px-sub">Built for the summer season &mdash; pick the plan that fits your camp. No contracts, cancel anytime.</p>
     <div class="px-grid">
       <div class="px-card">
         <div class="px-tier">Starter</div>
         <div class="px-price">$34.99<span>/mo</span></div>
-        <p class="px-desc">Perfect for smaller camps or those just getting started with digital reporting.</p>
+        <p class="px-desc">Great for smaller camps getting started with digital reporting.</p>
         <ul class="px-features">
-          <li>20 reports per month</li>
-          <li>All available report types</li>
+          <li>1 staff login</li>
+          <li>Core reports: Bunk Snapshot, Group Attendance, AM/PM &amp; Group Extended, Driver Totals</li>
+          <li>Upload-once master sheet &amp; season calendar</li>
           <li>Configurable bunks &amp; camps</li>
-          <li>Print-ready Excel/Word output</li>
+          <li>Print-ready Excel &amp; Word output</li>
           <li>Email support</li>
         </ul>
-        <button class="px-cta" onclick="document.getElementById('pricing-overlay').classList.add('hidden')">Get Started</button>
+        <button class="px-cta" onclick="window.location='mailto:bhimpele@gmail.com?subject=Start%20my%20EL%20Reporting%20Center%20trial%20(Starter)'">Start Free Trial</button>
       </div>
       <div class="px-card featured">
         <div class="px-badge">Most Popular</div>
         <div class="px-tier">Pro</div>
         <div class="px-price">$49.99<span>/mo</span></div>
-        <p class="px-desc">For active camps that run reports throughout the season on a regular basis.</p>
+        <p class="px-desc">For active camps running reports and payroll all season long.</p>
         <ul class="px-features">
-          <li>50 reports per month</li>
-          <li>All available report types</li>
-          <li>Configurable bunks &amp; camps</li>
-          <li>Print-ready Excel/Word output</li>
+          <li class="px-feat-head">Everything in Starter, plus:</li>
+          <li>Up to 10 staff logins</li>
+          <li>Payroll &amp; staff attendance tracking</li>
+          <li>Family contacts + Mailing, Inter &amp; Junior labels</li>
           <li>Recent reports history</li>
           <li>Priority email support</li>
         </ul>
-        <button class="px-cta" onclick="document.getElementById('pricing-overlay').classList.add('hidden')">Get Started</button>
+        <button class="px-cta" onclick="window.location='mailto:bhimpele@gmail.com?subject=Start%20my%20EL%20Reporting%20Center%20trial%20(Pro)'">Start Free Trial</button>
       </div>
       <div class="px-card">
         <div class="px-tier">Unlimited</div>
         <div class="px-price">$99.99<span>/mo</span></div>
-        <p class="px-desc">Full access for camps that need unrestricted reporting all season long.</p>
+        <p class="px-desc">Full access for large or multi-camp operations.</p>
         <ul class="px-features">
-          <li>Unlimited reports</li>
-          <li>All available report types</li>
-          <li>Configurable bunks &amp; camps</li>
-          <li>Print-ready Excel/Word output</li>
-          <li>Recent reports history</li>
-          <li>Priority support &amp; onboarding</li>
+          <li class="px-feat-head">Everything in Pro, plus:</li>
+          <li>Unlimited staff logins</li>
+          <li>Multi-camp &amp; unlimited bunks</li>
+          <li>Onboarding &amp; setup assistance</li>
+          <li>Priority support</li>
         </ul>
-        <button class="px-cta" onclick="document.getElementById('pricing-overlay').classList.add('hidden')">Get Started</button>
+        <button class="px-cta" onclick="window.location='mailto:bhimpele@gmail.com?subject=Start%20my%20EL%20Reporting%20Center%20trial%20(Unlimited)'">Start Free Trial</button>
       </div>
     </div>
-    <p class="px-note">All plans include a 14-day free trial &mdash; no credit card required.</p>
+    <p class="px-note">All plans include a 14-day free trial &mdash; no credit card required. No setup fees &middot; your data stays yours.</p>
   </div>
 </div>
 
