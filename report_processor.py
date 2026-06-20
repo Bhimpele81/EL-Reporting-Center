@@ -1629,7 +1629,7 @@ def _label_days_text(sched: str) -> str:
     return ", ".join(_DAY_FULL[c] for c in "MTWRF" if c in sched)
 
 
-def _avery5960_docx(rows3: list) -> bytes:
+def _avery5960_docx(rows3: list, l3_size: int = 12) -> bytes:
     """Render a list of (line1, line2, line3) tuples onto an Avery 5960 sheet
     (3 x 10, 2.625" x 1"). Returns the .docx bytes."""
     import io as _io
@@ -1660,7 +1660,7 @@ def _avery5960_docx(rows3: list) -> bytes:
 
     def _fill(cell, l1, l2, l3):
         cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-        for i, (text, sz, bold) in enumerate([(l1, 15, True), (l2, 17, True), (l3, 12, False)]):
+        for i, (text, sz, bold) in enumerate([(l1, 15, True), (l2, 17, True), (l3, l3_size, False)]):
             p = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             pf = p.paragraph_format
@@ -1737,7 +1737,7 @@ def build_jr_transport_labels_docx(records: list, config: dict) -> tuple:
         bk = _label_bunk(r["bunk"])
         if "2-way" in ex or "pm only trans" in ex:
             drv = (r.get("driver") or "").strip()
-            trans.append((bk, r["name"], f"Trans - {drv}" if drv else "Trans"))
+            trans.append((bk, r["name"], drv))   # driver only (no "Trans -" prefix)
         elif "drop-off" in ex:
             pmext.append((bk, r["name"], "Pm ext"))
         else:
@@ -1757,7 +1757,7 @@ def build_jr_transport_labels_docx(records: list, config: dict) -> tuple:
             flat.extend([("", "", "")] * (npages * PER_PAGE - len(rows)))
 
     counts = {"Trans": len(trans), "Pm ext": len(pmext), "Car line": len(carline)}
-    return _avery5960_docx(flat), counts, pages
+    return _avery5960_docx(flat, l3_size=14), counts, pages
 
 
 def build_pm_grp_extend_sheet(ws, campers: list, week_num: int = None) -> None:
