@@ -2298,6 +2298,44 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       </div>
     </details>
 
+    <div class="help-sub">Spreadsheet columns</div>
+
+    <details class="faq">
+      <summary>Master Sheet — required &amp; optional columns</summary>
+      <div class="faq-body">
+        <p>Columns are matched by their <strong>header name</strong> (not position), so extra columns and different ordering are fine. A file is recognized as a master when it has <strong>Session</strong>, <strong>Bunk</strong>, and an <strong>Enrollment Extra</strong> column.</p>
+        <p class="faq-q">Required</p>
+        <ul>
+          <li><strong>Last name</strong> &amp; <strong>First name</strong> — camper name</li>
+          <li><strong>Bunk</strong> — groups and sorts every report</li>
+          <li><strong>Session</strong> — sets which of the 8 weeks each camper is enrolled in (used by week-specific reports)</li>
+          <li><strong>Enrollment Extra</strong> — holds the AM "Drop-off" / PM "Pick-up" times and transport notes (2-Way / PM-Only)</li>
+        </ul>
+        <p class="faq-q">Used by specific reports — include if you run them</p>
+        <ul>
+          <li><strong>Monday–Friday</strong> (Yes/No) — partial-week schedule on attendance &amp; extend sheets</li>
+          <li><strong>Driver</strong> &amp; <strong>Stop #</strong> — Driver Totals and Junior transport labels</li>
+          <li><strong>Age</strong> &amp; <strong>Grade</strong> — Bunk Snapshot</li>
+          <li><strong>Gender</strong> — splits part-time CIT groups on PM GRP Extend</li>
+          <li><strong>CIT Bunk</strong> — a full-time CIT's assigned area on Group Attendance</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Family Contacts sheet — columns</summary>
+      <div class="faq-body">
+        <p>Columns are auto-detected by header, and any column we don't recognize is still stored. Typical headers:</p>
+        <ul>
+          <li><strong>Last name</strong>, <strong>First name</strong>, <strong>Family last name</strong> (shown on mailing labels), <strong>Bunk name</strong></li>
+          <li><strong>P1 / P2 first name, last name, cell phone</strong> — primary &amp; secondary guardians</li>
+          <li><strong>Primary family address 1 / 2, city, state, zip</strong></li>
+          <li><strong>Authorized Pick-up/Emergency Contact 1–4</strong> — name + authorization</li>
+        </ul>
+        <p>For <strong>Mailing labels</strong> you need at least the address fields plus a Family last name (it falls back to Last name).</p>
+      </div>
+    </details>
+
     <div class="help-sub">Reports</div>
 
     <details class="faq">
