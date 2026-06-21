@@ -1761,6 +1761,9 @@ def build_mailing_labels_docx(families: list) -> tuple:
         # slug from an earlier import), otherwise fall back to the last name
         name = ((f.get("family") or f.get("family_last_name") or "").strip()
                 or (f.get("last") or "").strip())
+        # Format as "The <Last Name> Family" (skip if it already reads that way)
+        if name and "family" not in name.lower():
+            name = f"The {name} Family"
         if not (a1 or city):           # no address → skip
             continue
         key = (a1.lower(), a2.lower(), city.lower(), state.lower(), zp.lower())
@@ -1776,7 +1779,7 @@ def build_mailing_labels_docx(families: list) -> tuple:
         lines.append(loc)
         labels.append(((name.lower(), a1.lower()), lines))
     labels.sort(key=lambda x: x[0])
-    return _avery5960_lines_docx([ln for _, ln in labels], size=12), len(labels)
+    return _avery5960_lines_docx([ln for _, ln in labels], size=14), len(labels)
 
 
 def _group_bunks(config: dict, group_name: str):
