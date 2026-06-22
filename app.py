@@ -1109,6 +1109,10 @@ def api_payroll_edit(sid):
         return jsonify({"error": "not found"}), 404
     if "area" in body:
         s["area"] = (body.get("area") or "").strip()
+    if "last" in body:
+        s["last"] = (body.get("last") or "").strip()
+    if "first" in body:
+        s["first"] = (body.get("first") or "").strip()
     _payroll_save(data)
     return jsonify(s)
 
@@ -1616,8 +1620,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table td.pr-name{text-align:left;font-weight:600;min-width:160px;white-space:normal;line-height:1.15}
 .payroll-table .pr-delcol{width:36px;min-width:36px}
 .payroll-table td.pr-area{color:#555;min-width:92px;white-space:normal;line-height:1.15}
-.payroll-table td.pr-area-edit{cursor:pointer}
-.payroll-table td.pr-area-edit:hover{background:#f4eef0;outline:1px dashed var(--brand)}
+.payroll-table td.pr-area-edit,.payroll-table td.pr-name-edit{cursor:pointer}
+.payroll-table td.pr-area-edit:hover,.payroll-table td.pr-name-edit:hover{background:#f4eef0;outline:1px dashed var(--brand)}
 .pr-area-input{width:80px;font-size:.8rem;padding:2px 3px;border:1px solid var(--brand);border-radius:4px;text-align:center}
 .payroll-table th.pr-extday{width:74px;min-width:74px}
 .fam-table{border-collapse:collapse;width:100%;font-size:.8rem}
@@ -3241,7 +3245,7 @@ function renderPayroll() {
     const c = payroll.checks[s.id] || {};
     html += `<tr data-id="${s.id}">`;
     html += `<td class="pr-count" id="cnt-${s.id}">${prCount(s.id)}</td>`;
-    html += `<td class="pr-name">${s.last}, ${s.first}</td>`;
+    html += `<td class="pr-name pr-name-edit" data-id="${s.id}" title="Click to edit name">${s.last}, ${s.first}</td>`;
     const areaTxt = (s.area === 'Support' && s.title) ? s.title : (s.area || '');
     const bunkLine = s.bunk ? `<br><small style="color:#888;font-weight:400">${s.bunk}</small>` : '';
     html += `<td class="pr-area pr-area-edit" data-id="${s.id}" title="Click to edit area">${areaTxt}${bunkLine}</td>`;
@@ -3352,6 +3356,39 @@ function renderPayroll() {
   });
 
   // Click an Area cell to edit it inline
+  // Click a name to edit it inline ("Last, First")
+  tbl.querySelectorAll('td.pr-name-edit').forEach(td => {
+    td.addEventListener('click', () => {
+      if (payroll.locked || td.querySelector('input')) return;
+      const id = td.dataset.id;
+      const s = payroll.staff.find(x => x.id === id);
+      if (!s) return;
+      const orig = `${s.last || ''}, ${s.first || ''}`.replace(/^,\s*|,\s*$/g, '');
+      td.innerHTML = `<input class="pr-area-input" style="width:96%;text-align:left" value="${orig.replace(/"/g,'&quot;')}">`;
+      const inp = td.querySelector('input');
+      inp.focus(); inp.select();
+      let done = false;
+      const commit = async (save) => {
+        if (done) return; done = true;
+        const val = inp.value.trim();
+        if (save && val !== orig) {
+          const ci = val.indexOf(',');
+          const last = (ci >= 0 ? val.slice(0, ci) : val).trim();
+          const first = (ci >= 0 ? val.slice(ci + 1) : '').trim();
+          s.last = last; s.first = first;
+          try { await fetch('/api/payroll/staff/' + id, {method:'PATCH',
+                headers:{'Content-Type':'application/json'}, body: JSON.stringify({last, first})}); } catch(e) {}
+        }
+        renderPayroll();
+      };
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter')  { e.preventDefault(); commit(true);  }
+        if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+      });
+      inp.addEventListener('blur', () => commit(true));
+    });
+  });
+
   tbl.querySelectorAll('td.pr-area-edit').forEach(td => {
     td.addEventListener('click', () => {
       if (payroll.locked || td.querySelector('input')) return;
