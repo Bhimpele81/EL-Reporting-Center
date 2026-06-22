@@ -2386,6 +2386,14 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       </div>
     </details>
 
+    <details class="faq">
+      <summary>How do I find someone who was missed on a day?</summary>
+      <div class="faq-body">
+        <p><strong>Click the date</strong> at the top of any day column. The grid filters to only the staff whose box is still <strong>blank</strong> that day (no ✓ and no ✗) — the ones that may have been missed — and highlights those empty cells.</p>
+        <p>Click the same date again to clear the filter and show everyone. It works alongside Search and Filter area.</p>
+      </div>
+    </details>
+
     <div class="help-sub">Family contacts &amp; labels</div>
 
     <details class="faq">
