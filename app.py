@@ -1545,6 +1545,10 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table.pr-locked td.pr-cell,.payroll-table.pr-locked td.pr-xcell{cursor:not-allowed}
 .payroll-table .pr-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.95rem;padding:0}
 .pr-week-sep{border-left:3px solid #6d1f2f !important}
+.payroll-table th.pr-day-click{cursor:pointer}
+.payroll-table th.pr-day-click:hover{background:#7a2236}
+.payroll-table th.pr-day-active{background:var(--gold) !important;color:#1a1018 !important}
+.payroll-table td.pr-missed-hl{background:#fff3d6}
 .pr-period-btn{padding:.4rem .8rem;border:1px solid var(--brand);background:#fff;color:var(--brand);border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem}
 .pr-period-btn.active{background:var(--brand);color:#fff}
 .pr-period-btn.pr-sm{padding:.28rem .55rem;font-size:.72rem;font-weight:600}
@@ -2941,6 +2945,7 @@ let prExt = false;      // when true, show the blank Extended Staff sheet
 let prExtPeriod = 'ALL';// Extended Staff AM/PM filter: ALL | AM | PM
 let prAreas = [];       // selected areas to filter by ([] = all areas)
 let prSearch = '';      // free-text search across name + area
+let prMissedDay = '';   // iso date: filter to staff with a blank box that day
 
 // True if a staff member passes the current area filter
 function prAreaMatch(s) { return prAreas.length === 0 || prAreas.includes(s.area || ''); }
@@ -3068,7 +3073,10 @@ function renderPayroll() {
 
   // table
   const days = prPeriodDays();
-  let staff = payroll.staff.filter(s => prAreaMatch(s) && prSearchMatch(s));
+  // "Needs attention" day filter — only valid within the current block
+  if (prMissedDay && !days.some(d => d.iso === prMissedDay)) prMissedDay = '';
+  let staff = payroll.staff.filter(s => prAreaMatch(s) && prSearchMatch(s)
+    && (!prMissedDay || cellState(s.id, prMissedDay) === ''));
   staff.sort((a,b) => {
     if (sortKey === 'total') {
       const d = prCount(b.id) - prCount(a.id);
@@ -3080,10 +3088,15 @@ function renderPayroll() {
     return (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase());
   });
   const showExtra = prPeriod === 0;   // BS / SP\\MTC columns only on the Weeks 1 & 2 block
-  let html = `<caption>${payrollTitle()}</caption><thead><tr><th>#</th><th>Staff</th><th>Area</th>`;
+  let cap = payrollTitle();
+  if (prMissedDay) {
+    const md = days.find(d => d.iso === prMissedDay);
+    cap += ` &middot; <span style="color:#9a5b00">showing staff not yet marked on <strong>${md.dow} ${md.md}</strong> — click the date again to clear</span>`;
+  }
+  let html = `<caption>${cap}</caption><thead><tr><th>#</th><th>Staff</th><th>Area</th>`;
   days.forEach((d,i) => {
-    const cls = 'pr-day' + (i === 5 ? ' pr-week-sep' : '');
-    html += `<th class="${cls}">${d.dow}<br>${d.md}</th>`;
+    const cls = 'pr-day pr-day-click' + (i === 5 ? ' pr-week-sep' : '') + (d.iso === prMissedDay ? ' pr-day-active' : '');
+    html += `<th class="${cls}" data-iso="${d.iso}" title="Click to show staff not yet marked this day">${d.dow}<br>${d.md}</th>`;
   });
   if (showExtra) html += '<th class="pr-extra pr-xsep">BS</th><th class="pr-extra">SP\\MTC</th>';
   html += '<th class="pr-delcol"></th></tr></thead><tbody>';
@@ -3098,7 +3111,8 @@ function renderPayroll() {
     days.forEach((d,i) => {
       const st = cellState(s.id, d.iso);
       const sym = st === 'check' ? '✓' : st === 'x' ? '✗' : '';
-      const cls = 'pr-cell st-' + (st || 'none') + (i === 5 ? ' pr-week-sep' : '');
+      const cls = 'pr-cell st-' + (st || 'none') + (i === 5 ? ' pr-week-sep' : '')
+        + (d.iso === prMissedDay && st === '' ? ' pr-missed-hl' : '');
       html += `<td class="${cls}" data-id="${s.id}" data-date="${d.iso}">${sym}</td>`;
     });
     if (showExtra) {
@@ -3116,6 +3130,14 @@ function renderPayroll() {
   const tbl = document.getElementById('payroll-table');
   tbl.innerHTML = html;
   tbl.className = 'payroll-table' + (payroll.locked ? ' pr-locked' : '');
+
+  // Click a day's date to show only staff not yet marked that day (toggle)
+  tbl.querySelectorAll('th.pr-day-click').forEach(th => {
+    th.addEventListener('click', () => {
+      prMissedDay = (prMissedDay === th.dataset.iso) ? '' : th.dataset.iso;
+      renderPayroll();
+    });
+  });
 
   // Day cells: blank -> ✓ (counts) -> ✗ -> blank
   tbl.querySelectorAll('td.pr-cell').forEach(cell => {
