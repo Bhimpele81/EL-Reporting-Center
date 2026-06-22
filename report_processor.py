@@ -1779,7 +1779,7 @@ def build_mailing_labels_docx(families: list) -> tuple:
         lines.append(loc)
         labels.append(((name.lower(), a1.lower()), lines))
     labels.sort(key=lambda x: x[0])
-    return _avery5960_lines_docx([ln for _, ln in labels], size=14), len(labels)
+    return _avery5960_lines_docx([ln for _, ln in labels], size=14, bold_first=False), len(labels)
 
 
 def _group_bunks(config: dict, group_name: str):
