@@ -977,6 +977,23 @@ def api_payroll_check():
     return jsonify({"ok": True})
 
 
+@app.route("/api/payroll/clearday", methods=["POST"])
+def api_payroll_clearday():
+    """Remove every staff member's mark for one date."""
+    body = request.get_json(force=True, silent=True) or {}
+    dt = str(body.get("date", ""))
+    if not dt:
+        return jsonify({"error": "missing date"}), 400
+    data = _payroll_load()
+    if data.get("locked"):
+        return jsonify({"error": "locked"}), 403
+    for c in data["checks"].values():
+        if isinstance(c, dict):
+            c.pop(dt, None)
+    _payroll_save(data)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/payroll/staff", methods=["POST"])
 def api_payroll_add():
     body = request.get_json(force=True, silent=True) or {}
@@ -1549,6 +1566,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table th.pr-day-click:hover{background:#7a2236}
 .payroll-table th.pr-day-active{background:var(--gold) !important;color:#1a1018 !important}
 .payroll-table td.pr-missed-hl{background:#fff3d6}
+.payroll-table tfoot .pr-dayclear{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.95rem;padding:0;line-height:1}
+.payroll-table tfoot .pr-dayclear:hover{color:#7a1420}
+.payroll-table.pr-locked tfoot .pr-dayclear{opacity:.3;cursor:not-allowed}
 /* Weeks grid: fixed column widths so the layout doesn't shift when filtering */
 .payroll-table.pr-weeks{table-layout:fixed}
 .pr-weeks .pr-hnum{width:38px}
@@ -2961,7 +2981,10 @@ let prExt = false;      // when true, show the blank Extended Staff sheet
 let prExtPeriod = 'ALL';// Extended Staff AM/PM filter: ALL | AM | PM
 let prAreas = [];       // selected areas to filter by ([] = all areas)
 let prSearch = '';      // free-text search across name + area
-let prMissedDay = '';   // iso date: filter to staff with a blank box that day
+let prFilterDay = '';   // iso date being filtered by a day-header click
+let prFilterMode = '';  // '' | 'blank' | 'x' | 'check' — cycled by repeat clicks
+const PR_DAY_CYCLE = ['blank', 'x', 'check', ''];   // click order
+const PR_MODE_LABEL = {blank: 'not yet marked', x: 'marked ✗ (absent)', check: 'marked ✓ (present)'};
 
 // True if a staff member passes the current area filter
 function prAreaMatch(s) { return prAreas.length === 0 || prAreas.includes(s.area || ''); }
@@ -3089,10 +3112,14 @@ function renderPayroll() {
 
   // table
   const days = prPeriodDays();
-  // "Needs attention" day filter — only valid within the current block
-  if (prMissedDay && !days.some(d => d.iso === prMissedDay)) prMissedDay = '';
-  let staff = payroll.staff.filter(s => prAreaMatch(s) && prSearchMatch(s)
-    && (!prMissedDay || cellState(s.id, prMissedDay) === ''));
+  // Day-header filter — only valid within the current block
+  if (prFilterDay && !days.some(d => d.iso === prFilterDay)) { prFilterDay = ''; prFilterMode = ''; }
+  const dayStateOk = (id) => {
+    if (!prFilterDay || !prFilterMode) return true;
+    const st = cellState(id, prFilterDay);
+    return prFilterMode === 'blank' ? st === '' : st === prFilterMode;
+  };
+  let staff = payroll.staff.filter(s => prAreaMatch(s) && prSearchMatch(s) && dayStateOk(s.id));
   staff.sort((a,b) => {
     if (sortKey === 'total') {
       const d = prCount(b.id) - prCount(a.id);
@@ -3105,14 +3132,15 @@ function renderPayroll() {
   });
   const showExtra = prPeriod === 0;   // BS / SP\\MTC columns only on the Weeks 1 & 2 block
   let cap = payrollTitle();
-  if (prMissedDay) {
-    const md = days.find(d => d.iso === prMissedDay);
-    cap += ` &middot; <span style="color:#9a5b00">showing staff not yet marked on <strong>${md.dow} ${md.md}</strong> — click the date again to clear</span>`;
+  if (prFilterDay && prFilterMode) {
+    const md = days.find(d => d.iso === prFilterDay);
+    cap += ` &middot; <span style="color:#9a5b00">showing staff <strong>${PR_MODE_LABEL[prFilterMode]}</strong> on <strong>${md.dow} ${md.md}</strong> — click the date to cycle, or again to clear</span>`;
   }
   let html = `<caption>${cap}</caption><thead><tr><th class="pr-hnum">#</th><th class="pr-hstaff">Staff</th><th class="pr-harea">Area</th>`;
   days.forEach((d,i) => {
-    const cls = 'pr-day pr-day-click' + (i === 5 ? ' pr-week-sep' : '') + (d.iso === prMissedDay ? ' pr-day-active' : '');
-    html += `<th class="${cls}" data-iso="${d.iso}" title="Click to show staff not yet marked this day">${d.dow}<br>${d.md}</th>`;
+    const active = (d.iso === prFilterDay && prFilterMode);
+    const cls = 'pr-day pr-day-click' + (i === 5 ? ' pr-week-sep' : '') + (active ? ' pr-day-active' : '');
+    html += `<th class="${cls}" data-iso="${d.iso}" title="Click to filter this day: not marked → ✗ → ✓ → off">${d.dow}<br>${d.md}</th>`;
   });
   if (showExtra) html += '<th class="pr-extra pr-xsep">BS</th><th class="pr-extra">SP\\MTC</th>';
   html += '<th class="pr-delcol"></th></tr></thead><tbody>';
@@ -3127,8 +3155,9 @@ function renderPayroll() {
     days.forEach((d,i) => {
       const st = cellState(s.id, d.iso);
       const sym = st === 'check' ? '✓' : st === 'x' ? '✗' : '';
-      const cls = 'pr-cell st-' + (st || 'none') + (i === 5 ? ' pr-week-sep' : '')
-        + (d.iso === prMissedDay && st === '' ? ' pr-missed-hl' : '');
+      const hl = (d.iso === prFilterDay && prFilterMode &&
+                  (prFilterMode === 'blank' ? st === '' : st === prFilterMode)) ? ' pr-missed-hl' : '';
+      const cls = 'pr-cell st-' + (st || 'none') + (i === 5 ? ' pr-week-sep' : '') + hl;
       html += `<td class="${cls}" data-id="${s.id}" data-date="${d.iso}">${sym}</td>`;
     });
     if (showExtra) {
@@ -3143,15 +3172,41 @@ function renderPayroll() {
     html += '</tr>';
   });
   html += '</tbody>';
+  // Footer: a clear-✕ under each day to wipe that whole day's marks
+  html += '<tfoot><tr class="pr-foot"><td></td><td></td><td></td>';
+  days.forEach((d,i) => {
+    html += `<td${i === 5 ? ' class="pr-week-sep"' : ''}><button class="pr-dayclear" data-iso="${d.iso}" title="Clear all marks for ${d.dow} ${d.md}">✕</button></td>`;
+  });
+  if (showExtra) html += '<td></td><td></td>';
+  html += '<td class="pr-delcol"></td></tr></tfoot>';
   const tbl = document.getElementById('payroll-table');
   tbl.innerHTML = html;
   tbl.className = 'payroll-table pr-weeks' + (payroll.locked ? ' pr-locked' : '');
 
-  // Click a day's date to show only staff not yet marked that day (toggle)
+  // Click a day's date to cycle its filter: not-marked → ✗ → ✓ → off
   tbl.querySelectorAll('th.pr-day-click').forEach(th => {
     th.addEventListener('click', () => {
-      prMissedDay = (prMissedDay === th.dataset.iso) ? '' : th.dataset.iso;
+      const iso = th.dataset.iso;
+      if (prFilterDay !== iso) { prFilterDay = iso; prFilterMode = 'blank'; }
+      else {
+        const next = PR_DAY_CYCLE[(PR_DAY_CYCLE.indexOf(prFilterMode) + 1) % PR_DAY_CYCLE.length];
+        prFilterMode = next;
+        if (!next) prFilterDay = '';
+      }
       renderPayroll();
+    });
+  });
+
+  // Footer ✕: clear every mark for a whole day
+  tbl.querySelectorAll('.pr-dayclear').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (payroll.locked) return;
+      const iso = btn.dataset.iso;
+      const d = prPeriodDays().find(x => x.iso === iso);
+      if (!confirm(`Clear ALL attendance marks for ${d ? d.dow + ' ' + d.md : 'this day'}? This removes every ✓ / ✗ entered that day for all staff.`)) return;
+      Object.keys(payroll.checks).forEach(id => { if (payroll.checks[id]) delete payroll.checks[id][iso]; });
+      renderPayroll();
+      try { await fetch('/api/payroll/clearday', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({date: iso})}); } catch(e) {}
     });
   });
 
