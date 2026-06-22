@@ -1834,7 +1834,7 @@ def build_jr_transport_labels_docx(records: list, config: dict) -> tuple:
         if "2-way" in ex or "pm only trans" in ex:
             drv = (r.get("driver") or "").strip()
             trans.append((bk, r["name"], drv))   # driver only (no "Trans -" prefix)
-        elif "drop-off" in ex:
+        elif r.get("pm_time") is not None:        # PM "Pick-up" = on the PM Extend report
             pmext.append((bk, r["name"], "Pm ext"))
         else:
             carline.append((bk, r["name"], "Car line"))
