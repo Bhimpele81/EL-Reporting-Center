@@ -1673,11 +1673,12 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .pr-multi-menu label{display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-radius:6px;cursor:pointer;font-size:.85rem;color:#333;white-space:nowrap}
 .pr-multi-menu label:hover{background:#f4eef0}
 .pr-multi-menu .pr-multi-sep{border-top:1px solid #eee;margin:.25rem 0}
-.payroll-table caption{caption-side:top;text-align:left;font-weight:700;font-size:1rem;padding:.3rem 0 .5rem;color:var(--brand)}
+.payroll-table caption{display:none}   /* on screen the title shows in #pr-title; caption is for print */
 @media print {
   body * { visibility:hidden; }
   #payroll-table, #payroll-table * { visibility:visible; }
   #payroll-table { position:absolute; left:0; top:0; width:100%; font-size:9pt; }
+  #payroll-table caption { display:table-caption; caption-side:top; text-align:left; font-weight:700; font-size:12pt; color:#6D1F2F; padding-bottom:.3rem; }
   #payroll-table th, #payroll-table td { min-width:0 }   /* shrink to fit the page */
   /* uniform day + extra columns so they print the same width */
   #payroll-table th.pr-day, #payroll-table td.pr-cell,
@@ -2353,16 +2354,20 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
         </select></label>
     </div>
 
-    <div style="display:flex;gap:.5rem;justify-content:flex-end;align-items:center;margin:0">
-      <span id="pr-tc-msg" style="font-size:.78rem;color:#777;margin-right:auto"></span>
-      <button id="pr-timecard" class="pr-period-btn pr-sm" title="Import clock-ins from your payroll system">⏱ Import Time Card</button>
-      <input type="file" id="pr-timecard-file" accept=".xlsx,.xls,.csv" style="display:none">
-      <button id="pr-export" class="pr-period-btn pr-sm">⬇ Excel</button>
-      <button id="pr-print" class="pr-period-btn pr-sm">🖨 Print / PDF</button>
-      <button id="pr-lock" class="pr-period-btn pr-sm">🔓 Unlocked</button>
+    <div style="display:flex;gap:.5rem;justify-content:space-between;align-items:center;flex-wrap:wrap;margin:0 0 .3rem">
+      <span id="pr-title" style="font-family:'Roboto Slab',serif;font-weight:700;font-size:1rem;color:var(--brand)"></span>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <span id="pr-tc-msg" style="font-size:.78rem;color:#777"></span>
+        <button id="pr-timecard" class="pr-period-btn pr-sm" title="Import clock-ins from your payroll system">⏱ Import Time Card</button>
+        <input type="file" id="pr-timecard-file" accept=".xlsx,.xls,.csv" style="display:none">
+        <button id="pr-export" class="pr-period-btn pr-sm">⬇ Excel</button>
+        <button id="pr-print" class="pr-period-btn pr-sm">🖨 Print / PDF</button>
+        <button id="pr-lock" class="pr-period-btn pr-sm">🔓 Unlocked</button>
+      </div>
     </div>
+    <div id="pr-filter-note" style="font-size:.85rem;color:#9a5b00;margin:0 0 .5rem"></div>
 
-    <div style="overflow-x:auto;margin-top:-1.7rem">
+    <div style="overflow-x:auto">
       <table class="payroll-table" id="payroll-table"></table>
     </div>
 
@@ -3218,12 +3223,13 @@ function renderPayroll() {
     return (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase());
   });
   const showExtra = prPeriod === 0;   // BS / SP\\MTC columns only on the Weeks 1 & 2 block
-  let cap = payrollTitle();
+  let note = '';
   if (prFilterDay && prFilterMode) {
     const md = days.find(d => d.iso === prFilterDay);
-    cap += ` &middot; <span style="color:#9a5b00">showing staff <strong>${PR_MODE_LABEL[prFilterMode]}</strong> on <strong>${md.dow} ${md.md}</strong> — click the date to cycle, or again to clear</span>`;
+    note = `Showing staff <strong>${PR_MODE_LABEL[prFilterMode]}</strong> on <strong>${md.dow} ${md.md}</strong> — click the date to cycle, or again to clear.`;
   }
-  let html = `<caption>${cap}</caption><thead><tr><th class="pr-hnum">#</th><th class="pr-hstaff">Staff</th><th class="pr-harea">Area</th>`;
+  prSetHeader(payrollTitle(), note);
+  let html = `<caption>${payrollTitle()}</caption><thead><tr><th class="pr-hnum">#</th><th class="pr-hstaff">Staff</th><th class="pr-harea">Area</th>`;
   days.forEach((d,i) => {
     const active = (d.iso === prFilterDay && prFilterMode);
     const cls = 'pr-day pr-day-click' + (i === 5 ? ' pr-week-sep' : '') + (active ? ' pr-day-active' : '');
@@ -3402,8 +3408,10 @@ function renderExtTable(filterArea, extPeriod) {
     .filter(s => s.ext && matchShift(s.ext) && (filterArea === 'ALL' || s.area === filterArea))
     .sort((a,b) => (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase()));
   const shiftLbl = extPeriod === 'AM' ? 'AM' : extPeriod === 'PM' ? 'PM' : 'AM & PM';
-  let html = `<caption>Extended Staff (${shiftLbl}) — daily check-in (${staff.length})</caption>` +
-    '<thead><tr><th>Staff</th>' +
+  const extTitle = `Extended Staff (${shiftLbl}) — daily check-in (${staff.length})`;
+  prSetHeader(extTitle, '');
+  let html =
+    `<caption>${extTitle}</caption><thead><tr><th>Staff</th>` +
     ['MON','TUES','WED','THURS','FRI'].map(d => `<th class="pr-extday">${d}</th>`).join('') +
     '</tr></thead><tbody>';
   staff.forEach(s => {
@@ -3429,6 +3437,7 @@ function renderTotalsTable(sortKey) {
     return (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase());
   });
 
+  prSetHeader(payrollTitle(), '');
   let html = `<caption>${payrollTitle()}</caption><thead><tr><th>Staff</th><th>Area</th><th>Total Days<br><small style="font-weight:400">(all 8 weeks)</small></th></tr></thead><tbody>`;
   staff.forEach(s => {
     const jc = isJC(s) ? ' <small style="color:#1A79BF;font-weight:700">JC</small>' : '';
@@ -3469,6 +3478,14 @@ function payrollTitle() {
                    : `Staff Attendance — Weeks ${prPeriod*2+1} & ${prPeriod*2+2}`;
   if (prAreas.length) t += '  —  ' + prAreas.join(', ');
   return t;
+}
+
+// Set the section title (left of the action buttons) + the filter note line below
+function prSetHeader(title, note) {
+  const t = document.getElementById('pr-title');
+  const n = document.getElementById('pr-filter-note');
+  if (t) t.textContent = title;
+  if (n) { n.innerHTML = note || ''; n.style.display = note ? '' : 'none'; }
 }
 
 // Print / save-as-PDF (prints exactly what's on screen, filtered/sorted).
