@@ -977,6 +977,90 @@ def api_payroll_check():
     return jsonify({"ok": True})
 
 
+def _timecard_iso(v):
+    """Parse a time-card Date cell into an iso date string, or None."""
+    if isinstance(v, datetime):
+        return v.date().isoformat()
+    if isinstance(v, date):
+        return v.isoformat()
+    s = str(v or "").strip()
+    for fmt in ("%m/%d/%Y", "%Y-%m-%d", "%m/%d/%y", "%m-%d-%Y"):
+        try:
+            return datetime.strptime(s, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
+
+
+@app.route("/api/payroll/import-timecard", methods=["POST"])
+def api_payroll_import_timecard():
+    """Import clock-in rows (Last, First, Date) and mark ✓ for matched staff."""
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"error": "No file uploaded."}), 400
+    data = _payroll_load()
+    if data.get("locked"):
+        return jsonify({"error": "locked"}), 403
+    try:
+        rows = _read_spreadsheet_rows(f.read(), f.filename)
+    except Exception as e:
+        return jsonify({"error": f"Could not read file: {e}"}), 400
+    if not rows or len(rows) < 2:
+        return jsonify({"error": "No rows found in the file."}), 400
+
+    # Locate Last / First / Date columns by header (fallback to B / C / D)
+    hl = [str(h or "").strip().lower() for h in rows[0]]
+    def _col(keys, fb):
+        for i, h in enumerate(hl):
+            if any(k in h for k in keys):
+                return i
+        return fb
+    li, fi, di = _col(["last"], 1), _col(["first"], 2), _col(["date"], 3)
+
+    valid_days = {d["iso"] for d in _payroll_days()}
+
+    # Build name matchers from the staff roster
+    by_lf, by_last, by_li = {}, {}, {}
+    for s in data["staff"]:
+        ln = (s.get("last") or "").strip().lower()
+        fn = (s.get("first") or "").strip().lower()
+        by_lf[(ln, fn)] = s["id"]
+        by_last.setdefault(ln, []).append(s["id"])
+        if fn:
+            by_li.setdefault((ln, fn[0]), []).append(s["id"])
+
+    def _match(ln, fn):
+        ln, fn = ln.strip().lower(), fn.strip().lower()
+        if (ln, fn) in by_lf:
+            return by_lf[(ln, fn)]                       # exact last + first
+        if len(by_last.get(ln, [])) == 1:
+            return by_last[ln][0]                        # only one staffer with that last name
+        cand = by_li.get((ln, fn[:1]), [])
+        if len(cand) == 1:
+            return cand[0]                               # unique last + first-initial (nicknames)
+        return None
+
+    cells, dates, unmatched = set(), set(), set()
+    for r in rows[1:]:
+        ln = str(r[li]).strip() if li < len(r) and r[li] is not None else ""
+        fn = str(r[fi]).strip() if fi < len(r) and r[fi] is not None else ""
+        if not ln and not fn:
+            continue
+        iso = _timecard_iso(r[di] if di < len(r) else None)
+        if not iso or iso not in valid_days:
+            continue                                     # date outside the season → skip
+        sid = _match(ln, fn)
+        if sid is None:
+            unmatched.add(f"{ln}, {fn}".strip(", "))
+            continue
+        data["checks"].setdefault(sid, {})[iso] = "check"
+        cells.add((sid, iso)); dates.add(iso)
+    _payroll_save(data)
+    return jsonify({"ok": True, "checks_set": len(cells),
+                    "staff_matched": len({c[0] for c in cells}),
+                    "dates": sorted(dates), "unmatched": sorted(unmatched)})
+
+
 @app.route("/api/payroll/clearday", methods=["POST"])
 def api_payroll_clearday():
     """Remove every staff member's mark for one date."""
@@ -2269,7 +2353,10 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
         </select></label>
     </div>
 
-    <div style="display:flex;gap:.5rem;justify-content:flex-end;margin:0">
+    <div style="display:flex;gap:.5rem;justify-content:flex-end;align-items:center;margin:0">
+      <span id="pr-tc-msg" style="font-size:.78rem;color:#777;margin-right:auto"></span>
+      <button id="pr-timecard" class="pr-period-btn pr-sm" title="Import clock-ins from your payroll system">⏱ Import Time Card</button>
+      <input type="file" id="pr-timecard-file" accept=".xlsx,.xls,.csv" style="display:none">
       <button id="pr-export" class="pr-period-btn pr-sm">⬇ Excel</button>
       <button id="pr-print" class="pr-period-btn pr-sm">🖨 Print / PDF</button>
       <button id="pr-lock" class="pr-period-btn pr-sm">🔓 Unlocked</button>
@@ -3402,6 +3489,34 @@ document.getElementById('pr-export').addEventListener('click', () => {
   const sort = document.getElementById('pr-sort').value;
   const q = encodeURIComponent(prExt ? '' : prSearch.trim());
   window.location = `/api/payroll/export?view=${view}&period=${prPeriod}&areas=${areas}&sort=${sort}&extp=${prExtPeriod}&q=${q}`;
+});
+
+// Import time card (clock-ins) → mark ✓ for matched staff on each date
+const prTcFile = document.getElementById('pr-timecard-file');
+document.getElementById('pr-timecard').addEventListener('click', () => {
+  if (payroll.locked) { alert('Unlock the sheet before importing.'); return; }
+  prTcFile.click();
+});
+prTcFile.addEventListener('change', async e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  const msg = document.getElementById('pr-tc-msg');
+  msg.style.color = '#666'; msg.textContent = 'Importing time card…';
+  const fd = new FormData(); fd.append('file', f);
+  try {
+    const res = await fetch('/api/payroll/import-timecard', {method:'POST', body: fd});
+    const d = await res.json();
+    if (!res.ok || d.error) { msg.style.color = '#c0392b'; msg.textContent = d.error || 'Import failed.'; return; }
+    await loadPayroll();
+    msg.style.color = '#2e7d32';
+    msg.textContent = `✓ Marked ${d.checks_set} check-in(s) for ${d.staff_matched} staff across ${d.dates.length} day(s).`;
+    if (d.unmatched && d.unmatched.length) {
+      msg.style.color = '#9a5b00';
+      msg.textContent += `  ${d.unmatched.length} not matched.`;
+      alert('These names from the time card were not matched to a staff member (mark them manually if needed):\n\n' + d.unmatched.join('\n'));
+    }
+  } catch(err) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + err.message; }
 });
 
 // ---- Family contacts ----
