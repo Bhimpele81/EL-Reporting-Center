@@ -1549,6 +1549,14 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table th.pr-day-click:hover{background:#7a2236}
 .payroll-table th.pr-day-active{background:var(--gold) !important;color:#1a1018 !important}
 .payroll-table td.pr-missed-hl{background:#fff3d6}
+/* Weeks grid: fixed column widths so the layout doesn't shift when filtering */
+.payroll-table.pr-weeks{table-layout:fixed}
+.pr-weeks .pr-hnum{width:38px}
+.pr-weeks .pr-harea{width:104px}
+.pr-weeks .pr-day{width:54px}
+.pr-weeks .pr-extra{width:46px}
+.pr-weeks .pr-delcol{width:34px}
+/* (Staff column has no fixed width → it absorbs the remaining space) */
 .pr-period-btn{padding:.4rem .8rem;border:1px solid var(--brand);background:#fff;color:var(--brand);border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem}
 .pr-period-btn.active{background:var(--brand);color:#fff}
 .pr-period-btn.pr-sm{padding:.28rem .55rem;font-size:.72rem;font-weight:600}
@@ -3101,7 +3109,7 @@ function renderPayroll() {
     const md = days.find(d => d.iso === prMissedDay);
     cap += ` &middot; <span style="color:#9a5b00">showing staff not yet marked on <strong>${md.dow} ${md.md}</strong> — click the date again to clear</span>`;
   }
-  let html = `<caption>${cap}</caption><thead><tr><th>#</th><th>Staff</th><th>Area</th>`;
+  let html = `<caption>${cap}</caption><thead><tr><th class="pr-hnum">#</th><th class="pr-hstaff">Staff</th><th class="pr-harea">Area</th>`;
   days.forEach((d,i) => {
     const cls = 'pr-day pr-day-click' + (i === 5 ? ' pr-week-sep' : '') + (d.iso === prMissedDay ? ' pr-day-active' : '');
     html += `<th class="${cls}" data-iso="${d.iso}" title="Click to show staff not yet marked this day">${d.dow}<br>${d.md}</th>`;
@@ -3137,7 +3145,7 @@ function renderPayroll() {
   html += '</tbody>';
   const tbl = document.getElementById('payroll-table');
   tbl.innerHTML = html;
-  tbl.className = 'payroll-table' + (payroll.locked ? ' pr-locked' : '');
+  tbl.className = 'payroll-table pr-weeks' + (payroll.locked ? ' pr-locked' : '');
 
   // Click a day's date to show only staff not yet marked that day (toggle)
   tbl.querySelectorAll('th.pr-day-click').forEach(th => {
