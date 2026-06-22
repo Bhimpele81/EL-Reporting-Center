@@ -2511,10 +2511,37 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     </details>
 
     <details class="faq">
-      <summary>How do I find someone who was missed on a day?</summary>
+      <summary>How do I find who was missed (or absent/present) on a day?</summary>
       <div class="faq-body">
-        <p><strong>Click the date</strong> at the top of any day column. The grid filters to only the staff whose box is still <strong>blank</strong> that day (no ✓ and no ✗) — the ones that may have been missed — and highlights those empty cells.</p>
-        <p>Click the same date again to clear the filter and show everyone. It works alongside Search and Filter area.</p>
+        <p><strong>Click the date</strong> at the top of any day column to filter the grid by that day. Each click <strong>cycles</strong> through:</p>
+        <ul>
+          <li><strong>Not yet marked</strong> (blank) — the ones that may have been missed</li>
+          <li><strong>Marked ✗</strong> (absent)</li>
+          <li><strong>Marked ✓</strong> (present)</li>
+          <li><strong>Off</strong> — back to everyone</li>
+        </ul>
+        <p>The current mode shows above the table, and matching cells are highlighted. It works alongside Search and Filter area.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Can I clear or import a whole day at once?</summary>
+      <div class="faq-body">
+        <p><strong>Clear a day:</strong> the <strong>✕</strong> at the bottom of each day column wipes every ✓/✗ for that day (after a confirmation).</p>
+        <p><strong>Import clock-ins:</strong> click <strong>⏱ Import Time Card</strong> and choose the export from your payroll system (with Last name, First name, and Date columns). Matching staff get a ✓ on each date — even if the file uses nicknames (e.g. "Sam" matches "Samantha"). Any names it can't match are listed so you can mark them by hand. (Unlock the sheet first.)</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>How do I add, rename, or remove staff?</summary>
+      <div class="faq-body">
+        <ul>
+          <li><strong>Add:</strong> use the <em>Add staff</em> form at the bottom of the sheet.</li>
+          <li><strong>Rename:</strong> click a staff <strong>name</strong> to edit it inline ("Last, First").</li>
+          <li><strong>Change area:</strong> click the <strong>Area</strong> cell to edit it inline.</li>
+          <li><strong>Remove:</strong> the <strong>✕</strong> at the end of each row.</li>
+        </ul>
+        <p>All of these are disabled while the sheet is <strong>Locked</strong>.</p>
       </div>
     </details>
 
@@ -2524,7 +2551,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <summary>How do I load family contacts?</summary>
       <div class="faq-body">
         <p>In <strong>Utilities → Family Contacts</strong>, drop in the contact spreadsheet. Columns are auto-detected (name, bunk, parents, address, pickups), and new columns are kept automatically. Use <strong>Replace all</strong> to refresh, or <strong>Add to existing</strong> to append.</p>
-        <p><strong>Mailing labels</strong> print one label per address using the <strong>Family last name</strong> field.</p>
+        <p><strong>Mailing labels</strong> print one label per <strong>address</strong> (siblings share one), addressed as <strong>"The &lt;Family last name&gt; Family"</strong> over the street address, city, state and zip.</p>
       </div>
     </details>
 
