@@ -1668,6 +1668,10 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .pr-period-btn{padding:.4rem .8rem;border:1px solid var(--brand);background:#fff;color:var(--brand);border-radius:8px;cursor:pointer;font-weight:600;font-size:.85rem}
 .pr-period-btn.active{background:var(--brand);color:#fff}
 .pr-period-btn.pr-sm{padding:.28rem .55rem;font-size:.72rem;font-weight:600}
+.pr-period-btn.pr-lock-on{background:#2e7d32;border-color:#2e7d32;color:#fff}
+.pr-period-btn.pr-lock-on:hover{background:#27682b}
+.pr-period-btn.pr-lock-off{background:#c0392b;border-color:#c0392b;color:#fff}
+.pr-period-btn.pr-lock-off:hover{background:#a5311f}
 .pr-input{padding:.45rem .6rem;border:1px solid var(--border);border-radius:8px;font-size:.85rem}
 .pr-multi{position:relative;display:inline-block}
 .pr-multi-btn{cursor:pointer;background:#fff;display:flex;align-items:center;gap:.5rem;min-width:120px;justify-content:space-between}
@@ -3213,7 +3217,10 @@ function renderPayroll() {
   const sortKey = document.getElementById('pr-sort').value;
 
   // Lock button + add-staff controls reflect lock state (both views)
-  document.getElementById('pr-lock').textContent = payroll.locked ? '🔒 Locked' : '🔓 Unlocked';
+  const lockBtn = document.getElementById('pr-lock');
+  lockBtn.textContent = payroll.locked ? '🔒 Locked' : '🔓 Unlocked';
+  lockBtn.classList.toggle('pr-lock-on', payroll.locked);
+  lockBtn.classList.toggle('pr-lock-off', !payroll.locked);
   ['pr-last','pr-first','pr-area','pr-add'].forEach(id => {
     const el = document.getElementById(id); if (el) el.disabled = payroll.locked;
   });
