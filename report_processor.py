@@ -2208,7 +2208,8 @@ def build_driver_totals_sheet(ws, campers: list, report_date: date, week_num: in
 
 def process_report(file_bytes: bytes, report_type: str,
                    config: dict, job_id: str, output_dir: str,
-                   week_num: int = None, week_dates=None, families=None) -> dict:
+                   week_num: int = None, week_dates=None, families=None,
+                   schedule_overrides=None) -> dict:
 
     if week_dates:
         set_week_dates(week_dates)
@@ -2232,6 +2233,20 @@ def process_report(file_bytes: bytes, report_type: str,
         master = parse_master(file_bytes)
     except Exception:
         master = None
+
+    # Apply per-camper day-schedule overrides for the selected week (set in the
+    # Camper Schedules tool). Replaces the master's default day pattern for week_num.
+    if master is not None and week_num and schedule_overrides:
+        wk = str(week_num)
+        for c in master:
+            key = f"{(c.get('name') or '').strip().lower()}||{(c.get('bunk') or '').strip().lower()}"
+            ov = schedule_overrides.get(key, {}).get(wk)
+            if ov is None:
+                continue
+            s = "".join(L for L in "MTWRF" if L in ov.upper())
+            c["days_sched"] = s
+            c["days"] = [L if L in s else None for L in "MTWRF"]
+            c["enrolled"] = "" if s == "MTWRF" else s
 
     def _week_filter(campers):
         """For week-specific reports off the master, keep only campers enrolled

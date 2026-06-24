@@ -25,7 +25,7 @@ from botocore.exceptions import ClientError
 from flask import Flask, request, jsonify, send_file, render_template_string, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from report_processor import process_report, load_bunk_config, save_bunk_config, is_master
+from report_processor import process_report, load_bunk_config, save_bunk_config, is_master, parse_master
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -187,6 +187,8 @@ CONFIG_META_KEY   = "bunk_config_meta.json"
 LOCAL_CONFIG_META = os.path.join(UPLOAD_DIR, "bunk_config_meta.json")
 SEASON_KEY        = "season.json"
 LOCAL_SEASON      = os.path.join(UPLOAD_DIR, "season.json")
+SCHEDULES_KEY     = "schedules.json"
+LOCAL_SCHEDULES   = os.path.join(UPLOAD_DIR, "schedules.json")
 # Default season: Monday of each of the 8 camp weeks (2026)
 _DEFAULT_SEASON_MONDAYS = ["2026-06-22", "2026-06-29", "2026-07-06", "2026-07-13",
                            "2026-07-20", "2026-07-27", "2026-08-03", "2026-08-10"]
@@ -198,7 +200,18 @@ FAMILY_FIELDS     = ["last", "first", "family", "bunk",
                      "pu1_name", "pu1_auth", "pu2_name", "pu2_auth",
                      "pu3_name", "pu3_auth", "pu4_name", "pu4_auth"]
 _PROTECTED_KEYS   = {"bunk_config.json", CONFIG_META_KEY, MASTER_KEY, MASTER_META_KEY,
-                     PAYROLL_KEY, FAMILIES_KEY, USERS_KEY, SEASON_KEY}
+                     PAYROLL_KEY, FAMILIES_KEY, USERS_KEY, SEASON_KEY, SCHEDULES_KEY}
+
+
+def _camper_key(name, bunk):
+    """Stable key for a camper (name + bunk), used by schedule overrides."""
+    return f"{(name or '').strip().lower()}||{(bunk or '').strip().lower()}"
+
+
+def _canon_days(s):
+    """Canonicalize a day string to M/T/W/R/F in order."""
+    up = (s or "").upper()
+    return "".join(L for L in "MTWRF" if L in up)
 
 
 def _now_eastern_stamp() -> str:
@@ -334,6 +347,44 @@ def _week_range_str(monday: date) -> str:
 def _season_week_strings() -> list:
     """The 8 date-range strings used in report headers."""
     return [_week_range_str(m) for m in _season_mondays()]
+
+
+# --- Per-camper, per-week day-schedule overrides ---
+
+def _schedules_save(data: dict) -> None:
+    try:
+        with open(LOCAL_SCHEDULES, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+    if _s3:
+        try:
+            _s3.put_object(Bucket=S3_BUCKET, Key=SCHEDULES_KEY,
+                           Body=json.dumps(data).encode("utf-8"),
+                           ContentType="application/json")
+        except ClientError:
+            pass
+
+
+def _schedules_load() -> dict:
+    data = None
+    if _s3:
+        buf = _s3_get_file(SCHEDULES_KEY)
+        if buf:
+            try:
+                data = json.load(buf)
+            except Exception:
+                data = None
+    if data is None and os.path.exists(LOCAL_SCHEDULES):
+        try:
+            with open(LOCAL_SCHEDULES, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = None
+    if data is None:
+        data = {}
+    data.setdefault("overrides", {})   # { camper_key: { "1": "MWF", ... } }
+    return data
 
 
 def _payroll_days() -> list:
@@ -665,7 +716,8 @@ def run_job(job_id: str, file_bytes: bytes, report_type: str, week_num: int = No
         log(f"Processing report type: {report_type}…")
         result = process_report(file_bytes, report_type, config, job_id, OUTPUT_DIR,
                                 week_num=week_num, week_dates=_season_week_strings(),
-                                families=_families_load()["families"])
+                                families=_families_load()["families"],
+                                schedule_overrides=_schedules_load()["overrides"])
 
         if result["success"]:
             log(result["message"], "ok")
@@ -780,6 +832,61 @@ def api_season_save():
     clean = [(d0 + timedelta(days=7 * i)).isoformat() for i in range(8)]
     _season_save({"mondays": clean})
     return jsonify({"ok": True, **_season_summary()})
+
+
+@app.route("/api/schedules", methods=["GET"])
+@admin_required
+def api_schedules():
+    """Camper list (from the saved master) + per-week day overrides, for the editor."""
+    overrides = _schedules_load()["overrides"]
+    weeks = [{"n": i + 1, "range": r} for i, r in enumerate(_season_week_strings())]
+    fb = _load_master()
+    campers = []
+    if fb:
+        try:
+            for r in parse_master(fb) or []:
+                campers.append({
+                    "key":   _camper_key(r.get("name"), r.get("bunk")),
+                    "name":  r.get("name", ""),
+                    "bunk":  r.get("bunk", ""),
+                    "weeks": r.get("weeks", []),
+                    "days":  r.get("days_sched", "MTWRF"),
+                })
+        except Exception:
+            campers = []
+        # de-dupe by key (master may repeat), keep first
+        seen, uniq = set(), []
+        for c in campers:
+            if c["key"] in seen:
+                continue
+            seen.add(c["key"]); uniq.append(c)
+        uniq.sort(key=lambda c: c["name"].lower())
+        campers = uniq
+    return jsonify({"campers": campers, "overrides": overrides, "weeks": weeks,
+                    "has_master": bool(fb)})
+
+
+@app.route("/api/schedules", methods=["POST"])
+@admin_required
+def api_schedules_save():
+    body = request.get_json(force=True, silent=True) or {}
+    key = (body.get("key") or "").strip()
+    try:
+        wk = int(body.get("week", 0))
+    except (TypeError, ValueError):
+        wk = 0
+    if not key or not (1 <= wk <= 8):
+        return jsonify({"error": "missing key/week"}), 400
+    data = _schedules_load()
+    ov = data["overrides"].setdefault(key, {})
+    if body.get("clear"):
+        ov.pop(str(wk), None)
+        if not ov:
+            data["overrides"].pop(key, None)
+    else:
+        ov[str(wk)] = _canon_days(body.get("days"))
+    _schedules_save(data)
+    return jsonify({"ok": True})
 
 
 # --- Report processing ---
@@ -1632,6 +1739,17 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .fam-table .fam-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.9rem;padding:0}
 .usr-ic{cursor:pointer;border:none;background:none;color:#1A79BF;font-size:1rem;padding:0 .3rem;line-height:1}
 .usr-ic:hover{color:var(--brand)}
+/* Camper Schedules */
+.sched-hit{padding:.5rem .7rem;border:1px solid var(--border);border-radius:8px;margin-bottom:.4rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.88rem}
+.sched-hit:hover{background:var(--brand-light);border-color:var(--brand-mid)}
+.sched-hit .sh-bunk{font-size:.78rem;color:#888}
+.sched-wk{display:flex;align-items:center;gap:.6rem;padding:.5rem 0;border-bottom:1px solid #eee;flex-wrap:wrap}
+.sched-wk .sw-label{width:170px;font-size:.85rem;color:var(--brand-dark);font-weight:600}
+.sched-day{width:42px;height:36px;border:1.5px solid var(--border);border-radius:6px;background:#fff;color:#999;font-weight:700;font-size:.8rem;cursor:pointer;transition:all .12s}
+.sched-day.on{background:#2e7d32;border-color:#2e7d32;color:#fff}
+.sched-day:hover{border-color:var(--brand-mid)}
+.sched-back{background:none;border:none;color:var(--brand);cursor:pointer;font-size:.85rem;font-weight:600;padding:0;margin-bottom:.6rem}
+.sched-ov{font-size:.72rem;color:#9a5b00;margin-left:.3rem}
 .season-row{display:flex;align-items:center;gap:.7rem;padding:.3rem 0}
 .season-row .sr-wk{font-weight:700;color:var(--brand);width:64px;font-size:.85rem}
 .season-row input[type=date]{padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.85rem}
@@ -2031,6 +2149,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
+  <div class="tab" data-tab="sched" id="tab-sched-nav" style="display:none">📆 <span>Schedules</span></div>
   <div class="tab" data-tab="help">🛟 <span>Help</span></div>
 </nav>
 
@@ -2600,6 +2719,20 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     </div>
   </div>
 </div><!-- /tab-help -->
+
+<!-- ===== SCHEDULES TAB (admin only) ===== -->
+<div class="tab-panel" id="tab-sched">
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Camper Schedules</div>
+        <div class="card-hint">Find a camper and set which days they attend each week. This overrides the master's default day pattern for that week (used by Group Attendance, Extend and Bunk Snapshot reports). Changes save automatically.</div>
+      </div>
+    </div>
+    <input type="search" id="sched-search" class="pr-input" placeholder="Search camper name…" style="width:100%;max-width:420px;font-size:.95rem">
+    <div id="sched-results" style="margin-top:.8rem"></div>
+  </div>
+</div><!-- /tab-sched -->
 
 </div><!-- /container -->
 
@@ -3714,7 +3847,86 @@ function loadAllData() {
   loadFamilies();
   loadUsers();
   loadSeason();
+  loadSchedules();
 }
+
+// ---- Camper Schedules (admin) ----
+let schedCampers = [], schedOverrides = {}, schedWeeks = [];
+const SCHED_DAYS = ['M','T','W','R','F'];
+const SCHED_DAY_LABEL = {M:'M', T:'T', W:'W', R:'Th', F:'F'};
+
+async function loadSchedules() {
+  if (!currentUser || !currentUser.is_admin) return;
+  try {
+    const res = await fetch('/api/schedules');
+    if (!res.ok) return;
+    const d = await res.json();
+    schedCampers = d.campers || [];
+    schedOverrides = d.overrides || {};
+    schedWeeks = d.weeks || [];
+  } catch(e) {}
+  renderSchedResults();
+}
+
+function renderSchedResults() {
+  const box = document.getElementById('sched-results');
+  if (!box) return;
+  const q = (document.getElementById('sched-search').value || '').trim().toLowerCase();
+  if (!q) { box.innerHTML = '<div style="color:#aaa;font-size:.85rem">Start typing a camper name…</div>'; return; }
+  const hits = schedCampers.filter(c => (c.name + ' ' + c.bunk).toLowerCase().includes(q)).slice(0, 50);
+  if (!hits.length) { box.innerHTML = '<div style="color:#aaa;font-size:.85rem">No matches.</div>'; return; }
+  box.innerHTML = hits.map(c =>
+    `<div class="sched-hit" data-key="${famEsc(c.key)}"><span>${famEsc(c.name)}</span><span class="sh-bunk">${famEsc(c.bunk)}</span></div>`).join('');
+  box.querySelectorAll('.sched-hit').forEach(el => el.addEventListener('click', () => renderSchedEditor(el.dataset.key)));
+}
+
+function renderSchedEditor(key) {
+  const c = schedCampers.find(x => x.key === key);
+  const box = document.getElementById('sched-results');
+  if (!c) { renderSchedResults(); return; }
+  const def = c.days || 'MTWRF';
+  const ov = schedOverrides[key] || {};
+  const enrolled = schedWeeks.filter(w => c.weeks && c.weeks[w.n - 1]);
+  let h = `<button class="sched-back" id="sched-back">← Back to search</button>`;
+  h += `<div style="font-weight:700;color:var(--brand-dark);font-size:1rem">${famEsc(c.name)}</div>`;
+  h += `<div style="font-size:.82rem;color:#888;margin-bottom:.6rem">${famEsc(c.bunk)}</div>`;
+  if (!enrolled.length) h += '<div style="color:#aaa;font-size:.85rem">This camper is not enrolled in any week.</div>';
+  enrolled.forEach(w => {
+    const isOv = ov[String(w.n)] != null;
+    const cur = isOv ? ov[String(w.n)] : def;
+    h += `<div class="sched-wk">` +
+      `<span class="sw-label">Week ${w.n} <span style="color:#999;font-weight:400">${w.range || ''}</span>${isOv ? '<span class="sched-ov">(custom)</span>' : ''}</span>` +
+      SCHED_DAYS.map(L => `<button class="sched-day${cur.includes(L) ? ' on' : ''}" data-wk="${w.n}" data-day="${L}">${SCHED_DAY_LABEL[L]}</button>`).join('') +
+      (isOv ? `<button class="sched-back" style="margin:0" data-reset="${w.n}">reset</button>` : '') +
+      `</div>`;
+  });
+  box.innerHTML = h;
+  document.getElementById('sched-back').addEventListener('click', renderSchedResults);
+  box.querySelectorAll('.sched-day').forEach(btn =>
+    btn.addEventListener('click', () => toggleSchedDay(key, parseInt(btn.dataset.wk, 10), btn.dataset.day)));
+  box.querySelectorAll('[data-reset]').forEach(btn =>
+    btn.addEventListener('click', () => resetSchedWeek(key, parseInt(btn.dataset.reset, 10))));
+}
+
+async function toggleSchedDay(key, wk, day) {
+  const c = schedCampers.find(x => x.key === key);
+  const ovc = schedOverrides[key] || (schedOverrides[key] = {});
+  const cur = ovc[String(wk)] != null ? ovc[String(wk)] : (c.days || 'MTWRF');
+  const set = new Set(cur.split(''));
+  set.has(day) ? set.delete(day) : set.add(day);
+  const canon = SCHED_DAYS.filter(L => set.has(L)).join('');
+  ovc[String(wk)] = canon;
+  renderSchedEditor(key);
+  try { await fetch('/api/schedules', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key, week: wk, days: canon})}); } catch(e) {}
+}
+
+async function resetSchedWeek(key, wk) {
+  if (schedOverrides[key]) { delete schedOverrides[key][String(wk)]; if (!Object.keys(schedOverrides[key]).length) delete schedOverrides[key]; }
+  renderSchedEditor(key);
+  try { await fetch('/api/schedules', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key, week: wk, clear: true})}); } catch(e) {}
+}
+
+(function(){ const s = document.getElementById('sched-search'); if (s) s.addEventListener('input', renderSchedResults); })();
 
 // ---- First-time "Utilities" notice (shows once per browser, after sign-in) ----
 function maybeShowNotice() {
@@ -3860,6 +4072,8 @@ document.getElementById('usr-copy').addEventListener('click', async () => {
     overlay.classList.add('hidden');
     document.getElementById('h-user').style.display = 'flex';
     document.getElementById('h-user-name').textContent = user.name || user.username;
+    const schedNav = document.getElementById('tab-sched-nav');   // admin-only for now
+    if (schedNav) schedNav.style.display = user.is_admin ? '' : 'none';
     loadAllData();
     maybeShowNotice();
   }
