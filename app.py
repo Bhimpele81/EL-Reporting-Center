@@ -835,7 +835,6 @@ def api_season_save():
 
 
 @app.route("/api/schedules", methods=["GET"])
-@admin_required
 def api_schedules():
     """Camper list (from the saved master) + per-week day overrides, for the editor."""
     overrides = _schedules_load()["overrides"]
@@ -867,7 +866,6 @@ def api_schedules():
 
 
 @app.route("/api/schedules", methods=["POST"])
-@admin_required
 def api_schedules_save():
     body = request.get_json(force=True, silent=True) or {}
     key = (body.get("key") or "").strip()
@@ -2387,11 +2385,11 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   </div><!-- /card-grid master+family -->
 
   <!-- Camper Schedules (admins only, sits just below the master sheet) -->
-  <div class="card" id="sched-card" style="display:none">
+  <div class="card" id="sched-card">
     <div class="card-hd">
       <div>
         <div class="card-title">Camper Schedules</div>
-        <div class="card-hint">Find a camper and set which days they attend each week. This overrides the master's default day pattern for that week (used by Group Attendance, Extend and Bunk Snapshot reports). Pick a camper, set the days, then Save.</div>
+        <div class="card-hint">Find a camper and set which days they attend each week. This overrides the master's default day pattern for that week (used by Group Attendance, Extend and Bunk Snapshot reports). Pick a camper, set the days, then Save. Saved changes are kept when you upload a new master sheet and reapply automatically, as long as the camper's name and bunk still match (a change is dropped if that camper moves to a different bunk).</div>
       </div>
     </div>
     <input type="search" id="sched-search" class="pr-input" placeholder="Search camper name…" style="width:100%;max-width:420px;font-size:.95rem">
@@ -3874,7 +3872,7 @@ const SCHED_DAYS = ['M','T','W','R','F'];
 const SCHED_DAY_LABEL = {M:'M', T:'T', W:'W', R:'Th', F:'F'};
 
 async function loadSchedules() {
-  if (!currentUser || !currentUser.is_admin) return;
+  if (!currentUser) return;
   schedCurrentKey = null; schedDirty = false;
   try {
     const res = await fetch('/api/schedules');
@@ -4128,8 +4126,6 @@ document.getElementById('usr-copy').addEventListener('click', async () => {
     overlay.classList.add('hidden');
     document.getElementById('h-user').style.display = 'flex';
     document.getElementById('h-user-name').textContent = user.name || user.username;
-    const schedCard = document.getElementById('sched-card');   // admin-only for now
-    if (schedCard) schedCard.style.display = user.is_admin ? '' : 'none';
     loadAllData();
     maybeShowNotice();
   }
