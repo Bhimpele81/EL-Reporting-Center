@@ -2389,7 +2389,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <div class="card-hd">
       <div>
         <div class="card-title">Camper Schedules</div>
-        <div class="card-hint">Find a camper and set which days they attend each week. This overrides the master's default day pattern for that week (used by Group Attendance, Extend and Bunk Snapshot reports). Pick a camper, set the days, then Save. Saved changes are kept when you upload a new master sheet and reapply automatically, as long as the camper's name and bunk still match (a change is dropped if that camper moves to a different bunk).</div>
+        <div class="card-hint">Find a camper and set which days they attend each week. This overrides the master's default day's for that week (used by Group Attendance, Extend and Bunk Snapshot reports). Pick a camper, set the days, then Save. Saved changes are kept after you upload a new master sheet and reapply automatically.</div>
       </div>
     </div>
     <input type="search" id="sched-search" class="pr-input" placeholder="Search camper name…" style="width:100%;max-width:420px;font-size:.95rem">
@@ -2636,6 +2636,24 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <summary>My report is empty or missing campers — why?</summary>
       <div class="faq-body">
         <p>Usually the <strong>selected week</strong> (the report only includes campers enrolled that week) or an <strong>out-of-date master sheet</strong>. Re-upload the latest master in Utilities and try again.</p>
+      </div>
+    </details>
+
+    <div class="help-sub">Camper schedules</div>
+
+    <details class="faq">
+      <summary>How do I change which days a camper attends?</summary>
+      <div class="faq-body">
+        <p>Go to <strong>Utilities → Camper Schedules</strong>. Search a camper by name, click them, and you'll see a row for <strong>each week they're enrolled</strong> with Mon–Fri buttons.</p>
+        <p>Each day button is <strong style="color:#2e7d32">green when scheduled</strong> and <strong style="color:#c0392b">red when not</strong> — tap to toggle. When you're done, click <strong>💾 Save schedule</strong>. (If you switch campers or go back with unsaved edits, it saves automatically so nothing is lost.)</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>How do schedule changes affect reports?</summary>
+      <div class="faq-body">
+        <p>A saved change <strong>overrides the master sheet's default days</strong> for that camper, in that week only. It's applied to the week-specific reports that show attendance — <strong>Group Attendance</strong>, <strong>AM/PM Extend</strong>, <strong>PM GRP Extend</strong>, and <strong>Bunk Snapshot</strong> — when you run them for that week.</p>
+        <p>Saved changes are <strong>kept after you upload a new master sheet</strong> and reapply automatically, so you don't have to redo them each time the master is refreshed.</p>
       </div>
     </details>
 
