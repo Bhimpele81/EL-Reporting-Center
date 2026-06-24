@@ -2642,7 +2642,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <div class="help-sub">Camper schedules</div>
 
     <details class="faq">
-      <summary>How do I change which days a camper attends?</summary>
+      <summary>Can I change which days a camper attends without having to upload a new spreadsheet?</summary>
       <div class="faq-body">
         <p>Go to <strong>Utilities → Camper Schedules</strong>. Search a camper by name, click them, and you'll see a row for <strong>each week they're enrolled</strong> with Mon–Fri buttons.</p>
         <p>Each day button is <strong style="color:#2e7d32">green when scheduled</strong> and <strong style="color:#c0392b">red when not</strong> — tap to toggle. When you're done, click <strong>💾 Save schedule</strong>. (If you switch campers or go back with unsaved edits, it saves automatically so nothing is lost.)</p>
