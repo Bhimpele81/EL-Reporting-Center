@@ -871,21 +871,11 @@ def api_schedules():
 def api_schedules_save():
     body = request.get_json(force=True, silent=True) or {}
     key = (body.get("key") or "").strip()
-    # Accept one week ("week") or several ("weeks") to apply the same change to
-    raw = body.get("weeks") if body.get("weeks") is not None else [body.get("week")]
-    weeks = []
-    for w in (raw or []):
-        try:
-            n = int(w)
-            if 1 <= n <= 8:
-                weeks.append(n)
-        except (TypeError, ValueError):
-            pass
+    if not key:
+        return jsonify({"error": "missing key"}), 400
     data = _schedules_load()
     # Replace the camper's entire week map in one shot (used by the Save button)
     if isinstance(body.get("replace"), dict):
-        if not key:
-            return jsonify({"error": "missing key"}), 400
         clean = {}
         for w, dd in body["replace"].items():
             try:
@@ -900,14 +890,18 @@ def api_schedules_save():
             data["overrides"].pop(key, None)
         _schedules_save(data)
         return jsonify({"ok": True})
-    if not key or not weeks:
-        return jsonify({"error": "missing key/week"}), 400
+    # Single-week set/clear
+    try:
+        wk = int(body.get("week", 0))
+    except (TypeError, ValueError):
+        wk = 0
+    if not (1 <= wk <= 8):
+        return jsonify({"error": "missing week"}), 400
     ov = data["overrides"].setdefault(key, {})
-    for n in weeks:
-        if body.get("clear"):
-            ov.pop(str(n), None)
-        else:
-            ov[str(n)] = _canon_days(body.get("days"))
+    if body.get("clear"):
+        ov.pop(str(wk), None)
+    else:
+        ov[str(wk)] = _canon_days(body.get("days"))
     if not ov:
         data["overrides"].pop(key, None)
     _schedules_save(data)
@@ -3875,7 +3869,6 @@ function loadAllData() {
 
 // ---- Camper Schedules (admin) ----
 let schedCampers = [], schedOverrides = {}, schedWeeks = [];
-let schedScope = 'single';   // 'single' | 'future'
 let schedCurrentKey = null, schedDirty = false;   // explicit-save state
 const SCHED_DAYS = ['M','T','W','R','F'];
 const SCHED_DAY_LABEL = {M:'M', T:'T', W:'W', R:'Th', F:'F'};
@@ -3923,10 +3916,7 @@ function renderSchedEditor(key) {
   const enrolled = schedWeeks.filter(w => c.weeks && c.weeks[w.n - 1]);
   let h = `<button class="sched-back" id="sched-back">← Back to search</button>`;
   h += `<div style="font-weight:700;color:var(--brand-dark);font-size:1rem">${famEsc(c.name)}</div>`;
-  h += `<div style="font-size:.82rem;color:#888;margin-bottom:.5rem">${famEsc(c.bunk)}</div>`;
-  h += `<div style="font-size:.82rem;color:#555;margin-bottom:.7rem">Apply changes to: ` +
-    `<label style="margin-right:.8rem"><input type="radio" name="sched-scope" value="single" ${schedScope!=='future'?'checked':''}> this week only</label>` +
-    `<label><input type="radio" name="sched-scope" value="future" ${schedScope==='future'?'checked':''}> this week + all later weeks</label></div>`;
+  h += `<div style="font-size:.82rem;color:#888;margin-bottom:.7rem">${famEsc(c.bunk)}</div>`;
   if (!enrolled.length) h += '<div style="color:#aaa;font-size:.85rem">This camper is not enrolled in any week.</div>';
   enrolled.forEach(w => {
     const isOv = ov[String(w.n)] != null;
@@ -3945,8 +3935,6 @@ function renderSchedEditor(key) {
   }
   box.innerHTML = h;
   document.getElementById('sched-back').addEventListener('click', schedBack);
-  box.querySelectorAll('input[name="sched-scope"]').forEach(r =>
-    r.addEventListener('change', () => { schedScope = r.value; }));
   box.querySelectorAll('.sched-day').forEach(btn =>
     btn.addEventListener('click', () => toggleSchedDay(key, parseInt(btn.dataset.wk, 10), btn.dataset.day)));
   box.querySelectorAll('[data-reset]').forEach(btn =>
@@ -3961,20 +3949,13 @@ async function schedBack() {
   renderSchedResults();
 }
 
-// Enrolled week numbers for a camper at or after a given week (for 'future' scope)
-function schedTargetWeeks(c, fromWk) {
-  if (schedScope !== 'future') return [fromWk];
-  return schedWeeks.filter(w => w.n >= fromWk && c.weeks && c.weeks[w.n - 1]).map(w => w.n);
-}
-
 function toggleSchedDay(key, wk, day) {
   const c = schedCampers.find(x => x.key === key);
   const ovc = schedOverrides[key] || (schedOverrides[key] = {});
   const cur = ovc[String(wk)] != null ? ovc[String(wk)] : (c.days || 'MTWRF');
   const set = new Set(cur.split(''));
   set.has(day) ? set.delete(day) : set.add(day);
-  const canon = SCHED_DAYS.filter(L => set.has(L)).join('');
-  schedTargetWeeks(c, wk).forEach(n => { ovc[String(n)] = canon; });   // this week, or this + all later
+  ovc[String(wk)] = SCHED_DAYS.filter(L => set.has(L)).join('');
   schedDirty = true;
   renderSchedEditor(key);
 }
