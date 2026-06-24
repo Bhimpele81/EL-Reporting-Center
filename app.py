@@ -3908,7 +3908,7 @@ function renderSchedResults() {
   if (!box) return;
   const q = (document.getElementById('sched-search').value || '').trim().toLowerCase();
   if (!q) { box.innerHTML = '<div style="color:#aaa;font-size:.85rem">Start typing a camper name…</div>'; return; }
-  const hits = schedCampers.filter(c => (c.name + ' ' + c.bunk).toLowerCase().includes(q)).slice(0, 50);
+  const hits = schedCampers.filter(c => (c.name || '').toLowerCase().includes(q)).slice(0, 50);
   if (!hits.length) { box.innerHTML = '<div style="color:#aaa;font-size:.85rem">No matches.</div>'; return; }
   box.innerHTML = hits.map(c =>
     `<div class="sched-hit" data-key="${famEsc(c.key)}"><span>${famEsc(c.name)}</span><span class="sh-bunk">${famEsc(c.bunk)}</span></div>`).join('');
