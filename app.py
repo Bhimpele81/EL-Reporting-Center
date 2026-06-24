@@ -881,9 +881,27 @@ def api_schedules_save():
                 weeks.append(n)
         except (TypeError, ValueError):
             pass
+    data = _schedules_load()
+    # Replace the camper's entire week map in one shot (used by the Save button)
+    if isinstance(body.get("replace"), dict):
+        if not key:
+            return jsonify({"error": "missing key"}), 400
+        clean = {}
+        for w, dd in body["replace"].items():
+            try:
+                n = int(w)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= n <= 8:
+                clean[str(n)] = _canon_days(dd)   # "" is valid (attends no days that week)
+        if clean:
+            data["overrides"][key] = clean
+        else:
+            data["overrides"].pop(key, None)
+        _schedules_save(data)
+        return jsonify({"ok": True})
     if not key or not weeks:
         return jsonify({"error": "missing key/week"}), 400
-    data = _schedules_load()
     ov = data["overrides"].setdefault(key, {})
     for n in weeks:
         if body.get("clear"):
@@ -2156,7 +2174,6 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
-  <div class="tab" data-tab="sched" id="tab-sched-nav" style="display:none">📆 <span>Schedules</span></div>
   <div class="tab" data-tab="help">🛟 <span>Help</span></div>
 </nav>
 
@@ -2374,6 +2391,18 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     </div>
   </div>
   </div><!-- /card-grid master+family -->
+
+  <!-- Camper Schedules (admins only, sits just below the master sheet) -->
+  <div class="card" id="sched-card" style="display:none">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Camper Schedules</div>
+        <div class="card-hint">Find a camper and set which days they attend each week. This overrides the master's default day pattern for that week (used by Group Attendance, Extend and Bunk Snapshot reports). Pick a camper, set the days, then Save.</div>
+      </div>
+    </div>
+    <input type="search" id="sched-search" class="pr-input" placeholder="Search camper name…" style="width:100%;max-width:420px;font-size:.95rem">
+    <div id="sched-results" style="margin-top:.8rem"></div>
+  </div>
 
   <!-- Season Calendar + User Accounts (left) | Bunks & Camps (right) -->
   <div class="card-grid" style="align-items:start">
@@ -2728,19 +2757,6 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
 </div><!-- /tab-help -->
 
 <!-- ===== SCHEDULES TAB (admin only) ===== -->
-<div class="tab-panel" id="tab-sched">
-  <div class="card">
-    <div class="card-hd">
-      <div>
-        <div class="card-title">Camper Schedules</div>
-        <div class="card-hint">Find a camper and set which days they attend each week. This overrides the master's default day pattern for that week (used by Group Attendance, Extend and Bunk Snapshot reports). Changes save automatically.</div>
-      </div>
-    </div>
-    <input type="search" id="sched-search" class="pr-input" placeholder="Search camper name…" style="width:100%;max-width:420px;font-size:.95rem">
-    <div id="sched-results" style="margin-top:.8rem"></div>
-  </div>
-</div><!-- /tab-sched -->
-
 </div><!-- /container -->
 
 </div><!-- /layout -->
@@ -3860,11 +3876,13 @@ function loadAllData() {
 // ---- Camper Schedules (admin) ----
 let schedCampers = [], schedOverrides = {}, schedWeeks = [];
 let schedScope = 'single';   // 'single' | 'future'
+let schedCurrentKey = null, schedDirty = false;   // explicit-save state
 const SCHED_DAYS = ['M','T','W','R','F'];
 const SCHED_DAY_LABEL = {M:'M', T:'T', W:'W', R:'Th', F:'F'};
 
 async function loadSchedules() {
   if (!currentUser || !currentUser.is_admin) return;
+  schedCurrentKey = null; schedDirty = false;
   try {
     const res = await fetch('/api/schedules');
     if (!res.ok) return;
@@ -3885,7 +3903,15 @@ function renderSchedResults() {
   if (!hits.length) { box.innerHTML = '<div style="color:#aaa;font-size:.85rem">No matches.</div>'; return; }
   box.innerHTML = hits.map(c =>
     `<div class="sched-hit" data-key="${famEsc(c.key)}"><span>${famEsc(c.name)}</span><span class="sh-bunk">${famEsc(c.bunk)}</span></div>`).join('');
-  box.querySelectorAll('.sched-hit').forEach(el => el.addEventListener('click', () => renderSchedEditor(el.dataset.key)));
+  box.querySelectorAll('.sched-hit').forEach(el => el.addEventListener('click', () => openSchedEditor(el.dataset.key)));
+}
+
+// Enter the editor for a camper (save any pending edits on the previous camper first)
+async function openSchedEditor(key) {
+  if (schedDirty && schedCurrentKey && schedCurrentKey !== key) await saveSchedule(schedCurrentKey);
+  schedCurrentKey = key;
+  schedDirty = false;
+  renderSchedEditor(key);
 }
 
 function renderSchedEditor(key) {
@@ -3911,14 +3937,28 @@ function renderSchedEditor(key) {
       (isOv ? `<button class="sched-back" style="margin:0" data-reset="${w.n}">reset</button>` : '') +
       `</div>`;
   });
+  if (enrolled.length) {
+    h += `<div style="margin-top:.9rem;display:flex;align-items:center;gap:.7rem">` +
+      `<button class="pr-period-btn" id="sched-save"${schedDirty ? '' : ' disabled style=\"opacity:.55;cursor:default\"'}>💾 Save schedule</button>` +
+      `<span id="sched-savemsg" style="font-size:.82rem;color:${schedDirty ? '#b26a00' : '#777'}">${schedDirty ? 'Unsaved changes' : 'All changes saved'}</span>` +
+      `</div>`;
+  }
   box.innerHTML = h;
-  document.getElementById('sched-back').addEventListener('click', renderSchedResults);
+  document.getElementById('sched-back').addEventListener('click', schedBack);
   box.querySelectorAll('input[name="sched-scope"]').forEach(r =>
     r.addEventListener('change', () => { schedScope = r.value; }));
   box.querySelectorAll('.sched-day').forEach(btn =>
     btn.addEventListener('click', () => toggleSchedDay(key, parseInt(btn.dataset.wk, 10), btn.dataset.day)));
   box.querySelectorAll('[data-reset]').forEach(btn =>
     btn.addEventListener('click', () => resetSchedWeek(key, parseInt(btn.dataset.reset, 10))));
+  const saveBtn = document.getElementById('sched-save');
+  if (saveBtn) saveBtn.addEventListener('click', () => saveSchedule(key, true));
+}
+
+async function schedBack() {
+  if (schedDirty && schedCurrentKey) await saveSchedule(schedCurrentKey);
+  schedCurrentKey = null; schedDirty = false;
+  renderSchedResults();
 }
 
 // Enrolled week numbers for a camper at or after a given week (for 'future' scope)
@@ -3927,23 +3967,38 @@ function schedTargetWeeks(c, fromWk) {
   return schedWeeks.filter(w => w.n >= fromWk && c.weeks && c.weeks[w.n - 1]).map(w => w.n);
 }
 
-async function toggleSchedDay(key, wk, day) {
+function toggleSchedDay(key, wk, day) {
   const c = schedCampers.find(x => x.key === key);
   const ovc = schedOverrides[key] || (schedOverrides[key] = {});
   const cur = ovc[String(wk)] != null ? ovc[String(wk)] : (c.days || 'MTWRF');
   const set = new Set(cur.split(''));
   set.has(day) ? set.delete(day) : set.add(day);
   const canon = SCHED_DAYS.filter(L => set.has(L)).join('');
-  const weeks = schedTargetWeeks(c, wk);          // this week, or this + all later (by scope)
-  weeks.forEach(n => { ovc[String(n)] = canon; });
+  schedTargetWeeks(c, wk).forEach(n => { ovc[String(n)] = canon; });   // this week, or this + all later
+  schedDirty = true;
   renderSchedEditor(key);
-  try { await fetch('/api/schedules', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key, weeks, days: canon})}); } catch(e) {}
 }
 
-async function resetSchedWeek(key, wk) {
+function resetSchedWeek(key, wk) {
   if (schedOverrides[key]) { delete schedOverrides[key][String(wk)]; if (!Object.keys(schedOverrides[key]).length) delete schedOverrides[key]; }
+  schedDirty = true;
   renderSchedEditor(key);
-  try { await fetch('/api/schedules', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key, week: wk, clear: true})}); } catch(e) {}
+}
+
+async function saveSchedule(key, fromButton) {
+  key = key || schedCurrentKey;
+  if (!key) return;
+  const msg = fromButton ? document.getElementById('sched-savemsg') : null;
+  if (msg) { msg.textContent = 'Saving…'; msg.style.color = '#777'; }
+  try {
+    const res = await fetch('/api/schedules', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({key, replace: schedOverrides[key] || {}})});
+    if (!res.ok) throw new Error('save failed');
+    schedDirty = false;
+    if (fromButton && schedCurrentKey === key) renderSchedEditor(key);   // refresh button/state
+  } catch(e) {
+    if (msg) { msg.textContent = 'Save failed — try again'; msg.style.color = '#c0392b'; }
+  }
 }
 
 (function(){ const s = document.getElementById('sched-search'); if (s) s.addEventListener('input', renderSchedResults); })();
@@ -4092,8 +4147,8 @@ document.getElementById('usr-copy').addEventListener('click', async () => {
     overlay.classList.add('hidden');
     document.getElementById('h-user').style.display = 'flex';
     document.getElementById('h-user-name').textContent = user.name || user.username;
-    const schedNav = document.getElementById('tab-sched-nav');   // admin-only for now
-    if (schedNav) schedNav.style.display = user.is_admin ? '' : 'none';
+    const schedCard = document.getElementById('sched-card');   // admin-only for now
+    if (schedCard) schedCard.style.display = user.is_admin ? '' : 'none';
     loadAllData();
     maybeShowNotice();
   }
