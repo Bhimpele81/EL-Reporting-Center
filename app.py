@@ -1762,9 +1762,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .sched-hit .sh-bunk{font-size:.78rem;color:#888}
 .sched-wk{display:flex;align-items:center;gap:.6rem;padding:.5rem 0;border-bottom:1px solid #eee;flex-wrap:wrap}
 .sched-wk .sw-label{width:170px;font-size:.85rem;color:var(--brand-dark);font-weight:600}
-.sched-day{width:42px;height:36px;border:1.5px solid var(--border);border-radius:6px;background:#fff;color:#999;font-weight:700;font-size:.8rem;cursor:pointer;transition:all .12s}
+.sched-day{width:42px;height:36px;border:1.5px solid #c0392b;border-radius:6px;background:#c0392b;color:#fff;font-weight:700;font-size:.8rem;cursor:pointer;transition:all .12s}
 .sched-day.on{background:#2e7d32;border-color:#2e7d32;color:#fff}
-.sched-day:hover{border-color:var(--brand-mid)}
+.sched-day:hover{filter:brightness(1.08)}
 .sched-back{background:none;border:none;color:var(--brand);cursor:pointer;font-size:.85rem;font-weight:600;padding:0;margin-bottom:.6rem}
 .sched-ov{font-size:.72rem;color:#9a5b00;margin-left:.3rem}
 .season-row{display:flex;align-items:center;gap:.7rem;padding:.3rem 0}
