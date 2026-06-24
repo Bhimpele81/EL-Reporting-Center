@@ -871,20 +871,27 @@ def api_schedules():
 def api_schedules_save():
     body = request.get_json(force=True, silent=True) or {}
     key = (body.get("key") or "").strip()
-    try:
-        wk = int(body.get("week", 0))
-    except (TypeError, ValueError):
-        wk = 0
-    if not key or not (1 <= wk <= 8):
+    # Accept one week ("week") or several ("weeks") to apply the same change to
+    raw = body.get("weeks") if body.get("weeks") is not None else [body.get("week")]
+    weeks = []
+    for w in (raw or []):
+        try:
+            n = int(w)
+            if 1 <= n <= 8:
+                weeks.append(n)
+        except (TypeError, ValueError):
+            pass
+    if not key or not weeks:
         return jsonify({"error": "missing key/week"}), 400
     data = _schedules_load()
     ov = data["overrides"].setdefault(key, {})
-    if body.get("clear"):
-        ov.pop(str(wk), None)
-        if not ov:
-            data["overrides"].pop(key, None)
-    else:
-        ov[str(wk)] = _canon_days(body.get("days"))
+    for n in weeks:
+        if body.get("clear"):
+            ov.pop(str(n), None)
+        else:
+            ov[str(n)] = _canon_days(body.get("days"))
+    if not ov:
+        data["overrides"].pop(key, None)
     _schedules_save(data)
     return jsonify({"ok": True})
 
@@ -3852,6 +3859,7 @@ function loadAllData() {
 
 // ---- Camper Schedules (admin) ----
 let schedCampers = [], schedOverrides = {}, schedWeeks = [];
+let schedScope = 'single';   // 'single' | 'future'
 const SCHED_DAYS = ['M','T','W','R','F'];
 const SCHED_DAY_LABEL = {M:'M', T:'T', W:'W', R:'Th', F:'F'};
 
@@ -3889,7 +3897,10 @@ function renderSchedEditor(key) {
   const enrolled = schedWeeks.filter(w => c.weeks && c.weeks[w.n - 1]);
   let h = `<button class="sched-back" id="sched-back">← Back to search</button>`;
   h += `<div style="font-weight:700;color:var(--brand-dark);font-size:1rem">${famEsc(c.name)}</div>`;
-  h += `<div style="font-size:.82rem;color:#888;margin-bottom:.6rem">${famEsc(c.bunk)}</div>`;
+  h += `<div style="font-size:.82rem;color:#888;margin-bottom:.5rem">${famEsc(c.bunk)}</div>`;
+  h += `<div style="font-size:.82rem;color:#555;margin-bottom:.7rem">Apply changes to: ` +
+    `<label style="margin-right:.8rem"><input type="radio" name="sched-scope" value="single" ${schedScope!=='future'?'checked':''}> this week only</label>` +
+    `<label><input type="radio" name="sched-scope" value="future" ${schedScope==='future'?'checked':''}> this week + all later weeks</label></div>`;
   if (!enrolled.length) h += '<div style="color:#aaa;font-size:.85rem">This camper is not enrolled in any week.</div>';
   enrolled.forEach(w => {
     const isOv = ov[String(w.n)] != null;
@@ -3902,10 +3913,18 @@ function renderSchedEditor(key) {
   });
   box.innerHTML = h;
   document.getElementById('sched-back').addEventListener('click', renderSchedResults);
+  box.querySelectorAll('input[name="sched-scope"]').forEach(r =>
+    r.addEventListener('change', () => { schedScope = r.value; }));
   box.querySelectorAll('.sched-day').forEach(btn =>
     btn.addEventListener('click', () => toggleSchedDay(key, parseInt(btn.dataset.wk, 10), btn.dataset.day)));
   box.querySelectorAll('[data-reset]').forEach(btn =>
     btn.addEventListener('click', () => resetSchedWeek(key, parseInt(btn.dataset.reset, 10))));
+}
+
+// Enrolled week numbers for a camper at or after a given week (for 'future' scope)
+function schedTargetWeeks(c, fromWk) {
+  if (schedScope !== 'future') return [fromWk];
+  return schedWeeks.filter(w => w.n >= fromWk && c.weeks && c.weeks[w.n - 1]).map(w => w.n);
 }
 
 async function toggleSchedDay(key, wk, day) {
@@ -3915,9 +3934,10 @@ async function toggleSchedDay(key, wk, day) {
   const set = new Set(cur.split(''));
   set.has(day) ? set.delete(day) : set.add(day);
   const canon = SCHED_DAYS.filter(L => set.has(L)).join('');
-  ovc[String(wk)] = canon;
+  const weeks = schedTargetWeeks(c, wk);          // this week, or this + all later (by scope)
+  weeks.forEach(n => { ovc[String(n)] = canon; });
   renderSchedEditor(key);
-  try { await fetch('/api/schedules', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key, week: wk, days: canon})}); } catch(e) {}
+  try { await fetch('/api/schedules', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key, weeks, days: canon})}); } catch(e) {}
 }
 
 async function resetSchedWeek(key, wk) {
