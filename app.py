@@ -2936,7 +2936,7 @@ async function uploadMaster(f) {
     if (!res.ok || d.error) { msg.style.color = '#c0392b'; msg.textContent = d.error || 'Upload failed.'; return; }
     msg.style.color = '#2e7d32'; msg.textContent = '✓ Master sheet saved.';
     loadMaster();
-    snapLoaded = false;   // refresh the Bunk Snapshot from the new master next time it's opened
+    snapRendered = false;   // repaint the Bunk Snapshot on next open (timestamp changed → re-fetch)
   } catch(e) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + e.message; }
 }
 masterDrop.addEventListener('dragover', e => { e.preventDefault(); masterDrop.classList.add('drag-over'); });
@@ -4078,27 +4078,61 @@ async function saveSchedule(key, fromButton) {
 (function(){ const s = document.getElementById('sched-search'); if (s) s.addEventListener('input', renderSchedResults); })();
 
 // ---- Bunk Snapshot viewer (admin) ----
-let snapLoaded = false;
+// Data only changes when a new master sheet is uploaded, so we cache the last
+// snapshot in localStorage and reuse it unless the master's upload timestamp
+// has changed. That means no spinner / reload on normal opens.
+const SNAP_CACHE_KEY = 'el_snap_cache_v2';
+let snapRendered = false;
+
+function _snapPaint(d) {
+  renderSnapMeta(d.meta || {});
+  renderSnapTotals(d.totals || {});
+  renderSnapBunks(d.report || []);
+  snapRendered = true;
+}
+
 async function loadBunkSnapshot(force) {
   if (!currentUser || !currentUser.is_admin) return;
-  if (snapLoaded && !force) return;
-  const meta = document.getElementById('snap-meta');
+  const metaEl = document.getElementById('snap-meta');
+
+  // 1) Paint instantly from cache (even across page reloads) if we have one.
+  let cache = null;
+  try { cache = JSON.parse(localStorage.getItem(SNAP_CACHE_KEY) || 'null'); } catch(e) {}
+  if (!snapRendered) {
+    if (cache && cache.report) _snapPaint(cache);
+    else metaEl.innerHTML = '<span>📋</span><span>Loading…</span>';
+  }
+
+  // 2) Cheap check: did the master sheet change since our cached copy?
+  let curStamp = '', hasMaster = true;
+  try {
+    const mr = await fetch('/api/master');
+    if (mr.ok) { const md = await mr.json(); hasMaster = !!md.loaded; curStamp = md.uploaded_at || ''; }
+  } catch(e) {}
+  if (!force && cache && cache.report && hasMaster && curStamp && cache.uploaded_at === curStamp) {
+    return;   // up to date — nothing to reload
+  }
+
+  // 3) Master changed (or no cache / forced) — fetch fresh and re-cache.
   try {
     const res = await fetch('/api/bunk-snapshot');
-    if (!res.ok) { meta.innerHTML = '<span>⚠️</span><span>Could not load snapshot.</span>'; return; }
+    if (!res.ok) { if (!snapRendered) metaEl.innerHTML = '<span>⚠️</span><span>Could not load snapshot.</span>'; return; }
     const d = await res.json();
     if (!d.has_master) {
-      meta.innerHTML = '<span>📋</span><span>No master sheet uploaded yet. Upload one in Utilities to see the snapshot.</span>';
+      metaEl.innerHTML = '<span>📋</span><span>No master sheet uploaded yet. Upload one in Utilities to see the snapshot.</span>';
       document.getElementById('snap-totals').innerHTML = '';
       document.getElementById('snap-bunks').innerHTML = '';
-      snapLoaded = true; return;
+      try { localStorage.removeItem(SNAP_CACHE_KEY); } catch(e) {}
+      snapRendered = true; return;
     }
-    if (d.error) { meta.innerHTML = '<span>⚠️</span><span>' + famEsc(d.error) + '</span>'; return; }
-    renderSnapMeta(d.meta || {});
-    renderSnapTotals(d.totals || {});
-    renderSnapBunks(d.report || []);
-    snapLoaded = true;
-  } catch(e) { meta.innerHTML = '<span>⚠️</span><span>Could not load snapshot.</span>'; }
+    if (d.error) { if (!snapRendered) metaEl.innerHTML = '<span>⚠️</span><span>' + famEsc(d.error) + '</span>'; return; }
+    _snapPaint(d);
+    try {
+      localStorage.setItem(SNAP_CACHE_KEY, JSON.stringify({
+        uploaded_at: (d.meta && d.meta.uploaded_at) || curStamp || '',
+        meta: d.meta, totals: d.totals, report: d.report }));
+    } catch(e) {}
+  } catch(e) { if (!snapRendered) metaEl.innerHTML = '<span>⚠️</span><span>Could not load snapshot.</span>'; }
 }
 
 function renderSnapMeta(m) {
