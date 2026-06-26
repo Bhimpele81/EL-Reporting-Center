@@ -2209,7 +2209,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
 <nav class="sidebar">
   <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
-  <div class="tab" data-tab="snap" id="tab-snap-nav">📸 <span>Bunk Snapshot</span><span class="nav-new">NEW</span></div>
+  <div class="tab" data-tab="snap" id="tab-snap-nav">📸 <span>Camp Snapshot</span><span class="nav-new">NEW</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
   <div class="tab" data-tab="help">🛟 <span>Help</span></div>
 </nav>
@@ -2383,7 +2383,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="card">
     <div class="card-hd">
       <div>
-        <div class="card-title">Bunk Snapshot</div>
+        <div class="card-title">Camp Snapshot</div>
         <div class="card-hint">A live, on-screen version of the Bunk Snapshot report, built from the master sheet currently saved on the server. Switch between camp/bunk totals and the full per-bunk roster.</div>
       </div>
     </div>
@@ -2704,9 +2704,9 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     </details>
 
     <details class="faq">
-      <summary>How can I see a summary of camp (Bunk Snapshot) without generating a whole new report?</summary>
+      <summary>How can I see a summary of camp (Camp Snapshot) without generating a whole new report?</summary>
       <div class="faq-body">
-        <p>Open the <strong>📸 Bunk Snapshot</strong> tab on the left. It shows the same information as the Bunk Snapshot report, right on screen — no file to download.</p>
+        <p>Open the <strong>📸 Camp Snapshot</strong> tab on the left. It shows the same information as the Bunk Snapshot report, right on screen — no file to download.</p>
         <ul>
           <li><strong>Totals</strong> — camper counts by bunk and by camp group, plus the by-week breakdowns.</li>
           <li><strong>Bunks</strong> — the full per-bunk roster (weeks, days, age, grade) with a camper search box.</li>
