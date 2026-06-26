@@ -23,10 +23,11 @@ Push to `master` (EL-Reporting-Center) / `main` (PGAGolfPool); Render auto-deplo
 - **Storage**: AWS S3 (boto3, optional) **plus** local files under `uploads/`. JSON state files: `bunk_config.json`, `current_master.dat`/`_meta.json`, `payroll.json`, `families.json`, `users.json`. These are hidden from the "Recent reports" list via `_PROTECTED_KEYS`.
 - **Fonts**: Roboto Slab + DM Sans. Brand color `#6D1F2F` (burgundy).
 
-### Three tabs
+### Tabs (left sidebar)
 1. **Run Report** — pick a report (+ week for week-aware ones), Run → builds in background, auto-downloads. Shows the saved-master banner (with uploader). No master upload here anymore.
 2. **Payroll** — shared staff attendance system (see below).
-3. **Utilities** (renamed from "Bunks & Camps") — top→bottom: **Master Sheet** upload, **Family Contacts**, **Bunks & Camps** config, and (admins only) **User Accounts**.
+3. **Bunk Snapshot** *(admin-only nav tab `#tab-snap-nav`, with a green "NEW" badge; gated in `showApp` by `is_admin`)* — on-screen version of the Bunk Snapshot report. Two sub-tabs: **Totals** (Bunk Totals, Group Totals, Group/Bunk Totals by Week) and **Bunks** (per-bunk roster: Child / #1–#8 / M T W R F / Age / Grade + per-bunk Total, with a camper search). Shows a "Data last updated …" line from the master meta. `GET /api/bunk-snapshot` (`@admin_required`) returns `{has_master, meta, report, totals}` computed by `report_processor.bunk_snapshot_data(campers, config)` (mirrors `build_report_sheet`/`build_totals_sheet` numbers without writing Excel). Lazy-loaded on first open; `snapLoaded` reset after a master upload.
+4. **Utilities** (renamed from "Bunks & Camps") — top→bottom: **Master Sheet** upload, **Camper Schedules**, **Family Contacts**, **Season Calendar**, **Bunks & Camps** config, and (admins only) **User Accounts**.
 
 ---
 

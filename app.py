@@ -25,7 +25,7 @@ from botocore.exceptions import ClientError
 from flask import Flask, request, jsonify, send_file, render_template_string, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from report_processor import process_report, load_bunk_config, save_bunk_config, is_master, parse_master
+from report_processor import process_report, load_bunk_config, save_bunk_config, is_master, parse_master, bunk_snapshot_data
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -906,6 +906,30 @@ def api_schedules_save():
     return jsonify({"ok": True})
 
 
+@app.route("/api/bunk-snapshot", methods=["GET"])
+@admin_required
+def api_bunk_snapshot():
+    """On-screen Bunk Snapshot (Totals + Bunks) computed from the saved master."""
+    meta = _load_master_meta() or {}
+    fb = _load_master()
+    if not fb:
+        return jsonify({"has_master": False, "meta": meta})
+    try:
+        campers = parse_master(fb) or []
+        config = _s3_load_config() or load_bunk_config(CONFIG_PATH)
+        data = bunk_snapshot_data(campers, config)
+    except Exception as e:
+        return jsonify({"has_master": True, "error": str(e), "meta": meta}), 200
+    return jsonify({
+        "has_master": True,
+        "meta":       {"filename": meta.get("filename", ""),
+                       "uploaded_at": meta.get("uploaded_at", ""),
+                       "uploaded_by": meta.get("uploaded_by", "")},
+        "report":     data["report"],
+        "totals":     data["totals"],
+    })
+
+
 # --- Report processing ---
 
 @app.route("/api/master", methods=["GET"])
@@ -1737,6 +1761,27 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .tab-badge{background:var(--brand);color:#fff;font-size:.65rem;font-weight:700;padding:.15rem .45rem;border-radius:10px;min-width:18px;text-align:center;margin-left:auto}
 .container{flex:1;min-width:0;max-width:1400px;padding:2rem 2rem 4rem;box-sizing:border-box}
 .tab-panel{display:none}.tab-panel.active{display:block}
+/* NEW badge next to a nav tab */
+.nav-new{background:#2e7d32;color:#fff;font-size:.6rem;font-weight:800;letter-spacing:.5px;padding:.1rem .35rem;border-radius:8px;margin-left:.4rem}
+/* Bunk Snapshot viewer */
+.snap-meta{font-size:.83rem;color:#1A79BF;background:#eef4fb;border:1px solid #b9d2ec;border-radius:8px;padding:.55rem .85rem;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.snap-subtabs{display:flex;gap:.4rem;margin-bottom:1rem}
+.snap-subtab{padding:.45rem .95rem;border:1px solid var(--border);border-radius:8px;background:#fff;color:#555;font-weight:600;font-size:.9rem;cursor:pointer}
+.snap-subtab.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.snap-view{display:none}.snap-view.on{display:block}
+.snap-search{width:100%;max-width:380px;margin-bottom:1rem;font-size:.92rem}
+.snap-tbl{border-collapse:collapse;font-size:.85rem;width:100%}
+.snap-tbl th,.snap-tbl td{border:1px solid #d8d8d8;padding:.3rem .5rem;text-align:center;white-space:nowrap}
+.snap-tbl thead th{background:var(--brand);color:#fff;font-weight:700}
+.snap-tbl td.snap-l,.snap-tbl th.snap-l{text-align:left}
+.snap-tbl tr.snap-alt td{background:#f6f6f8}
+.snap-tbl tr.snap-total td{background:#fde9cf;font-weight:700}
+.snap-tbl .snap-sep{border-left:2px solid #9a9a9a}
+.snap-bunk-block{margin-bottom:1.6rem}
+.snap-bunk-name{font-weight:800;color:#000;font-size:1.15rem;margin:.2rem 0 .35rem}
+.snap-grids{display:flex;flex-wrap:wrap;gap:1.6rem;align-items:flex-start}
+.snap-grids>div{min-width:280px}
+.snap-sec-title{font-weight:700;color:var(--brand-dark);margin:.2rem 0 .4rem}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
 .payroll-table td{height:42px}
@@ -2165,6 +2210,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
 <nav class="sidebar">
   <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
+  <div class="tab" data-tab="snap" id="tab-snap-nav" style="display:none">📸 <span>Bunk Snapshot</span><span class="nav-new">NEW</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
   <div class="tab" data-tab="help">🛟 <span>Help</span></div>
 </nav>
@@ -2332,6 +2378,25 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   </div>
 
 </div><!-- /tab-upload -->
+
+<!-- ===== BUNK SNAPSHOT TAB (admin only) ===== -->
+<div class="tab-panel" id="tab-snap">
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Bunk Snapshot</div>
+        <div class="card-hint">A live, on-screen version of the Bunk Snapshot report, built from the master sheet currently saved on the server. Switch between camp/bunk totals and the full per-bunk roster.</div>
+      </div>
+    </div>
+    <div class="snap-meta" id="snap-meta"><span>📋</span><span>Loading…</span></div>
+    <div class="snap-subtabs">
+      <button class="snap-subtab on" data-snap="totals">Totals</button>
+      <button class="snap-subtab" data-snap="bunks">Bunks</button>
+    </div>
+    <div class="snap-view on" id="snap-totals"></div>
+    <div class="snap-view" id="snap-bunks"></div>
+  </div>
+</div>
 
 <!-- ===== UTILITIES TAB ===== -->
 <div class="tab-panel" id="tab-config">
@@ -2782,6 +2847,17 @@ document.querySelectorAll('.tab').forEach(tab => {
     tab.classList.add('active');
     document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
     if (tab.dataset.tab === 'payroll') renderPayroll();
+    if (tab.dataset.tab === 'snap') loadBunkSnapshot();
+  });
+});
+
+// Bunk Snapshot sub-tabs (Totals / Bunks)
+document.querySelectorAll('.snap-subtab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.snap-subtab').forEach(b => b.classList.remove('on'));
+    document.querySelectorAll('.snap-view').forEach(v => v.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById('snap-' + btn.dataset.snap).classList.add('on');
   });
 });
 
@@ -2860,6 +2936,7 @@ async function uploadMaster(f) {
     if (!res.ok || d.error) { msg.style.color = '#c0392b'; msg.textContent = d.error || 'Upload failed.'; return; }
     msg.style.color = '#2e7d32'; msg.textContent = '✓ Master sheet saved.';
     loadMaster();
+    snapLoaded = false;   // refresh the Bunk Snapshot from the new master next time it's opened
   } catch(e) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + e.message; }
 }
 masterDrop.addEventListener('dragover', e => { e.preventDefault(); masterDrop.classList.add('drag-over'); });
@@ -4000,6 +4077,126 @@ async function saveSchedule(key, fromButton) {
 
 (function(){ const s = document.getElementById('sched-search'); if (s) s.addEventListener('input', renderSchedResults); })();
 
+// ---- Bunk Snapshot viewer (admin) ----
+let snapLoaded = false;
+async function loadBunkSnapshot(force) {
+  if (!currentUser || !currentUser.is_admin) return;
+  if (snapLoaded && !force) return;
+  const meta = document.getElementById('snap-meta');
+  try {
+    const res = await fetch('/api/bunk-snapshot');
+    if (!res.ok) { meta.innerHTML = '<span>⚠️</span><span>Could not load snapshot.</span>'; return; }
+    const d = await res.json();
+    if (!d.has_master) {
+      meta.innerHTML = '<span>📋</span><span>No master sheet uploaded yet. Upload one in Utilities to see the snapshot.</span>';
+      document.getElementById('snap-totals').innerHTML = '';
+      document.getElementById('snap-bunks').innerHTML = '';
+      snapLoaded = true; return;
+    }
+    if (d.error) { meta.innerHTML = '<span>⚠️</span><span>' + famEsc(d.error) + '</span>'; return; }
+    renderSnapMeta(d.meta || {});
+    renderSnapTotals(d.totals || {});
+    renderSnapBunks(d.report || []);
+    snapLoaded = true;
+  } catch(e) { meta.innerHTML = '<span>⚠️</span><span>Could not load snapshot.</span>'; }
+}
+
+function renderSnapMeta(m) {
+  const who = (m.uploaded_by || '').replace(/@.*$/, '');
+  let when = (m.uploaded_at || '').replace(/\s*[A-Z]{2,4}\s*$/, '');
+  let txt = 'Data last updated';
+  if (when) txt += ': ' + when;
+  if (who) txt += ' by ' + who;
+  if (m.filename) txt += ' (' + m.filename + ')';
+  document.getElementById('snap-meta').innerHTML = '<span>📋</span><span>' + famEsc(txt) + '</span>';
+}
+
+function _snapTbl(headLeft, rows, opts) {
+  // rows: array of {cells:[...], cls:''}; first cell is left-aligned label
+  opts = opts || {};
+  const wk = opts.weeks;   // true => header is #1..#8
+  let h = '<table class="snap-tbl"><thead><tr>';
+  if (Array.isArray(headLeft)) headLeft.forEach((hh,i) => h += `<th class="${i===0?'snap-l':''}">${famEsc(hh)}</th>`);
+  if (wk) for (let i=1;i<=8;i++) h += `<th>#${i}</th>`;
+  h += '</tr></thead><tbody>';
+  rows.forEach(r => {
+    h += `<tr class="${r.cls||''}">`;
+    r.cells.forEach((c,i) => h += `<td class="${i===0?'snap-l':''}">${c===''||c==null?'':famEsc(String(c))}</td>`);
+    h += '</tr>';
+  });
+  return h + '</tbody></table>';
+}
+
+function renderSnapTotals(t) {
+  // Bunk Totals (Camp | Bunk | Total)
+  const bunkRows = (t.bunk_totals||[]).map((b,i)=>({cls:i%2?'snap-alt':'',cells:[b.camp,b.bunk,b.total]}));
+  bunkRows.push({cls:'snap-total',cells:['TOTAL','',t.bunk_grand]});
+  // Group Totals (Camp | Total)
+  const grpRows = (t.group_totals||[]).map((g,i)=>({cls:i%2?'snap-alt':'',cells:[g.label,g.total]}));
+  grpRows.push({cls:'snap-total',cells:['Total',t.group_grand]});
+  // Group Totals by Week
+  const gwRows = (t.group_by_week||[]).map((g,i)=>({cls:i%2?'snap-alt':'',cells:[g.label,...g.weeks]}));
+  gwRows.push({cls:'snap-total',cells:['Total',...(t.week_total||[])]});
+  // Bunk Totals by Week
+  const bwRows = (t.bunk_by_week||[]).map((b,i)=>({cls:i%2?'snap-alt':'',cells:[b.bunk,...b.weeks]}));
+  bwRows.push({cls:'snap-total',cells:['Total',...(t.week_total||[])]});
+
+  document.getElementById('snap-totals').innerHTML =
+    '<div class="snap-grids">' +
+      '<div>' +
+        '<div class="snap-sec-title">Bunk Totals</div>' + _snapTbl(['Camp','Bunk','Total'], bunkRows) +
+        '<div class="snap-sec-title" style="margin-top:1.2rem">Group Totals</div>' + _snapTbl(['Camp','Total'], grpRows) +
+      '</div>' +
+      '<div>' +
+        '<div class="snap-sec-title">Group Totals by Week</div>' + _snapTbl(['Group'], gwRows, {weeks:true}) +
+        '<div class="snap-sec-title" style="margin-top:1.2rem">Bunk Totals by Week</div>' + _snapTbl(['Bunk'], bwRows, {weeks:true}) +
+      '</div>' +
+    '</div>';
+}
+
+function renderSnapBunks(report) {
+  let h = '<input type="search" id="snap-bunk-search" class="pr-input snap-search" placeholder="Search camper name…">';
+  report.forEach(b => {
+    h += '<div class="snap-bunk-block" data-block>';
+    h += `<div class="snap-bunk-name">${famEsc(b.bunk)}</div>`;
+    h += '<table class="snap-tbl"><thead><tr>' +
+         '<th class="snap-l">Child</th>' +
+         '<th>#1</th><th>#2</th><th>#3</th><th>#4</th><th>#5</th><th>#6</th><th>#7</th><th>#8</th>' +
+         '<th class="snap-sep">M</th><th>T</th><th>W</th><th>R</th><th>F</th>' +
+         '<th class="snap-sep">Age</th><th>Grade</th></tr></thead><tbody>';
+    b.campers.forEach((c,i) => {
+      h += `<tr class="${i%2?'snap-alt':''}" data-n="${famEsc((c.name||'').toLowerCase())}">`;
+      h += `<td class="snap-l">${famEsc(c.name)}</td>`;
+      c.weeks.forEach(w => h += `<td>${w?w:''}</td>`);
+      c.days.forEach((d,di) => h += `<td class="${di===0?'snap-sep':''}">${famEsc(d||'')}</td>`);
+      h += `<td class="snap-sep">${c.age===''?'':famEsc(String(c.age))}</td><td>${famEsc(String(c.grade||''))}</td>`;
+      h += '</tr>';
+    });
+    // Total row
+    h += '<tr class="snap-total"><td class="snap-l">Total: ' + b.total + '</td>';
+    b.week_sums.forEach(s => h += `<td>${s}</td>`);
+    h += '<td class="snap-sep"></td><td></td><td></td><td></td><td></td><td class="snap-sep"></td><td></td></tr>';
+    h += '</tbody></table></div>';
+  });
+  const box = document.getElementById('snap-bunks');
+  box.innerHTML = h;
+  const search = document.getElementById('snap-bunk-search');
+  if (search) search.addEventListener('input', () => {
+    const q = (search.value||'').trim().toLowerCase();
+    box.querySelectorAll('[data-block]').forEach(blk => {
+      let shown = 0;
+      blk.querySelectorAll('tr[data-n]').forEach(tr => {
+        const hit = !q || tr.dataset.n.includes(q);
+        tr.style.display = hit ? '' : 'none';
+        if (hit) shown++;
+      });
+      const totalRow = blk.querySelector('tr.snap-total');
+      if (totalRow) totalRow.style.display = q ? 'none' : '';
+      blk.style.display = (q && shown === 0) ? 'none' : '';
+    });
+  });
+}
+
 // ---- First-time "Utilities" notice (shows once per browser, after sign-in) ----
 function maybeShowNotice() {
   const KEY = 'el_seen_utilities_notice_v1';
@@ -4144,6 +4341,8 @@ document.getElementById('usr-copy').addEventListener('click', async () => {
     overlay.classList.add('hidden');
     document.getElementById('h-user').style.display = 'flex';
     document.getElementById('h-user-name').textContent = user.name || user.username;
+    const snapNav = document.getElementById('tab-snap-nav');   // admin-only for now
+    if (snapNav) snapNav.style.display = user.is_admin ? '' : 'none';
     loadAllData();
     maybeShowNotice();
   }

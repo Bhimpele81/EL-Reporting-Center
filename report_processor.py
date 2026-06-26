@@ -754,6 +754,104 @@ def build_totals_sheet(ws, campers: list, config: dict,
 
 
 # ---------------------------------------------------------------------------
+# Bunk Snapshot — structured data for the on-screen viewer (no Excel)
+# Mirrors build_report_sheet (Bunks) and build_totals_sheet (Totals) exactly,
+# but returns plain dicts/lists for the UI instead of writing a workbook.
+# ---------------------------------------------------------------------------
+
+def bunk_snapshot_data(campers: list, config: dict) -> dict:
+    # ----- BUNKS view: campers grouped by bunk (same order as the report) ----
+    bunk_groups = {}
+    for c in campers:
+        bunk_groups.setdefault(c["bunk"], []).append(c)
+    for bk in bunk_groups:
+        bunk_groups[bk].sort(key=lambda x: x["name"])
+    display_order = sorted(bunk_groups.keys(), key=_bunk_sort_key)
+
+    report = []
+    for bunk_name in display_order:
+        group = bunk_groups[bunk_name]
+        week_sums = [0] * 8
+        rows = []
+        for camper in group:
+            weeks = [int(w or 0) for w in camper["weeks"]]
+            for wi, wv in enumerate(weeks):
+                week_sums[wi] += wv
+            # Age numeric when possible; grade numeric when numeric else text
+            age_val = camper.get("age")
+            try:
+                age_val = int(float(str(age_val).strip()))
+            except (ValueError, TypeError, AttributeError):
+                try:
+                    age_val = float(str(age_val).strip())
+                except (ValueError, TypeError, AttributeError):
+                    age_val = camper.get("age") or ""
+            gtext = str(camper.get("grade") or "").strip()
+            rows.append({
+                "name":  camper["name"],
+                "days":  [d if d else "" for d in camper["days"]],   # M T W R F letters or ""
+                "weeks": weeks,
+                "age":   "" if age_val is None else age_val,
+                "grade": gtext,
+            })
+        report.append({
+            "bunk":      bunk_name or "(no bunk)",
+            "campers":   rows,
+            "total":     len(group),
+            "week_sums": week_sums,
+        })
+
+    # ----- TOTALS view: per-bunk, per-camp, and per-week roll-ups -------------
+    bunk_count, bunk_weeks = {}, {}
+    for c in campers:
+        bk = c["bunk"]
+        bunk_count[bk] = bunk_count.get(bk, 0) + 1
+        bunk_weeks.setdefault(bk, [0] * 8)
+        for wi, wv in enumerate(c["weeks"]):
+            bunk_weeks[bk][wi] += int(wv or 0)
+
+    camps = config.get("camps", [])
+    camp_count, camp_weeks = {}, {}
+    for camp in camps:
+        cn = camp["name"]
+        camp_count[cn] = 0
+        camp_weeks[cn] = [0] * 8
+        for bunk in camp.get("bunks", []):
+            bk = bunk["name"]
+            camp_count[cn] += bunk_count.get(bk, 0)
+            for wi in range(8):
+                camp_weeks[cn][wi] += bunk_weeks.get(bk, [0] * 8)[wi]
+
+    grand_total = sum(camp_count.values())
+    grand_weeks = [sum(camp_weeks[c][wi] for c in camp_weeks) for wi in range(8)]
+
+    def _grp_label(cn):
+        return f"{cn} (w/o FT)" if cn.strip().lower().startswith("upper") else cn
+
+    all_bunks_ordered, bunk_camp = [], {}
+    for camp in camps:
+        for b in sorted(camp.get("bunks", []), key=lambda b: int(b.get("number") or 999)):
+            all_bunks_ordered.append(b["name"])
+            bunk_camp[b["name"]] = camp["name"]
+
+    camp_names = [c["name"] for c in camps]
+
+    totals = {
+        "bunk_totals":   [{"camp": bunk_camp.get(bk, ""), "bunk": bk, "total": bunk_count.get(bk, 0)}
+                          for bk in all_bunks_ordered],
+        "bunk_grand":    grand_total,
+        "group_totals":  [{"label": _grp_label(cn), "total": camp_count[cn]} for cn in camp_names],
+        "group_grand":   grand_total,
+        "group_by_week": [{"label": _grp_label(cn), "weeks": camp_weeks[cn]} for cn in camp_names],
+        "bunk_by_week":  [{"bunk": bk, "weeks": bunk_weeks[bk]}
+                          for bk in all_bunks_ordered if bk in bunk_weeks],
+        "week_total":    grand_weeks,
+    }
+
+    return {"report": report, "totals": totals}
+
+
+# ---------------------------------------------------------------------------
 # Group Attendance parser + builder
 # ---------------------------------------------------------------------------
 
