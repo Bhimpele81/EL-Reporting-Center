@@ -907,7 +907,6 @@ def api_schedules_save():
 
 
 @app.route("/api/bunk-snapshot", methods=["GET"])
-@admin_required
 def api_bunk_snapshot():
     """On-screen Bunk Snapshot (Totals + Bunks) computed from the saved master."""
     meta = _load_master_meta() or {}
@@ -2210,7 +2209,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
 <nav class="sidebar">
   <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
-  <div class="tab" data-tab="snap" id="tab-snap-nav" style="display:none">📸 <span>Bunk Snapshot</span><span class="nav-new">NEW</span></div>
+  <div class="tab" data-tab="snap" id="tab-snap-nav">📸 <span>Bunk Snapshot</span><span class="nav-new">NEW</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
   <div class="tab" data-tab="help">🛟 <span>Help</span></div>
 </nav>
@@ -2701,6 +2700,18 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <summary>My report is empty or missing campers — why?</summary>
       <div class="faq-body">
         <p>Usually the <strong>selected week</strong> (the report only includes campers enrolled that week) or an <strong>out-of-date master sheet</strong>. Re-upload the latest master in Utilities and try again.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>How can I see a summary of camp (Bunk Snapshot) without generating a whole new report?</summary>
+      <div class="faq-body">
+        <p>Open the <strong>📸 Bunk Snapshot</strong> tab on the left. It shows the same information as the Bunk Snapshot report, right on screen — no file to download.</p>
+        <ul>
+          <li><strong>Totals</strong> — camper counts by bunk and by camp group, plus the by-week breakdowns.</li>
+          <li><strong>Bunks</strong> — the full per-bunk roster (weeks, days, age, grade) with a camper search box.</li>
+        </ul>
+        <p>It always reflects the <strong>master sheet currently saved on the server</strong> — the "Data last updated" line at the top tells you when that was. It loads instantly and only refreshes when a <strong>new master sheet is uploaded</strong>, so you don't wait on it each time.</p>
       </div>
     </details>
 
@@ -4092,7 +4103,7 @@ function _snapPaint(d) {
 }
 
 async function loadBunkSnapshot(force) {
-  if (!currentUser || !currentUser.is_admin) return;
+  if (!currentUser) return;
   const metaEl = document.getElementById('snap-meta');
 
   // 1) Paint instantly from cache (even across page reloads) if we have one.
@@ -4375,8 +4386,6 @@ document.getElementById('usr-copy').addEventListener('click', async () => {
     overlay.classList.add('hidden');
     document.getElementById('h-user').style.display = 'flex';
     document.getElementById('h-user-name').textContent = user.name || user.username;
-    const snapNav = document.getElementById('tab-snap-nav');   // admin-only for now
-    if (snapNav) snapNav.style.display = user.is_admin ? '' : 'none';
     loadAllData();
     maybeShowNotice();
   }
