@@ -2378,7 +2378,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="tab" data-tab="snap" id="tab-snap-nav">📸 <span>Camp Snapshot</span><span class="nav-new">NEW</span></div>
   <div class="tab" data-tab="families">👪 <span>Families</span><span class="nav-new">NEW</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
-  <div class="tab" data-tab="help">🛟 <span>Help</span></div>
+  <div class="tab" data-tab="help">❓ <span>FAQs</span></div>
 </nav>
 
 <div class="container">
@@ -2787,8 +2787,8 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="card">
     <div class="card-hd">
       <div>
-        <div class="card-title">Help &amp; FAQ</div>
-        <div class="card-hint">Quick answers for running reports, payroll, contacts, and accounts. Tap a question to expand it.</div>
+        <div class="card-title">Frequently Asked Questions</div>
+        <div class="card-hint">Quick answers for reports, payroll, schedules, families, contacts, and accounts. Tap a question to expand it.</div>
       </div>
     </div>
 
