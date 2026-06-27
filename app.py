@@ -2329,7 +2329,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div id="notice-box">
     <div class="notice-icon">📋</div>
     <h2>Heads up — new Utilities tab</h2>
-    <p>The <strong>Bunks &amp; Camps</strong> tab is now <strong>Utilities</strong>. From now on, upload your <strong>Master Sheet</strong> from the <strong>Utilities</strong> tab (not the Run Report tab).</p>
+    <p>The <strong>Bunks &amp; Camps</strong> tab is now <strong>Utilities</strong>. From now on, upload your <strong>Master Sheet</strong> from the <strong>Utilities</strong> tab (not the Reports tab).</p>
     <p style="color:#777;font-size:.82rem">You can also import &amp; manage <strong>Family Contacts</strong> there. Bunks &amp; Camps settings moved to the bottom of that tab.</p>
     <button id="notice-ok" class="notice-btn">Got it</button>
   </div>
@@ -2373,7 +2373,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
 <div class="layout">
 
 <nav class="sidebar">
-  <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
+  <div class="tab active" data-tab="upload">📂 <span>Reports</span></div>
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
   <div class="tab" data-tab="snap" id="tab-snap-nav">📸 <span>Camp Snapshot</span><span class="nav-new">NEW</span></div>
   <div class="tab" data-tab="families">👪 <span>Families</span><span class="nav-new">NEW</span></div>
@@ -2798,7 +2798,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <summary>How do I run a report?</summary>
       <div class="faq-body">
         <p>1. In the <strong>Utilities</strong> tab, upload the camper <strong>Master Sheet</strong> (you only do this once — it's saved on the server).</p>
-        <p>2. Go to <strong>Run Report</strong>, choose a report, and pick a <strong>week</strong> if it asks.</p>
+        <p>2. Go to <strong>Reports</strong>, choose a report, and pick a <strong>week</strong> if it asks.</p>
         <p>3. Click <strong>Run Report</strong> — the file builds and downloads automatically.</p>
       </div>
     </details>
@@ -3037,7 +3037,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>Where do my past reports go?</summary>
       <div class="faq-body">
-        <p>The most recent ones are listed under <strong>Recent Reports</strong> on the Run Report tab, each with a Download button.</p>
+        <p>The most recent ones are listed under <strong>Recent Reports</strong> on the Reports tab, each with a Download button.</p>
       </div>
     </details>
 
