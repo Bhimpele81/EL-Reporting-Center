@@ -969,6 +969,28 @@ def api_families_full():
     def _full(*parts):
         return " ".join(p.strip() for p in parts if (p or "").strip()).strip()
 
+    # Emails aren't a mapped field, but the importer auto-captures unknown columns
+    # under a slug — so pull any email out of the record by key hint or value shape.
+    email_re = re.compile(r"[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+")
+
+    def _emails_from_record(rec):
+        primary, secondary, others = "", "", []
+        for k, v in rec.items():
+            if not isinstance(v, str) or not v.strip():
+                continue
+            kl = k.lower()
+            m = email_re.search(v)
+            if not ("email" in kl or "e_mail" in kl or kl.endswith("_mail") or m):
+                continue
+            val = m.group(0) if m else v.strip()
+            if any(t in kl for t in ("p1", "parent_1", "parent1", "primary", "guardian_1", "guardian1", "mother", "mom")):
+                primary = primary or val
+            elif any(t in kl for t in ("p2", "parent_2", "parent2", "secondary", "guardian_2", "guardian2", "father", "dad")):
+                secondary = secondary or val
+            elif val not in (primary, secondary) and val not in others:
+                others.append(val)
+        return primary, secondary, others
+
     groups = {}
     for r in fams:
         fam = (r.get("family") or r.get("last") or "").strip()
@@ -977,6 +999,7 @@ def api_families_full():
                          _full(r.get("primary_first"), r.get("primary_last")).lower()])
         g = groups.get(gkey)
         if not g:
+            pe, se, oe = _emails_from_record(r)
             g = groups[gkey] = {
                 "key": gkey,
                 "name": fam or (r.get("last") or "Family"),
@@ -984,9 +1007,10 @@ def api_families_full():
                             "city": r.get("city", ""), "state": r.get("state", ""), "zip": r.get("zip", "")},
                 "contacts": {
                     "primary":   {"name": _full(r.get("primary_first"), r.get("primary_last")),
-                                  "phone": r.get("primary_phone", "")},
+                                  "phone": r.get("primary_phone", ""), "email": pe},
                     "secondary": {"name": _full(r.get("secondary_first"), r.get("secondary_last")),
-                                  "phone": r.get("secondary_phone", "")},
+                                  "phone": r.get("secondary_phone", ""), "email": se},
+                    "emails_other": oe,
                     "pickups":   [{"name": r.get(f"pu{i}_name", ""), "auth": r.get(f"pu{i}_auth", "")}
                                   for i in range(1, 5) if (r.get(f"pu{i}_name") or "").strip()],
                 },
@@ -4456,13 +4480,17 @@ function famCardHTML(f) {
 
   // Contacts
   const ct = f.contacts || {};
-  const hasC = (ct.primary && (ct.primary.name || ct.primary.phone)) || (ct.secondary && (ct.secondary.name || ct.secondary.phone)) || (ct.pickups && ct.pickups.length);
+  const hasC = (ct.primary && (ct.primary.name || ct.primary.phone || ct.primary.email)) || (ct.secondary && (ct.secondary.name || ct.secondary.phone || ct.secondary.email)) || (ct.emails_other && ct.emails_other.length) || (ct.pickups && ct.pickups.length);
   if (hasC) {
     h += '<div class="fam-sec"><div class="fam-sec-h">Contacts</div>';
     [['Primary', ct.primary], ['Secondary', ct.secondary]].forEach(([lbl, p]) => {
-      if (p && (p.name || p.phone)) {
-        h += '<div class="fam-row"><span class="fam-lbl">' + lbl + ':</span>' + famEsc(p.name || '—') + (p.phone ? ' · ' + famEsc(p.phone) : '') + '</div>';
+      if (p && (p.name || p.phone || p.email)) {
+        const bits = [p.phone, p.email].filter(Boolean).map(famEsc).join(' · ');
+        h += '<div class="fam-row"><span class="fam-lbl">' + lbl + ':</span>' + famEsc(p.name || '—') + (bits ? ' · ' + bits : '') + '</div>';
       }
+    });
+    (ct.emails_other || []).forEach(em => {
+      h += '<div class="fam-row"><span class="fam-lbl">Email:</span>' + famEsc(em) + '</div>';
     });
     (ct.pickups || []).forEach(pu => {
       h += '<div class="fam-pickup"><span class="fam-lbl">Pickup:</span>' + famEsc(pu.name) + (pu.auth ? ' <span style="color:#888">(' + famEsc(pu.auth) + ')</span>' : '') + '</div>';
