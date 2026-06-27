@@ -2993,6 +2993,18 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       </div>
     </details>
 
+    <details class="faq">
+      <summary>Can I update a family's contact info or a camper's schedule from here?</summary>
+      <div class="faq-body">
+        <p>Yes. On any family card, click <strong>✎ Edit</strong> (top-right). You can change:</p>
+        <ul>
+          <li><strong>Contact info</strong> — address, primary &amp; secondary parent (name, phone, email), and up to four authorized pickups. This is shared by the whole family, so it updates every sibling at once.</li>
+          <li><strong>Schedules</strong> — tap the day buttons (green = attending, red = not) for each enrolled week, per camper.</li>
+        </ul>
+        <p>Click <strong>Save</strong> to keep your changes or <strong>Cancel</strong> to discard them. Schedule changes save just the weeks you touched and behave exactly like the <strong>Camper Schedules</strong> tool — they're applied to the week-specific reports and kept even after a new master sheet is uploaded.</p>
+      </div>
+    </details>
+
     <div class="help-sub">Accounts</div>
 
     <details class="faq">
