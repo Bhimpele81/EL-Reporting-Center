@@ -929,6 +929,96 @@ def api_bunk_snapshot():
     })
 
 
+@app.route("/api/families/full", methods=["GET"])
+def api_families_full():
+    """Grouped family records joined with master (age/grade/enrollment) and
+    per-week schedule overrides, for the on-screen Families directory."""
+    fams = _families_load()["families"]
+    week_ranges = _season_week_strings()
+    weeks = [{"n": i + 1, "range": r} for i, r in enumerate(week_ranges)]
+    overrides = _schedules_load()["overrides"]
+
+    # Index the saved master by camper key and by name (for enrichment)
+    master_by_key, master_by_name = {}, {}
+    fb = _load_master()
+    if fb:
+        try:
+            for c in parse_master(fb) or []:
+                master_by_key.setdefault(_camper_key(c.get("name"), c.get("bunk")), c)
+                master_by_name.setdefault((c.get("name") or "").strip().lower(), c)
+        except Exception:
+            pass
+
+    def _camper_schedule(name, bunk):
+        c = master_by_key.get(_camper_key(name, bunk)) or master_by_name.get((name or "").strip().lower())
+        if not c:
+            return {"found": False, "age": "", "grade": "", "bunk": bunk, "weeks_detail": []}
+        ov = overrides.get(_camper_key(c.get("name"), c.get("bunk")), {})
+        default_days = c.get("days_sched") or "MTWRF"
+        detail = []
+        for i, enrolled in enumerate(c.get("weeks", [])):
+            if not enrolled:
+                continue
+            days = ov.get(str(i + 1), default_days)
+            detail.append({"n": i + 1,
+                           "range": week_ranges[i] if i < len(week_ranges) else "",
+                           "days": _canon_days(days)})
+        return {"found": True, "age": c.get("age") or "", "grade": c.get("grade") or "",
+                "bunk": c.get("bunk") or bunk, "weeks_detail": detail}
+
+    def _full(*parts):
+        return " ".join(p.strip() for p in parts if (p or "").strip()).strip()
+
+    groups = {}
+    for r in fams:
+        fam = (r.get("family") or r.get("last") or "").strip()
+        gkey = "|".join([fam.lower(), (r.get("address") or "").strip().lower(),
+                         (r.get("zip") or "").strip().lower(),
+                         _full(r.get("primary_first"), r.get("primary_last")).lower()])
+        g = groups.get(gkey)
+        if not g:
+            g = groups[gkey] = {
+                "key": gkey,
+                "name": fam or (r.get("last") or "Family"),
+                "address": {"address": r.get("address", ""), "address2": r.get("address2", ""),
+                            "city": r.get("city", ""), "state": r.get("state", ""), "zip": r.get("zip", "")},
+                "contacts": {
+                    "primary":   {"name": _full(r.get("primary_first"), r.get("primary_last")),
+                                  "phone": r.get("primary_phone", "")},
+                    "secondary": {"name": _full(r.get("secondary_first"), r.get("secondary_last")),
+                                  "phone": r.get("secondary_phone", "")},
+                    "pickups":   [{"name": r.get(f"pu{i}_name", ""), "auth": r.get(f"pu{i}_auth", "")}
+                                  for i in range(1, 5) if (r.get(f"pu{i}_name") or "").strip()],
+                },
+                "campers": [],
+                "_search": set(),
+            }
+        last, first = (r.get("last") or "").strip(), (r.get("first") or "").strip()
+        disp = _full(f"{last}," if last else "", first) or last or first
+        sched = _camper_schedule(f"{last}, {first}", r.get("bunk", ""))
+        g["campers"].append({
+            "name": disp, "first": first, "last": last,
+            "bunk": sched["bunk"] or r.get("bunk", ""),
+            "age": sched["age"], "grade": sched["grade"],
+            "weeks_detail": sched["weeks_detail"], "in_master": sched["found"],
+        })
+        for t in (disp, first, last):
+            if t:
+                g["_search"].add(t.lower())
+
+    out = []
+    for g in groups.values():
+        s = g.pop("_search")
+        s.add((g["name"] or "").lower())
+        s.add(g["contacts"]["primary"]["name"].lower())
+        s.add(g["contacts"]["secondary"]["name"].lower())
+        g["search"] = " ".join(x for x in s if x)
+        out.append(g)
+    out.sort(key=lambda g: (g["name"] or "").lower())
+    return jsonify({"families": out, "weeks": weeks,
+                    "has_families": bool(fams), "has_master": bool(fb)})
+
+
 # --- Report processing ---
 
 @app.route("/api/master", methods=["GET"])
@@ -1781,6 +1871,26 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .snap-grids{display:flex;flex-wrap:wrap;gap:1.6rem;align-items:flex-start}
 .snap-grids>div{min-width:280px}
 .snap-sec-title{font-weight:700;color:var(--brand-dark);margin:.2rem 0 .4rem}
+/* Families directory */
+.fam-cards{display:flex;flex-wrap:wrap;gap:1.2rem;align-items:flex-start}
+.fam-card{border:1px solid var(--border);border-radius:12px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.06);width:100%;max-width:520px;overflow:hidden}
+.fam-card-hd{background:var(--brand);color:#fff;padding:.7rem 1rem;font-weight:700;font-size:1.05rem}
+.fam-card-bd{padding:.9rem 1rem}
+.fam-sec{margin-bottom:1rem}
+.fam-sec:last-child{margin-bottom:0}
+.fam-sec-h{font-weight:700;color:var(--brand-dark);font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #eee;padding-bottom:.25rem;margin-bottom:.5rem}
+.fam-camper{padding:.5rem .65rem;border:1px solid #eee;border-radius:8px;margin-bottom:.6rem;background:#fafafa}
+.fam-camper:last-child{margin-bottom:0}
+.fam-camper-name{font-weight:700;color:#222}
+.fam-camper-meta{font-size:.82rem;color:#666;margin:.1rem 0 .4rem}
+.fam-wk-row{display:flex;align-items:center;gap:.5rem;margin:.18rem 0;flex-wrap:wrap}
+.fam-wk-lbl{font-size:.75rem;color:#777;min-width:130px}
+.fam-day{display:inline-block;width:24px;height:22px;line-height:22px;text-align:center;border-radius:5px;font-size:.7rem;font-weight:700;background:#c0392b;color:#fff}
+.fam-day.on{background:#2e7d32}
+.fam-row{font-size:.88rem;color:#333;margin:.15rem 0}
+.fam-row .fam-lbl{color:#888;font-size:.78rem;margin-right:.35rem}
+.fam-note{font-size:.8rem;color:#aaa;font-style:italic}
+.fam-pickup{font-size:.85rem;color:#333;margin:.12rem 0}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
 .payroll-table td{height:42px}
@@ -2210,6 +2320,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="tab active" data-tab="upload">📂 <span>Run Report</span></div>
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
   <div class="tab" data-tab="snap" id="tab-snap-nav">📸 <span>Camp Snapshot</span><span class="nav-new">NEW</span></div>
+  <div class="tab" data-tab="families">👪 <span>Families</span><span class="nav-new">NEW</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
   <div class="tab" data-tab="help">🛟 <span>Help</span></div>
 </nav>
@@ -2378,7 +2489,21 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
 
 </div><!-- /tab-upload -->
 
-<!-- ===== BUNK SNAPSHOT TAB (admin only) ===== -->
+<!-- ===== FAMILIES TAB ===== -->
+<div class="tab-panel" id="tab-families">
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Families</div>
+        <div class="card-hint">Search a camper, parent, or family name to see everything the system has for that family: campers (with bunk, age, grade and weekly schedule), address, and contact info. Sourced from the saved Family Contacts and master sheet.</div>
+      </div>
+    </div>
+    <input type="search" id="fam-dir-search" class="pr-input" placeholder="Search by camper, parent, or family name…" style="width:100%;max-width:460px;font-size:.95rem">
+    <div id="fam-dir-results" style="margin-top:1rem"></div>
+  </div>
+</div>
+
+<!-- ===== CAMP SNAPSHOT TAB ===== -->
 <div class="tab-panel" id="tab-snap">
   <div class="card">
     <div class="card-hd">
@@ -2859,6 +2984,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
     if (tab.dataset.tab === 'payroll') renderPayroll();
     if (tab.dataset.tab === 'snap') loadBunkSnapshot();
+    if (tab.dataset.tab === 'families') loadFamiliesDir();
   });
 });
 
@@ -2948,6 +3074,7 @@ async function uploadMaster(f) {
     msg.style.color = '#2e7d32'; msg.textContent = '✓ Master sheet saved.';
     loadMaster();
     snapRendered = false;   // repaint the Bunk Snapshot on next open (timestamp changed → re-fetch)
+    famDirLoaded = false;   // master schedules/ages changed → refresh Families on next open
   } catch(e) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + e.message; }
 }
 masterDrop.addEventListener('dragover', e => { e.preventDefault(); masterDrop.classList.add('drag-over'); });
@@ -3902,6 +4029,7 @@ async function importFamilies(f) {
     if (!res.ok || d.error) { msg.style.color = '#c0392b'; msg.textContent = d.error || 'Import failed.'; return; }
     msg.style.color = '#2e7d32'; msg.textContent = `✓ Imported ${d.count} (${d.total} total).`;
     loadFamilies();
+    famDirLoaded = false;   // refresh the Families directory on next open
   } catch(e) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + e.message; }
 }
 famDrop.addEventListener('dragover', e => { e.preventDefault(); famDrop.classList.add('drag-over'); });
@@ -4241,6 +4369,99 @@ function renderSnapBunks(report) {
     });
   });
 }
+
+// ---- Families directory ----
+let famDir = [], famDirWeeks = [], famDirLoaded = false, famDirState = {has_families:true, has_master:true};
+const FAM_DAY_LBL = {M:'M', T:'T', W:'W', R:'Th', F:'F'};
+
+async function loadFamiliesDir(force) {
+  if (!currentUser) return;
+  if (famDirLoaded && !force) return;
+  try {
+    const res = await fetch('/api/families/full');
+    if (!res.ok) return;
+    const d = await res.json();
+    famDir = d.families || [];
+    famDirWeeks = d.weeks || [];
+    famDirState = {has_families: !!d.has_families, has_master: !!d.has_master};
+    famDirLoaded = true;
+  } catch(e) {}
+  renderFamDir();
+}
+
+function renderFamDir() {
+  const box = document.getElementById('fam-dir-results');
+  if (!box) return;
+  if (!famDirState.has_families) {
+    box.innerHTML = '<div style="color:#888;font-size:.9rem">No family contacts loaded yet. Import a Family Contacts spreadsheet in <strong>Utilities</strong> first.</div>';
+    return;
+  }
+  const q = (document.getElementById('fam-dir-search').value || '').trim().toLowerCase();
+  if (!q) { box.innerHTML = '<div style="color:#aaa;font-size:.85rem">Start typing a camper, parent, or family name…</div>'; return; }
+  const hits = famDir.filter(f => f.search.includes(q)).slice(0, 25);
+  if (!hits.length) { box.innerHTML = '<div style="color:#aaa;font-size:.85rem">No matching families.</div>'; return; }
+  box.innerHTML = '<div style="font-size:.8rem;color:#888;margin-bottom:.6rem">' + hits.length + (famDir.filter(f=>f.search.includes(q)).length>25?'+ ':' ') + 'famil' + (hits.length===1?'y':'ies') + ' found</div>' +
+    '<div class="fam-cards">' + hits.map(famCardHTML).join('') + '</div>';
+}
+
+function famDays(days) {
+  return ['M','T','W','R','F'].map(L =>
+    `<span class="fam-day${(days||'').includes(L) ? ' on' : ''}">${FAM_DAY_LBL[L]}</span>`).join('');
+}
+
+function famCardHTML(f) {
+  let h = `<div class="fam-card"><div class="fam-card-hd">The ${famEsc(f.name)} Family</div><div class="fam-card-bd">`;
+
+  // Campers
+  h += '<div class="fam-sec"><div class="fam-sec-h">Camper' + (f.campers.length>1?'s':'') + '</div>';
+  f.campers.forEach(c => {
+    const meta = [c.bunk ? 'Bunk: ' + c.bunk : '', (c.age!==''&&c.age!=null) ? 'Age: ' + c.age : '', c.grade ? 'Grade: ' + c.grade : ''].filter(Boolean).join(' · ');
+    h += '<div class="fam-camper"><div class="fam-camper-name">' + famEsc(c.name) + '</div>';
+    if (meta) h += '<div class="fam-camper-meta">' + famEsc(meta) + '</div>';
+    if (!c.in_master) {
+      h += '<div class="fam-note">Not found in the current master sheet (no schedule).</div>';
+    } else if (!c.weeks_detail.length) {
+      h += '<div class="fam-note">Not enrolled in any week.</div>';
+    } else {
+      c.weeks_detail.forEach(w => {
+        h += '<div class="fam-wk-row"><span class="fam-wk-lbl">Week ' + w.n + (w.range ? ' · ' + famEsc(w.range) : '') + '</span><span>' + famDays(w.days) + '</span></div>';
+      });
+    }
+    h += '</div>';
+  });
+  h += '</div>';
+
+  // Address
+  const a = f.address || {};
+  const line2 = [a.city, a.state].filter(Boolean).join(', ') + (a.zip ? ' ' + a.zip : '');
+  if (a.address || line2.trim()) {
+    h += '<div class="fam-sec"><div class="fam-sec-h">Address</div>';
+    if (a.address) h += '<div class="fam-row">' + famEsc(a.address) + '</div>';
+    if (a.address2) h += '<div class="fam-row">' + famEsc(a.address2) + '</div>';
+    if (line2.trim()) h += '<div class="fam-row">' + famEsc(line2.trim()) + '</div>';
+    h += '</div>';
+  }
+
+  // Contacts
+  const ct = f.contacts || {};
+  const hasC = (ct.primary && (ct.primary.name || ct.primary.phone)) || (ct.secondary && (ct.secondary.name || ct.secondary.phone)) || (ct.pickups && ct.pickups.length);
+  if (hasC) {
+    h += '<div class="fam-sec"><div class="fam-sec-h">Contacts</div>';
+    [['Primary', ct.primary], ['Secondary', ct.secondary]].forEach(([lbl, p]) => {
+      if (p && (p.name || p.phone)) {
+        h += '<div class="fam-row"><span class="fam-lbl">' + lbl + ':</span>' + famEsc(p.name || '—') + (p.phone ? ' · ' + famEsc(p.phone) : '') + '</div>';
+      }
+    });
+    (ct.pickups || []).forEach(pu => {
+      h += '<div class="fam-pickup"><span class="fam-lbl">Pickup:</span>' + famEsc(pu.name) + (pu.auth ? ' <span style="color:#888">(' + famEsc(pu.auth) + ')</span>' : '') + '</div>';
+    });
+    h += '</div>';
+  }
+
+  return h + '</div></div>';
+}
+
+(function(){ const s = document.getElementById('fam-dir-search'); if (s) s.addEventListener('input', renderFamDir); })();
 
 // ---- First-time "Utilities" notice (shows once per browser, after sign-in) ----
 function maybeShowNotice() {
