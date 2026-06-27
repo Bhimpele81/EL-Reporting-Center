@@ -1888,7 +1888,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .fam-day{display:inline-block;width:24px;height:22px;line-height:22px;text-align:center;border-radius:5px;font-size:.7rem;font-weight:700;background:#c0392b;color:#fff}
 .fam-day.on{background:#2e7d32}
 .fam-row{font-size:.88rem;color:#333;margin:.15rem 0}
-.fam-row .fam-lbl{color:#888;font-size:.78rem;margin-right:.35rem}
+.fam-row .fam-lbl,.fam-pickup .fam-lbl{color:#888;font-size:.78rem;margin-right:.35rem}
 .fam-note{font-size:.8rem;color:#aaa;font-style:italic}
 .fam-pickup{font-size:.85rem;color:#333;margin:.12rem 0}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
