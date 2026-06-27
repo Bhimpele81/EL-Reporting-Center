@@ -1883,8 +1883,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .fam-camper:last-child{margin-bottom:0}
 .fam-camper-name{font-weight:700;color:#222}
 .fam-camper-meta{font-size:.82rem;color:#666;margin:.1rem 0 .4rem}
-.fam-wk-row{display:flex;align-items:center;gap:.5rem;margin:.18rem 0;flex-wrap:wrap}
-.fam-wk-lbl{font-size:.75rem;color:#777;min-width:130px}
+.fam-wk-row{display:flex;align-items:center;gap:.5rem;margin:.18rem 0}
+.fam-wk-lbl{font-size:.75rem;color:#777;width:190px;flex-shrink:0;white-space:nowrap}
 .fam-day{display:inline-block;width:24px;height:22px;line-height:22px;text-align:center;border-radius:5px;font-size:.7rem;font-weight:700;background:#c0392b;color:#fff}
 .fam-day.on{background:#2e7d32}
 .fam-row{font-size:.88rem;color:#333;margin:.15rem 0}
