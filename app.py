@@ -2925,6 +2925,18 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       </div>
     </details>
 
+    <details class="faq">
+      <summary>How do I look up everything we have on a family?</summary>
+      <div class="faq-body">
+        <p>Open the <strong>👪 Families</strong> tab on the left and type a <strong>camper, parent, or family name</strong>. Each match shows a card with everything the system has for that family:</p>
+        <ul>
+          <li><strong>Camper(s)</strong> — bunk, age, grade, and the weekly schedule (green = attending, red = not), with any Camper Schedules changes already applied. Siblings appear together on one card.</li>
+          <li><strong>Address</strong> and <strong>Contacts</strong> — primary &amp; secondary parents with phone numbers, plus authorized pickups.</li>
+        </ul>
+        <p>The information comes from the saved <strong>Family Contacts</strong> and <strong>master sheet</strong>, so load both in Utilities first. The directory refreshes automatically whenever you upload a new master or re-import contacts.</p>
+      </div>
+    </details>
+
     <div class="help-sub">Accounts</div>
 
     <details class="faq">
