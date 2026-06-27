@@ -194,8 +194,8 @@ _DEFAULT_SEASON_MONDAYS = ["2026-06-22", "2026-06-29", "2026-07-06", "2026-07-13
                            "2026-07-20", "2026-07-27", "2026-08-03", "2026-08-10"]
 # Fields stored for each family contact record (matches the contact master export)
 FAMILY_FIELDS     = ["last", "first", "family", "bunk",
-                     "primary_first", "primary_last", "primary_phone",
-                     "secondary_first", "secondary_last", "secondary_phone",
+                     "primary_first", "primary_last", "primary_phone", "primary_email",
+                     "secondary_first", "secondary_last", "secondary_phone", "secondary_email",
                      "address", "address2", "city", "state", "zip",
                      "pu1_name", "pu1_auth", "pu2_name", "pu2_auth",
                      "pu3_name", "pu3_auth", "pu4_name", "pu4_auth"]
@@ -526,9 +526,11 @@ _FAMILY_ALIASES = {
     "primary_first":   ["p1 first name", "parent 1 first name", "guardian 1 first name", "primary first name"],
     "primary_last":    ["p1 last name", "parent 1 last name", "guardian 1 last name", "primary last name"],
     "primary_phone":   ["p1 cell phone", "p1 phone", "parent 1 phone", "parent 1 cell phone", "primary phone"],
+    "primary_email":   ["p1 email", "p1 email address", "parent 1 email", "guardian 1 email", "primary email", "primary email address"],
     "secondary_first": ["p2 first name", "parent 2 first name", "guardian 2 first name", "secondary first name"],
     "secondary_last":  ["p2 last name", "parent 2 last name", "guardian 2 last name", "secondary last name"],
     "secondary_phone": ["p2 cell phone", "p2 phone", "parent 2 phone", "parent 2 cell phone", "secondary phone"],
+    "secondary_email": ["p2 email", "p2 email address", "parent 2 email", "guardian 2 email", "secondary email", "secondary email address"],
     "address":  ["primary family address 1", "primary family address", "address", "home address", "street"],
     "address2": ["primary family address 2", "address 2", "address line 2", "apt", "unit", "suite"],
     "city":     ["primary family city", "city"],
@@ -952,8 +954,9 @@ def api_families_full():
     def _camper_schedule(name, bunk):
         c = master_by_key.get(_camper_key(name, bunk)) or master_by_name.get((name or "").strip().lower())
         if not c:
-            return {"found": False, "age": "", "grade": "", "bunk": bunk, "weeks_detail": []}
-        ov = overrides.get(_camper_key(c.get("name"), c.get("bunk")), {})
+            return {"found": False, "age": "", "grade": "", "bunk": bunk, "weeks_detail": [], "sched_key": ""}
+        skey = _camper_key(c.get("name"), c.get("bunk"))
+        ov = overrides.get(skey, {})
         default_days = c.get("days_sched") or "MTWRF"
         detail = []
         for i, enrolled in enumerate(c.get("weeks", [])):
@@ -962,9 +965,10 @@ def api_families_full():
             days = ov.get(str(i + 1), default_days)
             detail.append({"n": i + 1,
                            "range": week_ranges[i] if i < len(week_ranges) else "",
-                           "days": _canon_days(days)})
+                           "days": _canon_days(days),
+                           "default": default_days == _canon_days(days) and str(i + 1) not in ov})
         return {"found": True, "age": c.get("age") or "", "grade": c.get("grade") or "",
-                "bunk": c.get("bunk") or bunk, "weeks_detail": detail}
+                "bunk": c.get("bunk") or bunk, "weeks_detail": detail, "sched_key": skey}
 
     def _full(*parts):
         return " ".join(p.strip() for p in parts if (p or "").strip()).strip()
@@ -1000,31 +1004,49 @@ def api_families_full():
         g = groups.get(gkey)
         if not g:
             pe, se, oe = _emails_from_record(r)
+            # Canonical, editable contact values (prefer the mapped email field,
+            # fall back to a detected one so existing imports are editable too).
             g = groups[gkey] = {
                 "key": gkey,
                 "name": fam or (r.get("last") or "Family"),
+                "ids": [],
                 "address": {"address": r.get("address", ""), "address2": r.get("address2", ""),
                             "city": r.get("city", ""), "state": r.get("state", ""), "zip": r.get("zip", "")},
                 "contacts": {
                     "primary":   {"name": _full(r.get("primary_first"), r.get("primary_last")),
-                                  "phone": r.get("primary_phone", ""), "email": pe},
+                                  "phone": r.get("primary_phone", ""), "email": (r.get("primary_email") or pe)},
                     "secondary": {"name": _full(r.get("secondary_first"), r.get("secondary_last")),
-                                  "phone": r.get("secondary_phone", ""), "email": se},
+                                  "phone": r.get("secondary_phone", ""), "email": (r.get("secondary_email") or se)},
                     "emails_other": oe,
                     "pickups":   [{"name": r.get(f"pu{i}_name", ""), "auth": r.get(f"pu{i}_auth", "")}
                                   for i in range(1, 5) if (r.get(f"pu{i}_name") or "").strip()],
                 },
+                "fields": {
+                    "address": r.get("address", ""), "address2": r.get("address2", ""),
+                    "city": r.get("city", ""), "state": r.get("state", ""), "zip": r.get("zip", ""),
+                    "primary_first": r.get("primary_first", ""), "primary_last": r.get("primary_last", ""),
+                    "primary_phone": r.get("primary_phone", ""), "primary_email": (r.get("primary_email") or pe),
+                    "secondary_first": r.get("secondary_first", ""), "secondary_last": r.get("secondary_last", ""),
+                    "secondary_phone": r.get("secondary_phone", ""), "secondary_email": (r.get("secondary_email") or se),
+                    "pu1_name": r.get("pu1_name", ""), "pu1_auth": r.get("pu1_auth", ""),
+                    "pu2_name": r.get("pu2_name", ""), "pu2_auth": r.get("pu2_auth", ""),
+                    "pu3_name": r.get("pu3_name", ""), "pu3_auth": r.get("pu3_auth", ""),
+                    "pu4_name": r.get("pu4_name", ""), "pu4_auth": r.get("pu4_auth", ""),
+                },
                 "campers": [],
                 "_search": set(),
             }
+        if r.get("id"):
+            g["ids"].append(r.get("id"))
         last, first = (r.get("last") or "").strip(), (r.get("first") or "").strip()
         disp = _full(f"{last}," if last else "", first) or last or first
         sched = _camper_schedule(f"{last}, {first}", r.get("bunk", ""))
         g["campers"].append({
-            "name": disp, "first": first, "last": last,
+            "name": disp, "first": first, "last": last, "id": r.get("id", ""),
             "bunk": sched["bunk"] or r.get("bunk", ""),
             "age": sched["age"], "grade": sched["grade"],
             "weeks_detail": sched["weeks_detail"], "in_master": sched["found"],
+            "sched_key": sched["sched_key"],
         })
         for t in (disp, first, last):
             if t:
@@ -1915,6 +1937,16 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .fam-row .fam-lbl,.fam-pickup .fam-lbl{color:#888;font-size:.78rem;margin-right:.35rem}
 .fam-note{font-size:.8rem;color:#aaa;font-style:italic}
 .fam-pickup{font-size:.85rem;color:#333;margin:.12rem 0}
+.fam-card-hd{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.fam-edit-btn{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:6px;font-size:.78rem;font-weight:600;padding:.25rem .6rem;cursor:pointer}
+.fam-edit-btn:hover{background:rgba(255,255,255,.3)}
+.fam-eday{cursor:pointer}
+.fam-inp{width:100%;box-sizing:border-box;padding:.32rem .45rem;border:1px solid var(--border);border-radius:6px;font-size:.85rem;margin-bottom:.35rem}
+.fam-inp-row{display:flex;gap:.4rem}
+.fam-inp-row .fam-inp{flex:1}
+.fam-flbl{font-size:.72rem;color:#888;margin:.3rem 0 .1rem;text-transform:uppercase;letter-spacing:.04em}
+.fam-edit-actions{display:flex;align-items:center;gap:.6rem;margin-top:1rem;padding-top:.8rem;border-top:1px solid #eee}
+.fam-edit-msg{font-size:.82rem;color:#777}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
 .payroll-table td{height:42px}
@@ -4408,6 +4440,7 @@ function renderSnapBunks(report) {
 
 // ---- Families directory ----
 let famDir = [], famDirWeeks = [], famDirLoaded = false, famDirState = {has_families:true, has_master:true};
+let famEditKey = null, famEditSched = {};   // which card is being edited + working schedule copy
 const FAM_DAY_LBL = {M:'M', T:'T', W:'W', R:'Th', F:'F'};
 
 async function loadFamiliesDir(force) {
@@ -4438,6 +4471,111 @@ function renderFamDir() {
   if (!hits.length) { box.innerHTML = '<div style="color:#aaa;font-size:.85rem">No matching families.</div>'; return; }
   box.innerHTML = '<div style="font-size:.8rem;color:#888;margin-bottom:.6rem">' + hits.length + (famDir.filter(f=>f.search.includes(q)).length>25?'+ ':' ') + 'famil' + (hits.length===1?'y':'ies') + ' found</div>' +
     '<div class="fam-cards">' + hits.map(famCardHTML).join('') + '</div>';
+  wireFamDir();
+}
+
+function wireFamDir() {
+  const box = document.getElementById('fam-dir-results');
+  if (!box) return;
+  box.querySelectorAll('[data-fedit]').forEach(btn =>
+    btn.addEventListener('click', () => enterFamEdit(btn.dataset.fedit)));
+  if (!famEditKey) return;
+  box.querySelectorAll('.fam-eday').forEach(btn => btn.addEventListener('click', () => {
+    const ci = btn.dataset.ci, wk = btn.dataset.wk, day = btn.dataset.day;
+    const cur = (famEditSched[ci] && famEditSched[ci][wk]) || '';
+    const set = new Set(cur.split(''));
+    set.has(day) ? set.delete(day) : set.add(day);
+    famEditSched[ci] = famEditSched[ci] || {};
+    famEditSched[ci][wk] = ['M','T','W','R','F'].filter(L => set.has(L)).join('');
+    btn.classList.toggle('on');
+  }));
+  const sv = box.querySelector('.fam-save');   if (sv) sv.addEventListener('click', saveFamEdit);
+  const cn = box.querySelector('.fam-cancel'); if (cn) cn.addEventListener('click', () => { famEditKey = null; renderFamDir(); });
+}
+
+function enterFamEdit(key) {
+  famEditKey = key;
+  const f = famDir.find(x => x.key === key);
+  famEditSched = {};
+  if (f) f.campers.forEach((c, ci) => {
+    famEditSched[ci] = {};
+    (c.weeks_detail || []).forEach(w => { famEditSched[ci][String(w.n)] = w.days || ''; });
+  });
+  renderFamDir();
+}
+
+function famEditFormHTML(f) {
+  const F = f.fields || {};
+  const inp = (field, ph) => `<input class="fam-inp" data-field="${field}" value="${famEsc(F[field] || '')}" placeholder="${famEsc(ph || '')}">`;
+  let h = `<div class="fam-card" data-fkey="${famEsc(f.key)}"><div class="fam-card-hd"><span>The ${famEsc(f.name)} Family</span><span style="font-size:.78rem;opacity:.85">Editing</span></div><div class="fam-card-bd">`;
+
+  // Per-camper schedules
+  h += '<div class="fam-sec"><div class="fam-sec-h">Schedule' + (f.campers.length>1?'s':'') + '</div>';
+  f.campers.forEach((c, ci) => {
+    h += '<div class="fam-camper"><div class="fam-camper-name">' + famEsc(c.name) + '</div>';
+    if (!c.in_master) h += '<div class="fam-note">Not in the current master sheet.</div>';
+    else if (!c.weeks_detail.length) h += '<div class="fam-note">Not enrolled in any week.</div>';
+    else c.weeks_detail.forEach(w => {
+      const cur = (famEditSched[ci] && famEditSched[ci][String(w.n)]) || '';
+      h += '<div class="fam-wk-row"><span class="fam-wk-lbl">Week ' + w.n + (w.range ? ' · ' + famEsc(w.range) : '') + '</span><span>' +
+        ['M','T','W','R','F'].map(L => `<span class="fam-day fam-eday${cur.includes(L) ? ' on' : ''}" data-ci="${ci}" data-wk="${w.n}" data-day="${L}">${FAM_DAY_LBL[L]}</span>`).join('') +
+        '</span></div>';
+    });
+    h += '</div>';
+  });
+  h += '</div>';
+
+  // Contact form (shared by the whole family)
+  h += '<div class="fam-sec"><div class="fam-sec-h">Contacts</div>';
+  h += '<div class="fam-flbl">Address</div>' + inp('address','Street address') + inp('address2','Apt / unit (optional)');
+  h += '<div class="fam-inp-row">' + inp('city','City') + inp('state','State') + inp('zip','Zip') + '</div>';
+  h += '<div class="fam-flbl">Primary parent</div>';
+  h += '<div class="fam-inp-row">' + inp('primary_first','First') + inp('primary_last','Last') + '</div>';
+  h += '<div class="fam-inp-row">' + inp('primary_phone','Phone') + inp('primary_email','Email') + '</div>';
+  h += '<div class="fam-flbl">Secondary parent</div>';
+  h += '<div class="fam-inp-row">' + inp('secondary_first','First') + inp('secondary_last','Last') + '</div>';
+  h += '<div class="fam-inp-row">' + inp('secondary_phone','Phone') + inp('secondary_email','Email') + '</div>';
+  h += '<div class="fam-flbl">Authorized pickups</div>';
+  for (let i = 1; i <= 4; i++) h += '<div class="fam-inp-row">' + inp('pu'+i+'_name','Pickup '+i+' name') + inp('pu'+i+'_auth','Authorization') + '</div>';
+  h += '</div>';
+
+  h += '<div class="fam-edit-actions"><button class="pr-period-btn fam-save">💾 Save</button><button class="sched-back fam-cancel" style="margin:0">Cancel</button><span class="fam-edit-msg"></span></div>';
+  return h + '</div></div>';
+}
+
+async function saveFamEdit() {
+  const f = famDir.find(x => x.key === famEditKey);
+  if (!f) return;
+  const box = document.getElementById('fam-dir-results');
+  const msg = box.querySelector('.fam-edit-msg');
+  const fields = {};
+  box.querySelectorAll('.fam-inp').forEach(i => { fields[i.dataset.field] = i.value.trim(); });
+  if (msg) { msg.textContent = 'Saving…'; msg.style.color = '#777'; }
+  try {
+    // Contact info applies to every record in the family (siblings share it)
+    for (const id of (f.ids || [])) {
+      await fetch('/api/families/' + encodeURIComponent(id), {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(fields)});
+    }
+    // Schedules: only the weeks the user actually changed, per camper
+    for (let ci = 0; ci < f.campers.length; ci++) {
+      const c = f.campers[ci];
+      if (!c.in_master || !c.sched_key) continue;
+      const orig = {}; (c.weeks_detail || []).forEach(w => { orig[String(w.n)] = w.days || ''; });
+      const cur = famEditSched[ci] || {};
+      for (const wk of Object.keys(cur)) {
+        if ((cur[wk] || '') !== (orig[wk] || '')) {
+          await fetch('/api/schedules', {method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({key: c.sched_key, week: parseInt(wk, 10), days: cur[wk]})});
+        }
+      }
+    }
+    famEditKey = null;
+    famDirLoaded = false;
+    snapRendered = false;   // contact/schedule changes ripple into other views
+    await loadFamiliesDir(true);
+  } catch(e) {
+    if (msg) { msg.textContent = 'Save failed — try again'; msg.style.color = '#c0392b'; }
+  }
 }
 
 function famDays(days) {
@@ -4446,7 +4584,8 @@ function famDays(days) {
 }
 
 function famCardHTML(f) {
-  let h = `<div class="fam-card"><div class="fam-card-hd">The ${famEsc(f.name)} Family</div><div class="fam-card-bd">`;
+  if (f.key === famEditKey) return famEditFormHTML(f);
+  let h = `<div class="fam-card" data-fkey="${famEsc(f.key)}"><div class="fam-card-hd"><span>The ${famEsc(f.name)} Family</span><button class="fam-edit-btn" data-fedit="${famEsc(f.key)}">✎ Edit</button></div><div class="fam-card-bd">`;
 
   // Campers
   h += '<div class="fam-sec"><div class="fam-sec-h">Camper' + (f.campers.length>1?'s':'') + '</div>';
