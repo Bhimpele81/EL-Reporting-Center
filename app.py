@@ -2282,6 +2282,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li>Up to 50 reports per month</li>
           <li>1 staff login</li>
           <li>Core reports: Bunk Snapshot, Group Attendance, AM/PM &amp; Group Extended, Driver Totals</li>
+          <li>On-screen Camp Snapshot: live camp &amp; bunk totals plus roster</li>
           <li>Upload-once master sheet &amp; season calendar</li>
           <li>Configurable bunks &amp; camps</li>
           <li>Print-ready Excel &amp; Word output</li>
@@ -2299,6 +2300,8 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li>Up to 50 reports per month</li>
           <li>Up to 10 staff logins</li>
           <li>Payroll &amp; staff attendance tracking</li>
+          <li>Camper Schedules: set each camper's weekly attendance days</li>
+          <li>Families directory: search a family, view &amp; edit contacts and schedules</li>
           <li>Family contacts + Mailing, Inter &amp; Junior labels</li>
           <li>Recent reports history</li>
           <li>Priority email support</li>
