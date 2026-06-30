@@ -4004,12 +4004,15 @@ function renderHolidayTable() {
     .map(([md, sep]) => ({d: byMd(md), sep})).filter(x => x.d);
   const title = 'Holiday Week Attendance';
   prSetHeader(title, dayCols.length ? '' : 'No holiday dates (7/2, 7/6, 7/3) were found in this season&rsquo;s calendar.');
-  let html = `<caption>${title}</caption><thead><tr><th class="pr-hstaff">Staff</th>` +
+  let html = `<caption>${title}</caption><thead><tr><th class="pr-hstaff">Staff</th><th class="pr-harea">Area</th>` +
     '<th class="pr-extra">BS</th><th class="pr-extra">SP\\MTC</th>';
   dayCols.forEach(c => { html += `<th class="pr-day${c.sep ? ' pr-week-sep' : ''}">${c.d.dow}<br>${c.d.md}</th>`; });
   html += '</tr></thead><tbody>';
   staff.forEach(s => {
-    html += `<tr data-id="${s.id}"><td class="pr-name">${s.last}, ${s.first}</td>`;
+    const areaTxt = (s.area === 'Support' && s.title) ? s.title : (s.area || '');
+    const bunkLine = s.bunk ? `<br><small style="color:#888;font-weight:400">${s.bunk}</small>` : '';
+    html += `<tr data-id="${s.id}"><td class="pr-name">${s.last}, ${s.first}</td>` +
+            `<td class="pr-area">${areaTxt}${bunkLine}</td>`;
     ['xtra:0:1','xtra:0:2'].forEach(key => {
       const xs = xtraState(s.id, key);
       html += `<td class="pr-xcell st-${xs||'none'}" data-id="${s.id}" data-key="${key}">${symFor(xs)}</td>`;
