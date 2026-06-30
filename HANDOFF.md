@@ -58,6 +58,8 @@ Master-sheet workflow: upload once (Utilities), auto-detected, de-duplicated, pe
 - **Lock/Unlock** freezes edits.
 - **Totals** view — cumulative checks all 8 weeks, "JC" tag for Junior Counselors.
 - **Extended Staff** view — blank printable Mon–Fri check-in sheet for AM/PM-extended staff, with an **AM/PM shift** filter; prints full-page-width.
+- **Holiday** view (`prHoliday`, 🎆 button right of Extended Staff) — all staff with columns Name, BS, SP\MTC, then holiday-week days **Th 7/2 / Mon 7/6 / Fri 7/3** (resolved from `payroll.days` by m/d label; dark separators before 7/2 and 7/3). Editable; reuses shared `prClickDayCell`/`prClickXCell` so marks sync with the week tabs.
+- **Half-day:** `PR_HALF_DAYS=['7/3']` makes July 3 cycle blank→✓→½→✗; `prCount`/`totalChecks` and the server export `cnt` count ½ as 0.5. Other days keep blank→✓→✗.
 - **Print/PDF** (portrait for all views now) + **Excel export** (`/api/payroll/export`) mirror the current filtered/sorted view.
 
 ---

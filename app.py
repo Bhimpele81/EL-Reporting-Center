@@ -1168,7 +1168,14 @@ def api_payroll_export():
     def namekey(s): return (s.get("last", "") + s.get("first", "")).lower()
     def cnt(sid, days):
         c = checks.get(sid, {})
-        return sum(1 for d in days if c.get(d["iso"]) in ("check", True))
+        total = 0.0
+        for d in days:
+            v = c.get(d["iso"])
+            if v in ("check", True):
+                total += 1
+            elif v == "half":
+                total += 0.5
+        return int(total) if total == int(total) else total
     def area_txt(s):
         return s.get("title") if (s.get("area") == "Support" and s.get("title")) else s.get("area", "")
 
@@ -2922,8 +2929,16 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do the attendance cells work?</summary>
       <div class="faq-body">
-        <p>Click a day cell to cycle <strong>blank → ✓ (present) → ✗</strong>. The count on the left totals the ✓ marks for the two-week block. Changes <strong>save automatically</strong> and are shared across devices.</p>
+        <p>Click a day cell to cycle <strong>blank → ✓ (present) → ✗</strong>. The count on the left totals the ✓ marks for the two-week block (a ½ counts as half a day). Changes <strong>save automatically</strong> and are shared across devices.</p>
         <p>The <strong>BS</strong> and <strong>SP\MTC</strong> columns appear on the Weeks 1 &amp; 2 block only and cycle ✓ / ✗ / ½ / N/A (they're never counted).</p>
+        <p><strong>July 3</strong> has an extra <strong>½</strong> option (blank → ✓ → ½ → ✗), so a half-day holiday can be paid as half a day.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>What is the Holiday view?</summary>
+      <div class="faq-body">
+        <p>The <strong>🎆 Holiday</strong> button (next to Extended Staff) shows every staff member with just the holiday-week columns: <strong>BS</strong>, <strong>SP\MTC</strong>, and the holiday-week days (<strong>Th 7/2</strong>, <strong>Mon 7/6</strong>, <strong>Fri 7/3</strong>). It pulls the same marks you set on the week tabs, and you can edit right here too: any change syncs back to the week tabs automatically (July 3 still offers the ½ option).</p>
       </div>
     </details>
 
@@ -3569,6 +3584,7 @@ let payroll = {staff: [], checks: {}, days: []};
 let prPeriod = 0;   // 0..3 → weeks 1&2, 3&4, 5&6, 7&8
 let prTotals = false;   // when true, show the cumulative Totals view
 let prExt = false;      // when true, show the blank Extended Staff sheet
+let prHoliday = false;  // when true, show the Holiday week view
 let prExtPeriod = 'ALL';// Extended Staff AM/PM filter: ALL | AM | PM
 let prAreas = [];       // selected areas to filter by ([] = all areas)
 let prSearch = '';      // free-text search across name + area
@@ -3635,12 +3651,22 @@ function cellState(id, iso) {
   const v = (payroll.checks[id] || {})[iso];
   if (v === true || v === 'check') return 'check';   // legacy true == check
   if (v === 'x') return 'x';
+  if (v === 'half') return 'half';
   return '';
 }
 
+// Days that may be marked ½ (half-day pay), matched by m/d label
+const PR_HALF_DAYS = ['7/3'];
+function prHalfDay(iso) {
+  const d = (payroll.days || []).find(x => x.iso === iso);
+  return !!(d && PR_HALF_DAYS.includes(d.md));
+}
+
+function prDayValue(st) { return st === 'check' ? 1 : st === 'half' ? 0.5 : 0; }
+
 function prCount(id) {
-  // Only checkmarks count toward the total (X marks do not)
-  return prPeriodDays().reduce((n, d) => n + (cellState(id, d.iso) === 'check' ? 1 : 0), 0);
+  // Checkmarks count as a full day, ½ as half; X / blank do not count
+  return prPeriodDays().reduce((n, d) => n + prDayValue(cellState(id, d.iso)), 0);
 }
 
 function xtraState(id, key) {
@@ -3652,29 +3678,68 @@ function symFor(st) {
   return st === 'check' ? '✓' : st === 'x' ? '✗' : st === 'half' ? '½' : st === 'na' ? 'N/A' : '';
 }
 
+// Day cell click — blank -> ✓ -> ✗ -> blank, or blank -> ✓ -> ½ -> ✗ -> blank on half-day dates
+async function prClickDayCell(cell) {
+  if (payroll.locked) return;
+  const id = cell.dataset.id, dt = cell.dataset.date;
+  const cur = cellState(id, dt);
+  const next = prHalfDay(dt)
+    ? (cur === '' ? 'check' : cur === 'check' ? 'half' : cur === 'half' ? 'x' : '')
+    : (cur === '' ? 'check' : cur === 'check' ? 'x' : '');
+  payroll.checks[id] = payroll.checks[id] || {};
+  if (next) payroll.checks[id][dt] = next; else delete payroll.checks[id][dt];
+  cell.textContent = symFor(next);
+  cell.classList.remove('st-check','st-x','st-half','st-none');
+  cell.classList.add('st-' + (next || 'none'));
+  const cnt = document.getElementById('cnt-' + id); if (cnt) cnt.textContent = prCount(id);
+  try { await fetch('/api/payroll/check', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id, date: dt, value: next})}); } catch(e) {}
+}
+
+// Extra column click — blank -> ✓ -> ✗ -> ½ -> N/A -> blank (never counted)
+async function prClickXCell(cell) {
+  if (payroll.locked) return;
+  const id = cell.dataset.id, key = cell.dataset.key;
+  const xorder = ['', 'check', 'x', 'half', 'na'];
+  const next = xorder[(xorder.indexOf(xtraState(id, key)) + 1) % xorder.length];
+  payroll.checks[id] = payroll.checks[id] || {};
+  if (next) payroll.checks[id][key] = next; else delete payroll.checks[id][key];
+  cell.textContent = symFor(next);
+  cell.classList.remove('st-check','st-x','st-half','st-na','st-none');
+  cell.classList.add('st-' + (next || 'none'));
+  try { await fetch('/api/payroll/check', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id, date: key, value: next})}); } catch(e) {}
+}
+
 function renderPayroll() {
   // period buttons
   const pb = document.getElementById('payroll-periods');
   pb.innerHTML = '';
   for (let p = 0; p < 4; p++) {
     const b = document.createElement('button');
-    b.className = 'pr-period-btn' + ((!prTotals && !prExt && p === prPeriod) ? ' active' : '');
+    b.className = 'pr-period-btn' + ((!prTotals && !prExt && !prHoliday && p === prPeriod) ? ' active' : '');
     b.textContent = `Weeks ${p*2+1} & ${p*2+2}`;
-    b.onclick = () => { prPeriod = p; prTotals = false; prExt = false; renderPayroll(); };
+    b.onclick = () => { prPeriod = p; prTotals = false; prExt = false; prHoliday = false; renderPayroll(); };
     pb.appendChild(b);
   }
   const tb = document.createElement('button');   // Totals view, slightly separated
   tb.className = 'pr-period-btn' + (prTotals ? ' active' : '');
   tb.textContent = '🧮 Totals';
   tb.style.marginLeft = '1.4rem';
-  tb.onclick = () => { prTotals = true; prExt = false; renderPayroll(); };
+  tb.onclick = () => { prTotals = true; prExt = false; prHoliday = false; renderPayroll(); };
   pb.appendChild(tb);
   const eb = document.createElement('button');   // Extended Staff blank sheet
   eb.className = 'pr-period-btn' + (prExt ? ' active' : '');
   eb.textContent = '👤 Extended Staff';
   eb.style.marginLeft = '.5rem';
-  eb.onclick = () => { prExt = true; prTotals = false; renderPayroll(); };
+  eb.onclick = () => { prExt = true; prTotals = false; prHoliday = false; renderPayroll(); };
   pb.appendChild(eb);
+  const hb = document.createElement('button');   // Holiday week view
+  hb.className = 'pr-period-btn' + (prHoliday ? ' active' : '');
+  hb.textContent = '🎆 Holiday';
+  hb.style.marginLeft = '.5rem';
+  hb.onclick = () => { prHoliday = true; prTotals = false; prExt = false; renderPayroll(); };
+  pb.appendChild(hb);
   // area filter (multi-select dropdown)
   const areas = [...new Set(payroll.staff.map(s => s.area).filter(Boolean))].sort();
   renderAreaFilter(areas);
@@ -3695,14 +3760,15 @@ function renderPayroll() {
   if (extWrap) extWrap.style.display = prExt ? '' : 'none';
   document.getElementById('pr-ext-period').value = prExtPeriod;
   const areaWrap = document.getElementById('pr-area-filter');
-  if (areaWrap) areaWrap.style.display = prExt ? 'none' : 'flex';
+  if (areaWrap) areaWrap.style.display = (prExt || prHoliday) ? 'none' : 'flex';
   const sortWrap = document.getElementById('pr-sort').closest('label');
-  if (sortWrap) sortWrap.style.display = (prExt || prTotals) ? 'none' : '';
+  if (sortWrap) sortWrap.style.display = (prExt || prTotals || prHoliday) ? 'none' : '';
   const searchWrap = document.getElementById('pr-search-wrap');
-  if (searchWrap) searchWrap.style.display = prExt ? 'none' : '';
+  if (searchWrap) searchWrap.style.display = (prExt || prHoliday) ? 'none' : '';
 
   if (prExt) { renderExtTable('ALL', prExtPeriod); return; }
   if (prTotals) { renderTotalsTable('last'); return; }
+  if (prHoliday) { renderHolidayTable(); return; }
 
   // table
   const days = prPeriodDays();
@@ -3749,7 +3815,7 @@ function renderPayroll() {
     html += `<td class="pr-area pr-area-edit" data-id="${s.id}" title="Click to edit area">${areaTxt}${bunkLine}</td>`;
     days.forEach((d,i) => {
       const st = cellState(s.id, d.iso);
-      const sym = st === 'check' ? '✓' : st === 'x' ? '✗' : '';
+      const sym = symFor(st);
       const hl = (d.iso === prFilterDay && prFilterMode &&
                   (prFilterMode === 'blank' ? st === '' : st === prFilterMode)) ? ' pr-missed-hl' : '';
       const cls = 'pr-cell st-' + (st || 'none') + (i === 5 ? ' pr-week-sep' : '') + hl;
@@ -3805,40 +3871,9 @@ function renderPayroll() {
     });
   });
 
-  // Day cells: blank -> ✓ (counts) -> ✗ -> blank
-  tbl.querySelectorAll('td.pr-cell').forEach(cell => {
-    cell.addEventListener('click', async () => {
-      if (payroll.locked) return;
-      const id = cell.dataset.id, dt = cell.dataset.date;
-      const cur = cellState(id, dt);
-      const next = cur === '' ? 'check' : cur === 'check' ? 'x' : '';
-      payroll.checks[id] = payroll.checks[id] || {};
-      if (next) payroll.checks[id][dt] = next; else delete payroll.checks[id][dt];
-      cell.textContent = symFor(next);
-      cell.classList.remove('st-check','st-x','st-none');
-      cell.classList.add('st-' + (next || 'none'));
-      document.getElementById('cnt-' + id).textContent = prCount(id);
-      try { await fetch('/api/payroll/check', {method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({id, date: dt, value: next})}); } catch(e) {}
-    });
-  });
-
-  // Extra columns: blank -> ✓ -> ✗ -> ½ -> N/A -> blank  (never counted)
-  const xorder = ['', 'check', 'x', 'half', 'na'];
-  tbl.querySelectorAll('td.pr-xcell').forEach(cell => {
-    cell.addEventListener('click', async () => {
-      if (payroll.locked) return;
-      const id = cell.dataset.id, key = cell.dataset.key;
-      const next = xorder[(xorder.indexOf(xtraState(id, key)) + 1) % xorder.length];
-      payroll.checks[id] = payroll.checks[id] || {};
-      if (next) payroll.checks[id][key] = next; else delete payroll.checks[id][key];
-      cell.textContent = symFor(next);
-      cell.classList.remove('st-check','st-x','st-half','st-na','st-none');
-      cell.classList.add('st-' + (next || 'none'));
-      try { await fetch('/api/payroll/check', {method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({id, date: key, value: next})}); } catch(e) {}
-    });
-  });
+  // Day + extra cells (shared with the Holiday view)
+  tbl.querySelectorAll('td.pr-cell').forEach(cell => cell.addEventListener('click', () => prClickDayCell(cell)));
+  tbl.querySelectorAll('td.pr-xcell').forEach(cell => cell.addEventListener('click', () => prClickXCell(cell)));
 
   tbl.querySelectorAll('.pr-del').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -3929,7 +3964,7 @@ document.getElementById('pr-lock').addEventListener('click', async () => {
 // ---- Totals tab (cumulative checks across all weeks) ----
 function totalChecks(id) {
   const c = payroll.checks[id] || {};
-  return payroll.days.reduce((n, d) => n + ((c[d.iso] === 'check' || c[d.iso] === true) ? 1 : 0), 0);
+  return payroll.days.reduce((n, d) => n + (c[d.iso] === 'half' ? 0.5 : (c[d.iso] === 'check' || c[d.iso] === true) ? 1 : 0), 0);
 }
 function isJC(s) { return (s.title || '').toLowerCase().includes('junior'); }
 
@@ -3956,6 +3991,41 @@ function renderExtTable(filterArea, extPeriod) {
   html += '</tbody>';
   const tbl = document.getElementById('payroll-table');
   tbl.innerHTML = html; tbl.className = 'payroll-table pr-ext';
+}
+
+// Holiday week — all staff with their BS / SP\\MTC plus the holiday-week days,
+// pulling the same marks shown on the week tabs (editable; July 3 allows ½).
+function renderHolidayTable() {
+  const staff = payroll.staff.slice()
+    .sort((a,b) => (a.last+a.first).toLowerCase().localeCompare((b.last+b.first).toLowerCase()));
+  const byMd = md => (payroll.days || []).find(d => d.md === md) || null;
+  // [m/d, dark line before this column?]
+  const dayCols = [['7/2', true], ['7/6', false], ['7/3', true]]
+    .map(([md, sep]) => ({d: byMd(md), sep})).filter(x => x.d);
+  const title = 'Holiday Week Attendance';
+  prSetHeader(title, dayCols.length ? '' : 'No holiday dates (7/2, 7/6, 7/3) were found in this season&rsquo;s calendar.');
+  let html = `<caption>${title}</caption><thead><tr><th class="pr-hstaff">Staff</th>` +
+    '<th class="pr-extra">BS</th><th class="pr-extra">SP\\MTC</th>';
+  dayCols.forEach(c => { html += `<th class="pr-day${c.sep ? ' pr-week-sep' : ''}">${c.d.dow}<br>${c.d.md}</th>`; });
+  html += '</tr></thead><tbody>';
+  staff.forEach(s => {
+    html += `<tr data-id="${s.id}"><td class="pr-name">${s.last}, ${s.first}</td>`;
+    ['xtra:0:1','xtra:0:2'].forEach(key => {
+      const xs = xtraState(s.id, key);
+      html += `<td class="pr-xcell st-${xs||'none'}" data-id="${s.id}" data-key="${key}">${symFor(xs)}</td>`;
+    });
+    dayCols.forEach(c => {
+      const st = cellState(s.id, c.d.iso);
+      html += `<td class="pr-cell st-${st||'none'}${c.sep ? ' pr-week-sep' : ''}" data-id="${s.id}" data-date="${c.d.iso}">${symFor(st)}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  const tbl = document.getElementById('payroll-table');
+  tbl.innerHTML = html;
+  tbl.className = 'payroll-table pr-weeks' + (payroll.locked ? ' pr-locked' : '');
+  tbl.querySelectorAll('td.pr-cell').forEach(c => c.addEventListener('click', () => prClickDayCell(c)));
+  tbl.querySelectorAll('td.pr-xcell').forEach(c => c.addEventListener('click', () => prClickXCell(c)));
 }
 
 // Totals view (rendered into the same Payroll table when the Totals button is on)
