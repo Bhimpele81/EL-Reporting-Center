@@ -1219,6 +1219,23 @@ def api_payroll_export():
         widths = {"A": 30, "B": 11, "C": 11, "D": 11, "E": 11, "F": 11}
         _sfx = {"AM": "_AM", "PM": "_PM"}.get(extp, "")
         fname = f"Extended_Staff{_sfx}.xlsx"
+    elif view == "holiday":
+        # All staff with BS / SP\\MTC plus the holiday-week days (Th 7/2, Mon 7/6, Fri 7/3)
+        staff_h = sorted(data["staff"], key=namekey)
+        hol = [d for md in ("7/2", "7/6", "7/3") for d in days_all if d["md"] == md]
+        header(["Staff", "Area", "BS", "SP\\MTC"] + [f"{d['dow']} {d['md']}" for d in hol])
+        for s in staff_h:
+            c = checks.get(s["id"], {})
+            row = [f"{s.get('last','')}, {s.get('first','')}",
+                   area_txt(s) + (f" / {s['bunk']}" if s.get("bunk") else ""),
+                   SYM.get(c.get("xtra:0:1"), ""), SYM.get(c.get("xtra:0:2"), "")]
+            row += [SYM.get(c.get(d["iso"]), "") for d in hol]
+            ws.append(row)
+            for cell in ws[ws.max_row]:
+                cell.border = BORD
+                cell.alignment = LEFT if cell.column <= 2 else CTR
+        widths = {"A": 26, "B": 18, "C": 8, "D": 10}
+        fname = "Payroll_Holiday.xlsx"
     else:  # weeks
         days = days_all[period * 10:period * 10 + 10]
         staff.sort(key=(lambda s: (-cnt(s["id"], days), namekey(s))) if sort == "total"
@@ -4109,7 +4126,7 @@ document.getElementById('pr-print').addEventListener('click', () => {
 
 // Export the current (filtered/sorted) view to a real .xlsx (server-built)
 document.getElementById('pr-export').addEventListener('click', () => {
-  const view = prTotals ? 'totals' : prExt ? 'ext' : 'weeks';
+  const view = prTotals ? 'totals' : prExt ? 'ext' : prHoliday ? 'holiday' : 'weeks';
   const areas = encodeURIComponent(prExt ? '' : prAreas.join(','));
   const sort = document.getElementById('pr-sort').value;
   const q = encodeURIComponent(prExt ? '' : prSearch.trim());
