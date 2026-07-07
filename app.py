@@ -349,6 +349,19 @@ def _season_week_strings() -> list:
     return [_week_range_str(m) for m in _season_mondays()]
 
 
+def _current_week_day():
+    """(week 1-8, day 0-4) for today in the season, or (None, None) if outside
+    the camp weeks. day is 0=Mon..4=Fri (None on weekends within a week)."""
+    today = (datetime.now(_EASTERN) if _EASTERN else datetime.now()).date()
+    mondays = _season_mondays()
+    for wk in range(8):
+        base = mondays[wk] or date.fromisoformat(_DEFAULT_SEASON_MONDAYS[wk])
+        delta = (today - base).days
+        if 0 <= delta <= 6:
+            return wk + 1, (delta if delta <= 4 else None)
+    return None, None
+
+
 # --- Per-camper, per-week day-schedule overrides ---
 
 def _schedules_save(data: dict) -> None:
@@ -921,6 +934,7 @@ def api_bunk_snapshot():
         data = bunk_snapshot_data(campers, config)
     except Exception as e:
         return jsonify({"has_master": True, "error": str(e), "meta": meta}), 200
+    cur_week, cur_day = _current_week_day()
     return jsonify({
         "has_master": True,
         "meta":       {"filename": meta.get("filename", ""),
@@ -928,6 +942,8 @@ def api_bunk_snapshot():
                        "uploaded_by": meta.get("uploaded_by", "")},
         "report":     data["report"],
         "totals":     data["totals"],
+        "current_week": cur_week,   # 1-8 or null
+        "current_day":  cur_day,    # 0=Mon..4=Fri or null
     })
 
 
@@ -1070,10 +1086,11 @@ def api_families_full():
 @app.route("/api/master", methods=["GET"])
 def api_master():
     """Report whether a master sheet is currently saved (for the UI)."""
+    cur_week, cur_day = _current_week_day()   # for the Camp Snapshot column highlight
     meta = _load_master_meta()
     if meta and _load_master() is not None:
-        return jsonify({"loaded": True, **meta})
-    return jsonify({"loaded": False})
+        return jsonify({"loaded": True, "current_week": cur_week, "current_day": cur_day, **meta})
+    return jsonify({"loaded": False, "current_week": cur_week, "current_day": cur_day})
 
 
 @app.route("/api/master", methods=["POST"])
@@ -1935,6 +1952,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .snap-tbl td.snap-l,.snap-tbl th.snap-l{text-align:left}
 .snap-tbl tr.snap-alt td{background:#f6f6f8}
 .snap-tbl tr.snap-total td{background:#fde9cf;font-weight:700}
+.snap-tbl th.snap-hl,.snap-tbl td.snap-hl{background:#dcecf9 !important}
+.snap-tbl th.snap-hl{background:#1A79BF !important}
 .snap-tbl .snap-sep{border-left:2px solid #9a9a9a}
 .snap-bunk-block{margin-bottom:1.6rem}
 .snap-bunk-name{font-weight:800;color:#000;font-size:1.15rem;margin:.2rem 0 .35rem}
@@ -2919,6 +2938,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li><strong>Totals</strong> — camper counts by bunk and by camp group, plus the by-week breakdowns.</li>
           <li><strong>Bunks</strong> — the full per-bunk roster (weeks, days, age, grade) with a camper search box.</li>
         </ul>
+        <p>The <strong>current camp week</strong> column is shaded in both sub-tabs, and in Bunks the <strong>current weekday</strong> column is shaded too, so today stands out at a glance.</p>
         <p>It always reflects the <strong>master sheet currently saved on the server</strong> — the "Data last updated" line at the top tells you when that was. It loads instantly and only refreshes when a <strong>new master sheet is uploaded</strong>, so you don't wait on it each time.</p>
       </div>
     </details>
@@ -4395,6 +4415,7 @@ async function saveSchedule(key, fromButton) {
 // has changed. That means no spinner / reload on normal opens.
 const SNAP_CACHE_KEY = 'el_snap_cache_v2';
 let snapRendered = false;
+let snapCurWeek = null, snapCurDay = null;   // today's camp week (1-8) / weekday (0-4) for column highlight
 
 function _snapPaint(d) {
   renderSnapMeta(d.meta || {});
@@ -4416,13 +4437,19 @@ async function loadBunkSnapshot(force) {
   }
 
   // 2) Cheap check: did the master sheet change since our cached copy?
+  //    Also grab today's week/day (changes daily, independent of the master).
   let curStamp = '', hasMaster = true;
   try {
     const mr = await fetch('/api/master');
-    if (mr.ok) { const md = await mr.json(); hasMaster = !!md.loaded; curStamp = md.uploaded_at || ''; }
+    if (mr.ok) {
+      const md = await mr.json();
+      hasMaster = !!md.loaded; curStamp = md.uploaded_at || '';
+      snapCurWeek = (md.current_week ?? null); snapCurDay = (md.current_day ?? null);
+    }
   } catch(e) {}
   if (!force && cache && cache.report && hasMaster && curStamp && cache.uploaded_at === curStamp) {
-    return;   // up to date — nothing to reload
+    if (cache && cache.report) _snapPaint(cache);   // repaint so today's column highlight is applied
+    return;
   }
 
   // 3) Master changed (or no cache / forced) — fetch fresh and re-cache.
@@ -4438,6 +4465,7 @@ async function loadBunkSnapshot(force) {
       snapRendered = true; return;
     }
     if (d.error) { if (!snapRendered) metaEl.innerHTML = '<span>⚠️</span><span>' + famEsc(d.error) + '</span>'; return; }
+    snapCurWeek = (d.current_week ?? snapCurWeek); snapCurDay = (d.current_day ?? snapCurDay);
     _snapPaint(d);
     try {
       localStorage.setItem(SNAP_CACHE_KEY, JSON.stringify({
@@ -4460,14 +4488,16 @@ function renderSnapMeta(m) {
 function _snapTbl(headLeft, rows, opts) {
   // rows: array of {cells:[...], cls:''}; first cell is left-aligned label
   opts = opts || {};
-  const wk = opts.weeks;   // true => header is #1..#8
+  const wk = opts.weeks;         // true => header is #1..#8
+  const hl = opts.hlCol ?? -1;   // column index to highlight (label=0, week n = n)
+  let ci = 0;
   let h = '<table class="snap-tbl"><thead><tr>';
-  if (Array.isArray(headLeft)) headLeft.forEach((hh,i) => h += `<th class="${i===0?'snap-l':''}">${famEsc(hh)}</th>`);
-  if (wk) for (let i=1;i<=8;i++) h += `<th>#${i}</th>`;
+  if (Array.isArray(headLeft)) headLeft.forEach(hh => { h += `<th class="${ci===0?'snap-l':''}${ci===hl?' snap-hl':''}">${famEsc(hh)}</th>`; ci++; });
+  if (wk) for (let i=1;i<=8;i++) { h += `<th class="${ci===hl?'snap-hl':''}">#${i}</th>`; ci++; }
   h += '</tr></thead><tbody>';
   rows.forEach(r => {
     h += `<tr class="${r.cls||''}">`;
-    r.cells.forEach((c,i) => h += `<td class="${i===0?'snap-l':''}">${c===''||c==null?'':famEsc(String(c))}</td>`);
+    r.cells.forEach((c,i) => h += `<td class="${i===0?'snap-l':''}${i===hl?' snap-hl':''}">${c===''||c==null?'':famEsc(String(c))}</td>`);
     h += '</tr>';
   });
   return h + '</tbody></table>';
@@ -4494,8 +4524,8 @@ function renderSnapTotals(t) {
         '<div class="snap-sec-title" style="margin-top:1.2rem">Group Totals</div>' + _snapTbl(['Camp','Total'], grpRows) +
       '</div>' +
       '<div>' +
-        '<div class="snap-sec-title">Group Totals by Week</div>' + _snapTbl(['Group'], gwRows, {weeks:true}) +
-        '<div class="snap-sec-title" style="margin-top:1.2rem">Bunk Totals by Week</div>' + _snapTbl(['Bunk'], bwRows, {weeks:true}) +
+        '<div class="snap-sec-title">Group Totals by Week</div>' + _snapTbl(['Group'], gwRows, {weeks:true, hlCol:snapCurWeek}) +
+        '<div class="snap-sec-title" style="margin-top:1.2rem">Bunk Totals by Week</div>' + _snapTbl(['Bunk'], bwRows, {weeks:true, hlCol:snapCurWeek}) +
       '</div>' +
     '</div>';
 }
@@ -4505,23 +4535,26 @@ function renderSnapBunks(report) {
   report.forEach(b => {
     h += '<div class="snap-bunk-block" data-block>';
     h += `<div class="snap-bunk-name">${famEsc(b.bunk)}</div>`;
+    const wkCls = n => (n === snapCurWeek ? ' snap-hl' : '');
+    const dayCls = di => (di === 0 ? 'snap-sep' : '') + (di === snapCurDay ? ' snap-hl' : '');
     h += '<table class="snap-tbl"><thead><tr>' +
-         '<th class="snap-l">Child</th>' +
-         '<th>#1</th><th>#2</th><th>#3</th><th>#4</th><th>#5</th><th>#6</th><th>#7</th><th>#8</th>' +
-         '<th class="snap-sep">M</th><th>T</th><th>W</th><th>R</th><th>F</th>' +
-         '<th class="snap-sep">Age</th><th>Grade</th></tr></thead><tbody>';
+         '<th class="snap-l">Child</th>';
+    for (let n = 1; n <= 8; n++) h += `<th class="${wkCls(n).trim()}">#${n}</th>`;
+    ['M','T','W','R','F'].forEach((L,di) => h += `<th class="${dayCls(di).trim()}">${L}</th>`);
+    h += '<th class="snap-sep">Age</th><th>Grade</th></tr></thead><tbody>';
     b.campers.forEach((c,i) => {
       h += `<tr class="${i%2?'snap-alt':''}" data-n="${famEsc((c.name||'').toLowerCase())}">`;
       h += `<td class="snap-l">${famEsc(c.name)}</td>`;
-      c.weeks.forEach(w => h += `<td>${w?w:''}</td>`);
-      c.days.forEach((d,di) => h += `<td class="${di===0?'snap-sep':''}">${famEsc(d||'')}</td>`);
+      c.weeks.forEach((w,wi) => h += `<td class="${wkCls(wi+1).trim()}">${w?w:''}</td>`);
+      c.days.forEach((d,di) => h += `<td class="${dayCls(di).trim()}">${famEsc(d||'')}</td>`);
       h += `<td class="snap-sep">${c.age===''?'':famEsc(String(c.age))}</td><td>${famEsc(String(c.grade||''))}</td>`;
       h += '</tr>';
     });
     // Total row
     h += '<tr class="snap-total"><td class="snap-l">Total: ' + b.total + '</td>';
-    b.week_sums.forEach(s => h += `<td>${s}</td>`);
-    h += '<td class="snap-sep"></td><td></td><td></td><td></td><td></td><td class="snap-sep"></td><td></td></tr>';
+    b.week_sums.forEach((s,wi) => h += `<td class="${wkCls(wi+1).trim()}">${s}</td>`);
+    ['M','T','W','R','F'].forEach((L,di) => h += `<td class="${dayCls(di).trim()}"></td>`);
+    h += '<td class="snap-sep"></td><td></td></tr>';
     h += '</tbody></table></div>';
   });
   const box = document.getElementById('snap-bunks');
