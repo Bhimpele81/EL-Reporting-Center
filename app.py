@@ -169,7 +169,7 @@ def _s3_delete_old(keep: int = 10) -> None:
 # Reports that take a camp-week selection
 WEEK_AWARE_REPORTS = {"driver_totals", "group_attendance",
                       "am_extend", "pm_extend", "pm_grp_extend",
-                      "inter_labels", "jr_transport_labels"}
+                      "inter_labels", "jr_transport_labels", "upper_labels"}
 
 MASTER_KEY        = "current_master.dat"
 MASTER_META_KEY   = "current_master_meta.json"
@@ -2452,6 +2452,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <div class="report-types">
         <button class="rtype-btn" data-rtype="inter_labels">Inter</button>
         <button class="rtype-btn" data-rtype="jr_transport_labels">Junior</button>
+        <button class="rtype-btn" data-rtype="upper_labels">Upper</button>
         <button class="rtype-btn" data-rtype="mailing_labels">Mailing</button>
     </div>
   </div>
@@ -2917,7 +2918,8 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li><strong>AM / PM Extend</strong> — extended-hours sign-in / sign-out sheets. <em>(week-specific)</em></li>
           <li><strong>PM GRP Extend</strong> — PM extended care grouped, one group per page. <em>(week-specific)</em></li>
           <li><strong>Driver Totals</strong> — per-driver transportation sheet. <em>(week-specific)</em></li>
-          <li><strong>Labels (Word):</strong> Inter, Junior, and Mailing (one per address). <em>(Inter/Junior are week-specific)</em></li>
+          <li><strong>Labels (Word):</strong> Inter, Junior, Upper, and Mailing (one per address). <em>(Inter/Junior/Upper are week-specific)</em></li>
+          <li><strong>Upper labels</strong> — one per Upper-camp camper attending the selected week (any number of days), showing the camper name with their bunk (no number) underneath.</li>
         </ul>
         <p>Reports marked <em>week-specific</em> ask you to pick a camp week before running.</p>
       </div>
@@ -3225,7 +3227,7 @@ function updateRunBtn() {
 }
 
 // Reports that use a camp-week selection
-const WEEK_AWARE = ['driver_totals','group_attendance','am_extend','pm_extend','pm_grp_extend','inter_labels','jr_transport_labels'];
+const WEEK_AWARE = ['driver_totals','group_attendance','am_extend','pm_extend','pm_grp_extend','inter_labels','jr_transport_labels','upper_labels'];
 
 // Report type buttons
 document.querySelectorAll('.rtype-btn').forEach(btn => {

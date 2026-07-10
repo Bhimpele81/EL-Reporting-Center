@@ -1907,6 +1907,17 @@ def build_group_labels_docx(records: list, config: dict, group_name: str = "Inte
     return _avery5960_docx(rows3), len(rows3)
 
 
+def build_upper_labels_docx(records: list, config: dict) -> tuple:
+    """Avery 5960 labels for every Upper-camp camper attending the selected week.
+    Each label: camper name, with their bunk (number removed) on the line below.
+    Returns (docx_bytes, count)."""
+    in_group = _group_bunks(config, "Upper")
+    labels = sorted((r for r in records if in_group(r["bunk"])),
+                    key=lambda r: (_bunk_sort_key(r["bunk"]), r["name"].lower()))
+    lines = [[r["name"], _label_bunk(r["bunk"])] for r in labels]
+    return _avery5960_lines_docx(lines, size=14, bold_first=True), len(lines)
+
+
 def build_jr_transport_labels_docx(records: list, config: dict) -> tuple:
     """
     Junior-group transportation labels in ONE Avery 5960 .docx, with each
@@ -2312,7 +2323,7 @@ def process_report(file_bytes: bytes, report_type: str,
     if week_dates:
         set_week_dates(week_dates)
 
-    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend", "driver_totals", "inter_labels", "jr_transport_labels", "mailing_labels")
+    supported = ("bunk_snapshot", "group_attendance", "am_extend", "pm_extend", "pm_grp_extend", "driver_totals", "inter_labels", "jr_transport_labels", "mailing_labels", "upper_labels")
     if report_type not in supported:
         return {
             "success": False,
@@ -2560,6 +2571,29 @@ def process_report(file_bytes: bytes, report_type: str,
         return {
             "success":  True,
             "message":  f"Created {count} labels for Group Inter.",
+            "filename": out_filename,
+            "rows":     count,
+        }
+
+    # ---- Upper Labels (Word / Avery 5960 — name + bunk, week-dependent) ----
+    if report_type == "upper_labels":
+        if master is None:
+            return {"success": False, "message": "Upper Labels needs a master sheet. Upload the master report."}
+        try:
+            docx_bytes, count = build_upper_labels_docx(_week_filter(master), config)
+        except Exception as e:
+            return {"success": False, "message": f"Could not build labels: {e}"}
+        if not count:
+            return {"success": False, "message": "No Upper campers attending the selected week."}
+
+        out_filename = f"Upper Labels {report_date.strftime('%m%d%Y')}.docx"
+        out_path = os.path.join(output_dir, out_filename)
+        with open(out_path, "wb") as f:
+            f.write(docx_bytes)
+
+        return {
+            "success":  True,
+            "message":  f"Created {count} labels for the Upper camp.",
             "filename": out_filename,
             "rows":     count,
         }
