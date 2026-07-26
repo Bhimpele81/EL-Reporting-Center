@@ -5078,7 +5078,7 @@ function renderPxRates() {
   let h = '<div class="px-sec"><div class="px-sec-title">Summer Camp tuition</div><table class="px-tbl"><thead><tr><th class="px-l">Weeks</th><th>Early Signup (ES)</th><th>Regular (Final)</th></tr></thead><tbody>';
   wk.forEach(w => h += '<tr><td class="px-l">'+w+'</td><td>'+inp('px-camp-ES-'+w, pricing.camp.tiers.ES[w])+'</td><td>'+inp('px-camp-Final-'+w, pricing.camp.tiers.Final[w])+'</td></tr>');
   h += '</tbody></table>';
-  h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the fraction of full 5-day tuition a 4-day or 3-day camper pays. 1 = full price (e.g. 0.9 = 90%). All 1 right now, so the number of days does not change camp tuition yet.</div>';
+  h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the proportion of the full 5-day tuition charged to a 4-day or 3-day camper, where 1.0 represents the full rate (for example, 0.90 applies a 10% reduction). Each value is currently set to 1.0, so the number of days attended does not yet affect camp tuition.</div>';
   h += '<table class="px-tbl"><thead><tr><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody><tr>'+
     '<td>'+inp('px-dm-5', pricing.camp.day_mult['5'])+'</td><td>'+inp('px-dm-4', pricing.camp.day_mult['4'])+'</td><td>'+inp('px-dm-3', pricing.camp.day_mult['3'])+'</td></tr></tbody></table></div>';
   h += '<div class="px-sec"><div class="px-sec-title">Transportation (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Type</th><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody>';
