@@ -189,6 +189,8 @@ SEASON_KEY        = "season.json"
 LOCAL_SEASON      = os.path.join(UPLOAD_DIR, "season.json")
 SCHEDULES_KEY     = "schedules.json"
 LOCAL_SCHEDULES   = os.path.join(UPLOAD_DIR, "schedules.json")
+PRICING_KEY       = "pricing.json"
+LOCAL_PRICING     = os.path.join(UPLOAD_DIR, "pricing.json")
 # Default season: Monday of each of the 8 camp weeks (2026)
 _DEFAULT_SEASON_MONDAYS = ["2026-06-22", "2026-06-29", "2026-07-06", "2026-07-13",
                            "2026-07-20", "2026-07-27", "2026-08-03", "2026-08-10"]
@@ -200,7 +202,7 @@ FAMILY_FIELDS     = ["last", "first", "family", "bunk",
                      "pu1_name", "pu1_auth", "pu2_name", "pu2_auth",
                      "pu3_name", "pu3_auth", "pu4_name", "pu4_auth"]
 _PROTECTED_KEYS   = {"bunk_config.json", CONFIG_META_KEY, MASTER_KEY, MASTER_META_KEY,
-                     PAYROLL_KEY, FAMILIES_KEY, USERS_KEY, SEASON_KEY, SCHEDULES_KEY}
+                     PAYROLL_KEY, FAMILIES_KEY, USERS_KEY, SEASON_KEY, SCHEDULES_KEY, PRICING_KEY}
 
 
 def _camper_key(name, bunk):
@@ -398,6 +400,84 @@ def _schedules_load() -> dict:
         data = {}
     data.setdefault("overrides", {})   # { camper_key: { "1": "MWF", ... } }
     return data
+
+
+# --- Pricing calculator / explorer (admin) ---
+
+# Seeded from the 2026 worksheets; all values are editable in the app.
+_DEFAULT_PRICING = {
+    "season_label": "2026",
+    "camp": {
+        "week_order": ["8", "7", "6", "5", "4", "Mini"],
+        # Two rate tiers by week-count: ES = early-signup (fall), Final = regular
+        "tiers": {
+            "ES":    {"8": 5580, "7": 5415, "6": 5080, "5": 4575, "4": 3905, "Mini": 550},
+            "Final": {"8": 6000, "7": 5820, "6": 5460, "5": 4920, "4": 4200, "Mini": 550},
+        },
+        # Multiplier applied to the (weeks) tuition for 5/4/3 days per week.
+        # Flat (1.0) for now — camp may provide day-based rates later.
+        "day_mult": {"5": 1.0, "4": 1.0, "3": 1.0},
+    },
+    # Weekly transportation add-on, by days per week
+    "transport": {
+        "2way": {"5": 160, "4": 140, "3": 120},
+        "1way": {"5": 120, "4": 120, "3": 120},
+    },
+    # Childcare / school (separate from camp): weekly rate by days per week.
+    #   base     = one child
+    #   sibling2 = combined weekly rate for two siblings (~130% of base)
+    "childcare": {
+        "5": {"base": 485, "sibling2": 595},
+        "4": {"base": 435, "sibling2": 530},
+        "3": {"base": 395, "sibling2": 485},
+    },
+}
+
+
+def _deep_fill(target, defaults):
+    """Recursively add any keys present in defaults but missing from target."""
+    for k, v in defaults.items():
+        if isinstance(v, dict):
+            target[k] = target.get(k) if isinstance(target.get(k), dict) else {}
+            _deep_fill(target[k], v)
+        else:
+            target.setdefault(k, v)
+    return target
+
+
+def _pricing_save(data: dict) -> None:
+    try:
+        with open(LOCAL_PRICING, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+    if _s3:
+        try:
+            _s3.put_object(Bucket=S3_BUCKET, Key=PRICING_KEY,
+                           Body=json.dumps(data).encode("utf-8"),
+                           ContentType="application/json")
+        except ClientError:
+            pass
+
+
+def _pricing_load() -> dict:
+    data = None
+    if _s3:
+        buf = _s3_get_file(PRICING_KEY)
+        if buf:
+            try:
+                data = json.load(buf)
+            except Exception:
+                data = None
+    if data is None and os.path.exists(LOCAL_PRICING):
+        try:
+            with open(LOCAL_PRICING, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = None
+    if not isinstance(data, dict):
+        data = {}
+    return _deep_fill(data, _DEFAULT_PRICING)
 
 
 def _payroll_days() -> list:
@@ -918,6 +998,24 @@ def api_schedules_save():
     if not ov:
         data["overrides"].pop(key, None)
     _schedules_save(data)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/pricing", methods=["GET"])
+@admin_required
+def api_pricing():
+    """Editable pricing config (camp tuition tiers, transport, childcare)."""
+    return jsonify(_pricing_load())
+
+
+@app.route("/api/pricing", methods=["POST"])
+@admin_required
+def api_pricing_save():
+    """Replace the pricing config with the posted body (validated-filled)."""
+    body = request.get_json(force=True, silent=True) or {}
+    if not isinstance(body, dict):
+        return jsonify({"error": "bad payload"}), 400
+    _pricing_save(_deep_fill(body, _DEFAULT_PRICING))
     return jsonify({"ok": True})
 
 
@@ -1990,6 +2088,32 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .fam-flbl{font-size:.72rem;color:#888;margin:.3rem 0 .1rem;text-transform:uppercase;letter-spacing:.04em}
 .fam-edit-actions{display:flex;align-items:center;gap:.6rem;margin-top:1rem;padding-top:.8rem;border-top:1px solid #eee}
 .fam-edit-msg{font-size:.82rem;color:#777}
+/* Pricing module */
+.px-view{display:none}.px-view.on{display:block}
+.px-sec{margin-bottom:1.6rem}
+.px-sec-title{font-weight:700;color:var(--brand-dark);margin:.2rem 0 .5rem;font-size:1rem}
+.px-tbl{border-collapse:collapse;font-size:.88rem;margin-bottom:.6rem}
+.px-tbl th,.px-tbl td{border:1px solid #d8d8d8;padding:.35rem .55rem;text-align:center;white-space:nowrap}
+.px-tbl thead th{background:var(--brand);color:#fff;font-weight:700}
+.px-tbl td.px-l,.px-tbl th.px-l{text-align:left;font-weight:600}
+.px-tbl tr.px-total td{background:#fde9cf;font-weight:700}
+.px-rate-inp{width:78px;border:1px solid var(--border);border-radius:5px;padding:.25rem .35rem;text-align:right;font-size:.85rem}
+.px-field{display:inline-flex;flex-direction:column;gap:.2rem;margin:0 .9rem .8rem 0;font-size:.8rem;color:#555}
+.px-field select,.px-field input{padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.9rem;min-width:120px}
+.px-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.4rem;margin-bottom:1rem}
+.px-camper-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.6rem;padding:.6rem .7rem;border:1px solid #eee;border-radius:8px;margin-bottom:.6rem;background:#fafafa}
+.px-total-box{margin-top:1rem;padding:1rem 1.2rem;border:2px solid var(--brand);border-radius:10px;background:#faf3f4;max-width:520px}
+.px-total-box .px-grand{font-size:1.6rem;font-weight:800;color:var(--brand-dark)}
+.px-line{display:flex;justify-content:space-between;gap:1.5rem;font-size:.88rem;padding:.15rem 0;border-bottom:1px dashed #e5d9dc}
+.px-line.px-sub{font-weight:700;border-bottom:none;padding-top:.4rem}
+.px-btn{background:var(--brand);color:#fff;border:none;border-radius:7px;padding:.5rem 1rem;font-weight:600;font-size:.85rem;cursor:pointer}
+.px-btn.ghost{background:#fff;color:var(--brand);border:1px solid var(--brand)}
+.px-diff-up{color:#c0392b}.px-diff-flat{color:#888}
+.px-msg{font-size:.82rem;color:#777;margin-left:.5rem}
+/* Rate sheet (print one-pager) */
+#px-sheet .px-sheet-head{text-align:center;margin-bottom:1rem}
+#px-sheet .px-sheet-head h2{font-family:'Roboto Slab',serif;color:var(--brand-dark);margin:.2rem 0}
+.px-sheet-grid{display:flex;flex-wrap:wrap;gap:1.6rem;align-items:flex-start}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
 .payroll-table td{height:42px}
@@ -2423,6 +2547,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
   <div class="tab" data-tab="snap" id="tab-snap-nav">📸 <span>Camp Snapshot</span></div>
   <div class="tab" data-tab="families">👪 <span>Families</span></div>
+  <div class="tab" data-tab="pricing" id="tab-pricing-nav" style="display:none">💲 <span>Pricing</span><span class="nav-new">NEW</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
   <div class="tab" data-tab="help">❓ <span>FAQs</span></div>
 </nav>
@@ -2591,6 +2716,28 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   </div>
 
 </div><!-- /tab-upload -->
+
+<!-- ===== PRICING TAB (admin only) ===== -->
+<div class="tab-panel" id="tab-pricing">
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Pricing</div>
+        <div class="card-hint">Maintain the rate tables, model price changes for an upcoming season, calculate what a family owes, and print a shareable rate sheet. All parts read from the same editable rates.</div>
+      </div>
+    </div>
+    <div class="snap-subtabs">
+      <button class="snap-subtab pxtab on" data-px="calc">Calculator</button>
+      <button class="snap-subtab pxtab" data-px="explore">Explorer</button>
+      <button class="snap-subtab pxtab" data-px="rates">Rate Settings</button>
+      <button class="snap-subtab pxtab" data-px="sheet">Rate Sheet</button>
+    </div>
+    <div class="px-view on" id="px-calc"></div>
+    <div class="px-view" id="px-explore"></div>
+    <div class="px-view" id="px-rates"></div>
+    <div class="px-view" id="px-sheet"></div>
+  </div>
+</div>
 
 <!-- ===== FAMILIES TAB ===== -->
 <div class="tab-panel" id="tab-families">
@@ -3122,6 +3269,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (tab.dataset.tab === 'payroll') renderPayroll();
     if (tab.dataset.tab === 'snap') loadBunkSnapshot();
     if (tab.dataset.tab === 'families') loadFamiliesDir();
+    if (tab.dataset.tab === 'pricing') loadPricing();
   });
 });
 
@@ -4782,6 +4930,212 @@ function famCardHTML(f) {
 
 (function(){ const s = document.getElementById('fam-dir-search'); if (s) s.addEventListener('input', renderFamDir); })();
 
+// ---- Pricing module (admin) ----
+let pricing = null, pxLoaded = false;
+let pxTier = 'ES';
+let pxCampers = [{weeks:'8', days:'5', transport:'none'}];
+let pxCC = {on:false, days:'5', kids:1, weeks:0};
+let pxExp = {pct:3, round:50};
+const pxMoney = n => '$' + (Math.round(Number(n)||0)).toLocaleString('en-US');
+
+async function loadPricing(force) {
+  if (!currentUser || !currentUser.is_admin) return;
+  if (pxLoaded && !force) return;
+  try {
+    const r = await fetch('/api/pricing');
+    if (!r.ok) return;
+    pricing = await r.json();
+    pxLoaded = true;
+  } catch(e) { return; }
+  renderPxCalc(); renderPxExplore(); renderPxRates(); renderPxSheet();
+}
+
+// Sub-tab switching
+document.querySelectorAll('.pxtab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.pxtab').forEach(b => b.classList.remove('on'));
+    document.querySelectorAll('.px-view').forEach(v => v.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById('px-' + btn.dataset.px).classList.add('on');
+  });
+});
+
+// ---------- Calculator ----------
+function renderPxCalc() {
+  if (!pricing) return;
+  const box = document.getElementById('px-calc');
+  const weekOpts = pricing.camp.week_order || ['8','7','6','5','4','Mini'];
+  const trLabel = {none:'None', '1way':'1-way', '2way':'2-way'};
+  let h = '<div class="px-sec"><div class="px-sec-title">Summer Camp</div>';
+  h += '<div class="px-controls"><label class="px-field">Rate<select id="px-tier">' +
+    `<option value="ES"${pxTier==='ES'?' selected':''}>Early Signup (fall)</option>` +
+    `<option value="Final"${pxTier==='Final'?' selected':''}>Regular</option></select></label></div>`;
+  pxCampers.forEach((c,i) => {
+    const opt = (v,cur) => `<option value="${v}"${cur===v?' selected':''}>${v}</option>`;
+    h += '<div class="px-camper-row" data-i="'+i+'">' +
+      '<span style="font-weight:700;color:#555">Camper '+(i+1)+'</span>' +
+      '<label class="px-field">Weeks<select data-f="weeks">'+weekOpts.map(w=>opt(w,c.weeks)).join('')+'</select></label>' +
+      '<label class="px-field">Days/wk<select data-f="days">'+['5','4','3'].map(d=>opt(d,c.days)).join('')+'</select></label>' +
+      '<label class="px-field">Transport<select data-f="transport">'+['none','1way','2way'].map(t=>`<option value="${t}"${c.transport===t?' selected':''}>${trLabel[t]}</option>`).join('')+'</select></label>' +
+      (pxCampers.length>1?'<button class="px-btn ghost px-rm" data-i="'+i+'" style="padding:.35rem .6rem">✕</button>':'') +
+      '</div>';
+  });
+  h += '<button class="px-btn ghost" id="px-add-camper">＋ Add camper</button></div>';
+  h += '<div class="px-sec"><div class="px-sec-title">Childcare / School <span style="font-weight:400;color:#999;font-size:.8rem">(separate from camp)</span></div><div class="px-controls">' +
+    '<label class="px-field">Include<select id="px-cc-on"><option value="no"'+(pxCC.on?'':' selected')+'>No</option><option value="yes"'+(pxCC.on?' selected':'')+'>Yes</option></select></label>' +
+    '<label class="px-field">Days/wk<select id="px-cc-days">'+['5','4','3'].map(d=>`<option value="${d}"${pxCC.days===d?' selected':''}>${d}</option>`).join('')+'</select></label>' +
+    '<label class="px-field">Children<select id="px-cc-kids"><option value="1"'+(pxCC.kids===1?' selected':'')+'>1</option><option value="2"'+(pxCC.kids===2?' selected':'')+'>2 (siblings)</option></select></label>' +
+    '<label class="px-field">Weeks<input type="number" id="px-cc-weeks" min="0" value="'+(pxCC.weeks||'')+'" placeholder="#"></label>' +
+    '</div></div><div id="px-calc-total"></div>';
+  box.innerHTML = h;
+  document.getElementById('px-tier').addEventListener('change', e => { pxTier = e.target.value; renderPxCalc(); });
+  box.querySelectorAll('.px-camper-row').forEach(row => {
+    const i = +row.dataset.i;
+    row.querySelectorAll('select[data-f]').forEach(sel => sel.addEventListener('change', () => { pxCampers[i][sel.dataset.f] = sel.value; renderPxCalc(); }));
+  });
+  box.querySelectorAll('.px-rm').forEach(b => b.addEventListener('click', () => { pxCampers.splice(+b.dataset.i,1); renderPxCalc(); }));
+  document.getElementById('px-add-camper').addEventListener('click', () => { pxCampers.push({weeks:'8',days:'5',transport:'none'}); renderPxCalc(); });
+  ['px-cc-on','px-cc-days','px-cc-kids','px-cc-weeks'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => {
+      pxCC.on = document.getElementById('px-cc-on').value === 'yes';
+      pxCC.days = document.getElementById('px-cc-days').value;
+      pxCC.kids = +document.getElementById('px-cc-kids').value;
+      pxCC.weeks = +document.getElementById('px-cc-weeks').value || 0;
+      renderPxCalc();
+    });
+  });
+  renderPxCalcTotal();
+}
+
+function renderPxCalcTotal() {
+  const tiers = pricing.camp.tiers[pxTier] || {}, dm = pricing.camp.day_mult || {};
+  let lines = [], campGrand = 0;
+  pxCampers.forEach((c,i) => {
+    const base = Number(tiers[c.weeks]||0);
+    const mult = Number(dm[c.days]!=null ? dm[c.days] : 1);
+    const tuition = base*mult; let sub = tuition;
+    let detail = pxMoney(tuition)+' tuition ('+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+(mult!==1?' ×'+mult:'')+')';
+    const wksNum = parseInt(c.weeks,10)||0;
+    if (c.transport!=='none' && wksNum) {
+      const wkr = Number((pricing.transport[c.transport]||{})[c.days]||0);
+      const tr = wkr*wksNum; sub += tr;
+      detail += ' + '+pxMoney(tr)+' transport ('+pxMoney(wkr)+'/wk × '+wksNum+')';
+    }
+    campGrand += sub;
+    lines.push('<div class="px-line"><span>Camper '+(i+1)+': '+detail+'</span><span>'+pxMoney(sub)+'</span></div>');
+  });
+  const tierLbl = pxTier==='ES' ? 'Early Signup' : 'Regular';
+  let html = '<div class="px-total-box">'+lines.join('')+'<div class="px-line px-sub"><span>Camp total ('+tierLbl+')</span><span class="px-grand">'+pxMoney(campGrand)+'</span></div></div>';
+  if (pxCC.on) {
+    const row = pricing.childcare[pxCC.days] || {};
+    const weekly = pxCC.kids===2 ? Number(row.sibling2||0) : Number(row.base||0);
+    const wks = pxCC.weeks||0; const ccTotal = wks ? weekly*wks : weekly;
+    const lbl = pxCC.kids===2 ? '2 siblings' : '1 child';
+    html += '<div class="px-total-box" style="margin-top:.8rem"><div class="px-line"><span>Childcare ('+pxCC.days+' days/wk, '+lbl+')'+(wks?': '+pxMoney(weekly)+'/wk × '+wks+' wks':'')+'</span><span>'+pxMoney(ccTotal)+'</span></div>' +
+      '<div class="px-line px-sub"><span>Childcare total'+(wks?'':' (weekly rate)')+'</span><span class="px-grand">'+pxMoney(ccTotal)+'</span></div></div>';
+  }
+  document.getElementById('px-calc-total').innerHTML = html;
+}
+
+// ---------- Explorer ----------
+function pxRound(x) { const s = pxExp.round; return s ? Math.round(x/s)*s : Math.round(x); }
+function pxExpTable(title, table, order, rowLabel) {
+  let h = '<div class="px-sec"><div class="px-sec-title">'+title+'</div><table class="px-tbl"><thead><tr>' +
+    '<th class="px-l">'+rowLabel+'</th><th>Current</th><th>+'+pxExp.pct+'%</th><th>$ diff</th><th>% diff</th></tr></thead><tbody>';
+  order.forEach(k => {
+    const base = Number(table[k]||0);
+    const nw = pxRound(base*(1+pxExp.pct/100));
+    const diff = nw-base, pct = base ? (diff/base*100) : 0;
+    const cls = diff ? 'px-diff-up' : 'px-diff-flat';
+    h += '<tr><td class="px-l">'+k+'</td><td>'+pxMoney(base)+'</td><td>'+pxMoney(nw)+'</td>' +
+      '<td class="'+cls+'">'+(diff>0?'+':'')+pxMoney(diff)+'</td><td class="'+cls+'">'+pct.toFixed(2)+'%</td></tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+function renderPxExplore() {
+  if (!pricing) return;
+  const box = document.getElementById('px-explore');
+  let h = '<div class="px-controls">' +
+    '<label class="px-field">% increase<input type="number" id="px-exp-pct" step="0.1" value="'+pxExp.pct+'"></label>' +
+    '<label class="px-field">Round to<select id="px-exp-round">'+[['0','$1'],['25','$25'],['50','$50'],['100','$100']].map(([v,l])=>`<option value="${v}"${pxExp.round==+v?' selected':''}>${l}</option>`).join('')+'</select></label>' +
+    '</div>';
+  const ccBase = {}, ccOrder = ['5','4','3'];
+  ccOrder.forEach(d => ccBase[d] = pricing.childcare[d].base);
+  h += pxExpTable('Summer Camp — Early Signup (ES)', pricing.camp.tiers.ES, pricing.camp.week_order, 'Weeks');
+  h += pxExpTable('Summer Camp — Regular (Final)', pricing.camp.tiers.Final, pricing.camp.week_order, 'Weeks');
+  h += pxExpTable('Childcare — 1 child (weekly)', ccBase, ccOrder, 'Days/wk');
+  box.innerHTML = h;
+  document.getElementById('px-exp-pct').addEventListener('input', e => { pxExp.pct = parseFloat(e.target.value)||0; renderPxExplore(); });
+  document.getElementById('px-exp-round').addEventListener('change', e => { pxExp.round = parseInt(e.target.value,10); renderPxExplore(); });
+}
+
+// ---------- Rate Settings ----------
+function renderPxRates() {
+  if (!pricing) return;
+  const box = document.getElementById('px-rates');
+  const wk = pricing.camp.week_order;
+  const inp = (id,v) => `<input class="px-rate-inp" id="${id}" value="${v==null?'':v}">`;
+  let h = '<div class="px-sec"><div class="px-sec-title">Summer Camp tuition</div><table class="px-tbl"><thead><tr><th class="px-l">Weeks</th><th>Early Signup (ES)</th><th>Regular (Final)</th></tr></thead><tbody>';
+  wk.forEach(w => h += '<tr><td class="px-l">'+w+'</td><td>'+inp('px-camp-ES-'+w, pricing.camp.tiers.ES[w])+'</td><td>'+inp('px-camp-Final-'+w, pricing.camp.tiers.Final[w])+'</td></tr>');
+  h += '</tbody></table>';
+  h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem">Day multiplier — tuition factor for 4/3-day campers (1 = same as 5-day):</div>';
+  h += '<table class="px-tbl"><thead><tr><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody><tr>'+
+    '<td>'+inp('px-dm-5', pricing.camp.day_mult['5'])+'</td><td>'+inp('px-dm-4', pricing.camp.day_mult['4'])+'</td><td>'+inp('px-dm-3', pricing.camp.day_mult['3'])+'</td></tr></tbody></table></div>';
+  h += '<div class="px-sec"><div class="px-sec-title">Transportation (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Type</th><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody>';
+  [['2way','2-way'],['1way','1-way']].forEach(([k,l]) => h += '<tr><td class="px-l">'+l+'</td><td>'+inp('px-tr-'+k+'-5', pricing.transport[k]['5'])+'</td><td>'+inp('px-tr-'+k+'-4', pricing.transport[k]['4'])+'</td><td>'+inp('px-tr-'+k+'-3', pricing.transport[k]['3'])+'</td></tr>');
+  h += '</tbody></table></div>';
+  h += '<div class="px-sec"><div class="px-sec-title">Childcare / School (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Days/wk</th><th>1 child</th><th>2 siblings (combined)</th></tr></thead><tbody>';
+  ['5','4','3'].forEach(d => h += '<tr><td class="px-l">'+d+'</td><td>'+inp('px-cc-'+d+'-base', pricing.childcare[d].base)+'</td><td>'+inp('px-cc-'+d+'-sib', pricing.childcare[d].sibling2)+'</td></tr>');
+  h += '</tbody></table></div>';
+  h += '<div style="margin-top:.5rem"><button class="px-btn" id="px-save">💾 Save rates</button><span class="px-msg" id="px-save-msg"></span></div>';
+  box.innerHTML = h;
+  document.getElementById('px-save').addEventListener('click', savePxRates);
+}
+
+async function savePxRates() {
+  const num = id => { const el = document.getElementById(id); const v = parseFloat((el && el.value || '').replace(/[^0-9.]/g,'')); return isNaN(v) ? 0 : v; };
+  pricing.camp.week_order.forEach(w => { pricing.camp.tiers.ES[w] = num('px-camp-ES-'+w); pricing.camp.tiers.Final[w] = num('px-camp-Final-'+w); });
+  ['5','4','3'].forEach(d => { pricing.camp.day_mult[d] = num('px-dm-'+d); pricing.childcare[d].base = num('px-cc-'+d+'-base'); pricing.childcare[d].sibling2 = num('px-cc-'+d+'-sib'); });
+  ['2way','1way'].forEach(k => ['5','4','3'].forEach(d => pricing.transport[k][d] = num('px-tr-'+k+'-'+d)));
+  const msg = document.getElementById('px-save-msg'); msg.textContent = 'Saving…'; msg.style.color = '#777';
+  try {
+    const r = await fetch('/api/pricing', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(pricing)});
+    if (!r.ok) throw 0;
+    msg.textContent = '✓ Saved'; msg.style.color = '#2e7d32';
+    renderPxCalc(); renderPxExplore(); renderPxSheet();
+  } catch(e) { msg.textContent = 'Save failed — try again'; msg.style.color = '#c0392b'; }
+}
+
+// ---------- Rate Sheet (printable one-pager) ----------
+function renderPxSheet() {
+  if (!pricing) return;
+  const box = document.getElementById('px-sheet');
+  const wk = pricing.camp.week_order;
+  let h = '<div style="margin-bottom:.8rem" class="px-noprint"><button class="px-btn" id="px-print">🖨 Print / Save PDF</button></div>';
+  h += '<div class="px-sheet-head"><h2>Elbow Lane Day Camp</h2><div style="color:#666;font-weight:600">'+famEsc(pricing.season_label||'')+' Rates</div></div>';
+  h += '<div class="px-sheet-grid">';
+  // Camp tuition
+  h += '<div><div class="px-sec-title">Summer Camp Tuition</div><table class="px-tbl"><thead><tr><th class="px-l">Weeks</th><th>Early Signup</th><th>Regular</th></tr></thead><tbody>';
+  wk.forEach(w => h += '<tr><td class="px-l">'+w+'</td><td>'+pxMoney(pricing.camp.tiers.ES[w])+'</td><td>'+pxMoney(pricing.camp.tiers.Final[w])+'</td></tr>');
+  h += '</tbody></table></div>';
+  // Transport
+  h += '<div><div class="px-sec-title">Transportation (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Type</th><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody>';
+  [['2way','2-way'],['1way','1-way']].forEach(([k,l]) => h += '<tr><td class="px-l">'+l+'</td><td>'+pxMoney(pricing.transport[k]['5'])+'</td><td>'+pxMoney(pricing.transport[k]['4'])+'</td><td>'+pxMoney(pricing.transport[k]['3'])+'</td></tr>');
+  h += '</tbody></table></div>';
+  // Childcare
+  h += '<div><div class="px-sec-title">Childcare / School (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Days/wk</th><th>1 child</th><th>2 siblings</th></tr></thead><tbody>';
+  ['5','4','3'].forEach(d => h += '<tr><td class="px-l">'+d+'</td><td>'+pxMoney(pricing.childcare[d].base)+'</td><td>'+pxMoney(pricing.childcare[d].sibling2)+'</td></tr>');
+  h += '</tbody></table></div>';
+  h += '</div>';
+  box.innerHTML = h;
+  document.getElementById('px-print').addEventListener('click', () => {
+    let st = document.getElementById('px-print-style');
+    if (!st) { st = document.createElement('style'); st.id = 'px-print-style'; document.head.appendChild(st); }
+    st.textContent = '@media print{ body *{visibility:hidden!important} #px-sheet,#px-sheet *{visibility:visible!important} #px-sheet{position:absolute;left:0;top:0;width:100%} .px-noprint{display:none!important} @page{margin:.5in} }';
+    window.print();
+  });
+}
+
 // ---- First-time "Utilities" notice (shows once per browser, after sign-in) ----
 function maybeShowNotice() {
   const KEY = 'el_seen_utilities_notice_v1';
@@ -4926,6 +5280,8 @@ document.getElementById('usr-copy').addEventListener('click', async () => {
     overlay.classList.add('hidden');
     document.getElementById('h-user').style.display = 'flex';
     document.getElementById('h-user-name').textContent = user.name || user.username;
+    const pxNav = document.getElementById('tab-pricing-nav');   // admin-only
+    if (pxNav) pxNav.style.display = user.is_admin ? '' : 'none';
     loadAllData();
     maybeShowNotice();
   }
