@@ -2143,6 +2143,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-sheet-tbl .c3l{background:#ece0c3!important}
 .px-sheet-tbl .c3m{background:#dbc57e!important}
 .px-sheet-tbl .px-l{background:#efecec!important}
+.px-sheet-tbl td.px-l,.px-sheet-tbl th.px-l{text-align:center}
 .px-sheet-tbl .px-grp{border-left:2px solid #fff}
 .px-chgs{font-size:.9em;font-weight:600}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
