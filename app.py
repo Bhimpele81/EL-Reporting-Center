@@ -5378,7 +5378,18 @@ function renderPxSheet() {
   document.getElementById('px-print').addEventListener('click', () => {
     let st = document.getElementById('px-print-style');
     if (!st) { st = document.createElement('style'); st.id = 'px-print-style'; document.head.appendChild(st); }
-    st.textContent = '@media print{ body *{visibility:hidden!important} #px-sheet,#px-sheet *{visibility:visible!important} #px-sheet{position:absolute;left:0;top:0;width:100%} .px-noprint{display:none!important} @page{size:landscape;margin:.4in} }';
+    st.textContent = '@media print{' +
+      ' body *{visibility:hidden!important}' +
+      ' #px-sheet,#px-sheet *{visibility:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}' +
+      ' #px-sheet{position:absolute;left:0;top:0;width:100%}' +
+      ' .px-noprint{display:none!important}' +
+      ' #px-sheet .px-sheet-tbl th,#px-sheet .px-sheet-tbl td{font-size:8px!important;padding:1px 3px!important;width:auto!important;min-width:0!important}' +
+      ' #px-sheet .px-sec{margin-bottom:6px!important}' +
+      ' #px-sheet .px-sec-title{font-size:10.5px!important;margin:2px 0!important}' +
+      ' #px-sheet .px-sheet-head h2{font-size:15px!important;margin:1px 0!important}' +
+      ' #px-sheet .px-sheet-head div{font-size:10px!important}' +
+      ' @page{size:landscape;margin:.35in}' +
+      '}';
     window.print();
   });
   const seasonSel = document.getElementById('px-sheet-season');
