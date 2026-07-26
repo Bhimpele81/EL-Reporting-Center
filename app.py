@@ -5263,7 +5263,7 @@ function pxUpdateRateChange() {
       if (!cell) return;
       if (!c) { cell.textContent = ''; cell.className = 'px-diff-flat'; return; }
       const pct = (p-c)/c*100;
-      cell.textContent = (pct>0?'+':'') + pct.toFixed(1) + '%';
+      cell.textContent = (pct>0?'+':'') + pct.toFixed(2) + '%';
       cell.className = Math.abs(pct) < 0.05 ? 'px-diff-flat' : 'px-diff-up';
     });
   });
