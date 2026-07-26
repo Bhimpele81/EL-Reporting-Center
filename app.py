@@ -5403,6 +5403,11 @@ function renderPxSheet() {
       '<tr>' + LABELS.map((lbl,i) => '<th class="'+ccls(i)+'">'+lbl+'</th>').join('') + '</tr>' +
       '</thead><tbody>';
     wk.forEach(w => {
+      // Junior Camp has no Mini row; show the "3/4 Day" note instead (as on the source sheet)
+      if (w === 'Mini' && prog === 'junior') {
+        s += '<tr><td class="px-l">3/4 Day</td><td colspan="8" style="text-align:center;font-style:italic;background:#efecec">Tuition 20% off, One-way transportation Add&rsquo;l $120 per week</td></tr>';
+        return;
+      }
       const pv = rowVals(pBase, prog, tier, w, stepFor(primary));
       const cv = comparing ? rowVals(cBase, prog, tier, w, stepFor(compareKey)) : null;
       s += '<tr><td class="px-l">'+w+'</td>';
