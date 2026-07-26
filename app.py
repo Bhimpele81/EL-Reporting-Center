@@ -5096,9 +5096,11 @@ function renderPxRates() {
   h += '<div class="px-sec"><div class="px-sec-title">Summer Camp tuition</div><table class="px-tbl"><thead><tr><th class="px-l">Weeks</th><th>Early Signup (ES)</th><th>Regular (Final)</th></tr></thead><tbody>';
   wk.forEach(w => h += '<tr><td class="px-l">'+w+'</td><td>'+inp('px-camp-ES-'+w, pricing.camp.tiers.ES[w])+'</td><td>'+inp('px-camp-Final-'+w, pricing.camp.tiers.Final[w])+'</td></tr>');
   h += '</tbody></table>';
-  h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the proportion of the full 5-day tuition charged to a 4-day or 3-day camper, where 1.0 represents the full rate (for example, 0.90 applies a 10% reduction). Each value is currently set to 1.0, so the number of days attended does not yet affect camp tuition.</div>';
+  h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the percentage of the full 5-day tuition charged to a 4-day or 3-day camper, where 100% is the full rate (for example, 90% applies a 10% reduction). Each value is currently 100%, so the number of days attended does not yet affect camp tuition.</div>';
+  const pct = v => parseFloat((Number(v||0) * 100).toFixed(2));
+  const pctInp = (id,v) => inp(id, pct(v)) + ' %';
   h += '<table class="px-tbl"><thead><tr><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody><tr>'+
-    '<td>'+inp('px-dm-5', pricing.camp.day_mult['5'])+'</td><td>'+inp('px-dm-4', pricing.camp.day_mult['4'])+'</td><td>'+inp('px-dm-3', pricing.camp.day_mult['3'])+'</td></tr></tbody></table></div>';
+    '<td>'+pctInp('px-dm-5', pricing.camp.day_mult['5'])+'</td><td>'+pctInp('px-dm-4', pricing.camp.day_mult['4'])+'</td><td>'+pctInp('px-dm-3', pricing.camp.day_mult['3'])+'</td></tr></tbody></table></div>';
   h += '<div class="px-sec"><div class="px-sec-title">Transportation (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Type</th><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody>';
   [['2way','2-way'],['1way','1-way']].forEach(([k,l]) => h += '<tr><td class="px-l">'+l+'</td><td>'+inp('px-tr-'+k+'-5', pricing.transport[k]['5'])+'</td><td>'+inp('px-tr-'+k+'-4', pricing.transport[k]['4'])+'</td><td>'+inp('px-tr-'+k+'-3', pricing.transport[k]['3'])+'</td></tr>');
   h += '</tbody></table></div>';
@@ -5115,7 +5117,7 @@ async function savePxRates() {
   const lblEl = document.getElementById('px-season-label');
   if (lblEl) pricing.season_label = lblEl.value.trim();
   pricing.camp.week_order.forEach(w => { pricing.camp.tiers.ES[w] = num('px-camp-ES-'+w); pricing.camp.tiers.Final[w] = num('px-camp-Final-'+w); });
-  ['5','4','3'].forEach(d => { pricing.camp.day_mult[d] = num('px-dm-'+d); pricing.childcare[d].base = num('px-cc-'+d+'-base'); pricing.childcare[d].sibling2 = num('px-cc-'+d+'-sib'); });
+  ['5','4','3'].forEach(d => { pricing.camp.day_mult[d] = num('px-dm-'+d) / 100; pricing.childcare[d].base = num('px-cc-'+d+'-base'); pricing.childcare[d].sibling2 = num('px-cc-'+d+'-sib'); });
   ['2way','1way'].forEach(k => ['5','4','3'].forEach(d => pricing.transport[k][d] = num('px-tr-'+k+'-'+d)));
   const msg = document.getElementById('px-save-msg'); msg.textContent = 'Saving…'; msg.style.color = '#777';
   try {
