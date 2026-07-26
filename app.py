@@ -421,9 +421,9 @@ _DEFAULT_PRICING = {
             "ES":    {"8": 5580, "7": 5415, "6": 5080, "5": 4575, "4": 3905, "Mini": 550},
             "Final": {"8": 6000, "7": 5820, "6": 5460, "5": 4920, "4": 4200, "Mini": 550},
         },
-        # Multiplier applied to the (weeks) tuition for 5/4/3 days per week.
-        # Flat (1.0) for now — camp may provide day-based rates later.
-        "day_mult": {"5": 1.0, "4": 1.0, "3": 1.0},
+        # Multiplier applied to the (weeks) tuition for 5/4/3 days per week
+        # (4-day = 88% of 5-day, 3-day = 80%, per the 2026 rate sheet).
+        "day_mult": {"5": 1.0, "4": 0.88, "3": 0.80},
     },
     # Weekly transportation add-on, by days per week
     "transport": {
@@ -3258,7 +3258,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <summary>How do the rate tables and the day rate factor work?</summary>
       <div class="faq-body">
         <p><strong>Rate Settings</strong> holds the camp tuition, transportation, and childcare rates. Camp tuition has a <strong>Current</strong> column set (the season now in effect, e.g. 2026) and a <strong>Proposed</strong> column set (the upcoming season, e.g. 2027), each with Early Signup and Regular by number of weeks. Enter both and the <strong>Change</strong> column shows the effective percent increase. The Proposed rates are what the Calculator and Explorer use. Set the season labels at the top, edit any value, and click <strong>Save rates</strong>.</p>
-        <p>The <strong>day rate factor</strong> is the percentage of the full 5-day tuition a 4-day or 3-day camper pays (100% = full price; 90% = a 10% reduction). The 5-day column is the base and is always 100%. It's set to 100% everywhere right now, so days do not change camp tuition yet.</p>
+        <p>The <strong>day rate factor</strong> is the percentage of the full 5-day tuition a 4-day or 3-day camper pays (100% = full price). It defaults to 88% for 4-day and 80% for 3-day, matching the rate sheet; the 5-day column is the base and is always 100%.</p>
       </div>
     </details>
 
@@ -5245,7 +5245,7 @@ function renderPxRates() {
     '<td id="px-chg-ES-'+w+'" class="px-diff-flat"></td><td id="px-chg-Final-'+w+'" class="px-diff-flat"></td></tr>');
   h += '</tbody></table>';
   h += '<div style="margin:.3rem 0 .9rem"><button class="px-btn ghost" id="px-copy-cur">Copy Current → Proposed</button> <span style="font-size:.78rem;color:#888">prefills the Proposed columns from Current as a starting point</span></div>';
-  h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the percentage of the full 5-day tuition charged to a 4-day or 3-day camper, where 100% is the full rate (for example, 90% applies a 10% reduction). Each value is currently 100%, so the number of days attended does not yet affect camp tuition.</div>';
+  h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the percentage of the full 5-day tuition charged to a 4-day or 3-day camper (100% is the full rate). Defaults to 88% for 4-day and 80% for 3-day, matching the rate sheet. The 5-day column is the base and is always 100%.</div>';
   const pct = v => parseFloat((Number(v||0) * 100).toFixed(2));
   const pctInp = (id,v) => '<input class="px-rate-inp px-pct" id="'+id+'" value="'+pct(v)+'"> %';
   h += '<table class="px-tbl"><thead><tr><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody><tr>'+
