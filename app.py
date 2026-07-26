@@ -2126,8 +2126,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-sheet-tbl th{font-size:.72rem;line-height:1.12;white-space:normal}
 .px-sheet-tbl td{font-size:.82rem}
 .px-sheet-tbl td:not(.px-l),.px-sheet-tbl th:not(.px-l){width:78px;min-width:78px}
-.px-sheet-sectitle{background:var(--brand);color:#fff;font-weight:700;text-align:center;padding:.35rem .5rem;border-radius:5px;font-size:1rem;margin:.2rem 0 .4rem}
-.px-sheet-tbl thead th{background:var(--brand);color:#fff}
+.px-sheet-sectitle{background:var(--brand);color:#fff;font-weight:700;text-align:center;padding:.35rem .5rem;border-radius:5px;font-size:1rem;margin:.2rem 0 .4rem;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.px-sheet-tbl thead th{background:var(--brand)!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .px-sheet-tbl .px-grp{border-left:3px solid var(--gold)}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
