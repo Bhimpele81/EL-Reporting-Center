@@ -5343,19 +5343,21 @@ function renderPxSheet() {
 
   function section(prog, tier, title) {
     let s = '<div class="px-sec"><div class="px-sec-title">'+title+'</div><div style="overflow-x:auto"><table class="px-tbl px-sheet-tbl"><thead>' +
-      '<tr><th class="px-l" rowspan="2">Weeks</th><th colspan="4">5 days</th><th colspan="2">4 days</th><th colspan="2">3 days</th></tr>' +
-      '<tr><th>Tuition</th><th>Sibling</th><th>Tuition + Transp</th><th>Sibling + Transp</th><th>Tuition</th><th>Tuition + Transp</th><th>Tuition</th><th>Tuition + Transp</th></tr>' +
+      '<tr><th class="px-l" rowspan="2">Weeks</th><th colspan="4">5</th><th colspan="2">4</th><th colspan="2">3</th></tr>' +
+      '<tr><th>Tuition with Transportation</th><th>Sibling Tuition w/ Transportation</th><th>Tuition</th><th>Sibling Tuition</th>' +
+      '<th>Tuition w/ Transportation</th><th>Tuition</th><th>Tuition w/ Transportation</th><th>Tuition</th></tr>' +
       '</thead><tbody>';
     wk.forEach(w => {
       const wn = wnum(w), transp = tr5*wn, sibTransp = r1(SIB*transp);
       const t5 = tui(prog,tier,w,'5'), sib5 = r1(SIB*t5), t4 = tui(prog,tier,w,'4'), t3 = tui(prog,tier,w,'3');
-      if (wn === 0) {   // Mini: tuition only
-        s += '<tr><td class="px-l">'+w+'</td><td>'+pxMoney(t5)+'</td><td></td><td></td><td></td><td>'+pxMoney(t4)+'</td><td></td><td>'+pxMoney(t3)+'</td><td></td></tr>';
+      if (wn === 0) {   // Mini: plain tuition only
+        s += '<tr><td class="px-l">'+w+'</td><td></td><td></td><td>'+pxMoney(t5)+'</td><td></td>' +
+          '<td></td><td>'+pxMoney(t4)+'</td><td></td><td>'+pxMoney(t3)+'</td></tr>';
       } else {
         s += '<tr><td class="px-l">'+w+'</td>' +
-          '<td>'+pxMoney(t5)+'</td><td>'+pxMoney(sib5)+'</td><td>'+pxMoney(t5+transp)+'</td><td>'+pxMoney(sib5+sibTransp)+'</td>' +
-          '<td>'+pxMoney(t4)+'</td><td>'+pxMoney(t4+transp)+'</td>' +
-          '<td>'+pxMoney(t3)+'</td><td>'+pxMoney(t3+transp)+'</td></tr>';
+          '<td>'+pxMoney(t5+transp)+'</td><td>'+pxMoney(sib5+sibTransp)+'</td><td>'+pxMoney(t5)+'</td><td>'+pxMoney(sib5)+'</td>' +
+          '<td>'+pxMoney(t4+transp)+'</td><td>'+pxMoney(t4)+'</td>' +
+          '<td>'+pxMoney(t3+transp)+'</td><td>'+pxMoney(t3)+'</td></tr>';
       }
     });
     return s + '</tbody></table></div></div>';
