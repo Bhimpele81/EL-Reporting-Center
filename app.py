@@ -2126,6 +2126,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-sheet-tbl th{font-size:.72rem;line-height:1.12;white-space:normal}
 .px-sheet-tbl td{font-size:.82rem}
 .px-sheet-tbl td:not(.px-l),.px-sheet-tbl th:not(.px-l){width:78px;min-width:78px}
+.px-sheet-sectitle{background:var(--brand);color:#fff;font-weight:700;text-align:center;padding:.35rem .5rem;border-radius:5px;font-size:1rem;margin:.2rem 0 .4rem}
+.px-sheet-tbl thead th{background:var(--brand);color:#fff}
+.px-sheet-tbl .px-grp{border-left:3px solid var(--gold)}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
 .payroll-table td{height:42px}
@@ -5342,10 +5345,10 @@ function renderPxSheet() {
   const tui = (prog,tier,w,d) => prog === 'junior' ? r25(JR * t2G(tier,w,d)) : t2G(tier,w,d);
 
   function section(prog, tier, title) {
-    let s = '<div class="px-sec"><div class="px-sec-title">'+title+'</div><div style="overflow-x:auto"><table class="px-tbl px-sheet-tbl"><thead>' +
-      '<tr><th class="px-l" rowspan="2">Weeks</th><th colspan="4">5</th><th colspan="2">4</th><th colspan="2">3</th></tr>' +
-      '<tr><th>Tuition with Transportation</th><th>Sibling Tuition w/ Transportation</th><th>Tuition</th><th>Sibling Tuition</th>' +
-      '<th>Tuition w/ Transportation</th><th>Tuition</th><th>Tuition w/ Transportation</th><th>Tuition</th></tr>' +
+    let s = '<div class="px-sec"><div class="px-sheet-sectitle">'+title+'</div><div style="overflow-x:auto"><table class="px-tbl px-sheet-tbl"><thead>' +
+      '<tr><th class="px-l" rowspan="2">Weeks</th><th colspan="4" class="px-grp">5</th><th colspan="2" class="px-grp">4</th><th colspan="2" class="px-grp">3</th></tr>' +
+      '<tr><th class="px-grp">Tuition with Transportation</th><th>Sibling Tuition w/ Transportation</th><th>Tuition</th><th>Sibling Tuition</th>' +
+      '<th class="px-grp">Tuition w/ Transportation</th><th>Tuition</th><th class="px-grp">Tuition w/ Transportation</th><th>Tuition</th></tr>' +
       '</thead><tbody>';
     wk.forEach(w => {
       const wn = wnum(w);
@@ -5353,13 +5356,13 @@ function renderPxSheet() {
       const sibTransp = r1(SIB*tr5v);   // sibling transport (5-day, 10% off)
       const t5 = tui(prog,tier,w,'5'), sib5 = r1(SIB*t5), t4 = tui(prog,tier,w,'4'), t3 = tui(prog,tier,w,'3');
       if (wn === 0) {   // Mini: plain tuition only
-        s += '<tr><td class="px-l">'+w+'</td><td></td><td></td><td>'+pxMoney(t5)+'</td><td></td>' +
-          '<td></td><td>'+pxMoney(t4)+'</td><td></td><td>'+pxMoney(t3)+'</td></tr>';
+        s += '<tr><td class="px-l">'+w+'</td><td class="px-grp"></td><td></td><td>'+pxMoney(t5)+'</td><td></td>' +
+          '<td class="px-grp"></td><td>'+pxMoney(t4)+'</td><td class="px-grp"></td><td>'+pxMoney(t3)+'</td></tr>';
       } else {
         s += '<tr><td class="px-l">'+w+'</td>' +
-          '<td>'+pxMoney(t5+tr5v)+'</td><td>'+pxMoney(sib5+sibTransp)+'</td><td>'+pxMoney(t5)+'</td><td>'+pxMoney(sib5)+'</td>' +
-          '<td>'+pxMoney(t4+tr4v)+'</td><td>'+pxMoney(t4)+'</td>' +
-          '<td>'+pxMoney(t3+tr3v)+'</td><td>'+pxMoney(t3)+'</td></tr>';
+          '<td class="px-grp">'+pxMoney(t5+tr5v)+'</td><td>'+pxMoney(sib5+sibTransp)+'</td><td>'+pxMoney(t5)+'</td><td>'+pxMoney(sib5)+'</td>' +
+          '<td class="px-grp">'+pxMoney(t4+tr4v)+'</td><td>'+pxMoney(t4)+'</td>' +
+          '<td class="px-grp">'+pxMoney(t3+tr3v)+'</td><td>'+pxMoney(t3)+'</td></tr>';
       }
     });
     return s + '</tbody></table></div></div>';
