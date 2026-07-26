@@ -5388,7 +5388,9 @@ function renderPxSheet() {
       ' #px-sheet .px-sec-title{font-size:10.5px!important;margin:2px 0!important}' +
       ' #px-sheet .px-sheet-head h2{font-size:15px!important;margin:1px 0!important}' +
       ' #px-sheet .px-sheet-head div{font-size:10px!important}' +
-      ' @page{size:landscape;margin:.35in}' +
+      ' #px-sheet div{overflow:visible!important}' +
+      ' #px-sheet .px-sheet-tbl{width:100%!important}' +
+      ' @page{size:portrait;margin:.35in}' +
       '}';
     window.print();
   });
