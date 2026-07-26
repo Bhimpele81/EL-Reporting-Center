@@ -417,9 +417,6 @@ _DEFAULT_PRICING = {
         # Multiplier applied to the (weeks) tuition for 5/4/3 days per week.
         # Flat (1.0) for now — camp may provide day-based rates later.
         "day_mult": {"5": 1.0, "4": 1.0, "3": 1.0},
-        # Multi-camper (sibling) discount applied to each camper after the first.
-        # mode "pct" = value% off that camper's tuition; "amt" = flat $ off. 0 = none.
-        "sibling_discount": {"mode": "pct", "value": 0},
     },
     # Weekly transportation add-on, by days per week
     "transport": {
@@ -3230,7 +3227,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <summary>How do I calculate what a family owes?</summary>
       <div class="faq-body">
         <p>On the <strong>Calculator</strong> sub-tab, choose <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
-        <p>If a <strong>multi-camper (sibling) discount</strong> is set in Rate Settings, it is applied automatically to each camper after the first and shown as a line on their subtotal.</p>
+        <p>For families with more than one camper, each camper after the first has a <strong>sibling discount</strong> field (% or $ off that camper's tuition). These are handled case by case, so you enter the amount per family; it is shown as a line on that camper's subtotal.</p>
         <p>For before/after-camp <strong>Childcare</strong>, switch its <em>Include</em> to Yes and pick days per week and number of children (2 uses the sibling rate); enter weeks to get a childcare total. Childcare is billed separately from camp.</p>
       </div>
     </details>
@@ -4982,7 +4979,7 @@ function famCardHTML(f) {
 // ---- Pricing module (admin) ----
 let pricing = null, pxLoaded = false;
 let pxTier = 'ES';
-let pxCampers = [{weeks:'8', days:'5', transport:'none'}];
+let pxCampers = [{weeks:'8', days:'5', transport:'none', disc:0, discMode:'pct'}];
 let pxCC = {on:false, days:'5', kids:1, weeks:0};
 let pxExp = {pct:3, round:50, esMode:'pct', esDisc:7};
 const pxMoney = n => '$' + (Math.round(Number(n)||0)).toLocaleString('en-US');
@@ -5023,6 +5020,8 @@ function renderPxCalc() {
       '<label class="px-field">Weeks<select data-f="weeks">'+weekOpts.map(w=>opt(w,c.weeks)).join('')+'</select></label>' +
       '<label class="px-field">Days/wk<select data-f="days">'+['5','4','3'].map(d=>opt(d,c.days)).join('')+'</select></label>' +
       '<label class="px-field">Transport<select data-f="transport">'+['none','1way','2way'].map(t=>`<option value="${t}"${c.transport===t?' selected':''}>${trLabel[t]}</option>`).join('')+'</select></label>' +
+      (i>0 ? '<label class="px-field">Sibling disc.<select data-f="discMode"><option value="pct"'+(c.discMode!=='amt'?' selected':'')+'>% off</option><option value="amt"'+(c.discMode==='amt'?' selected':'')+'>$ off</option></select></label>' +
+             '<label class="px-field">Amount<input type="number" data-f="disc" min="0" step="1" value="'+(c.disc||'')+'" placeholder="0" style="width:80px;padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px"></label>' : '') +
       (pxCampers.length>1?'<button class="px-btn ghost px-rm" data-i="'+i+'" style="padding:.35rem .6rem">✕</button>':'') +
       '</div>';
   });
@@ -5037,10 +5036,18 @@ function renderPxCalc() {
   document.getElementById('px-tier').addEventListener('change', e => { pxTier = e.target.value; renderPxCalc(); });
   box.querySelectorAll('.px-camper-row').forEach(row => {
     const i = +row.dataset.i;
-    row.querySelectorAll('select[data-f]').forEach(sel => sel.addEventListener('change', () => { pxCampers[i][sel.dataset.f] = sel.value; renderPxCalc(); }));
+    row.querySelectorAll('[data-f]').forEach(el => {
+      const ev = el.tagName === 'SELECT' ? 'change' : 'input';
+      el.addEventListener(ev, () => {
+        let v = el.value;
+        if (el.dataset.f === 'disc') v = parseFloat(v)||0;
+        pxCampers[i][el.dataset.f] = v;
+        renderPxCalcTotal();   // partial update keeps input focus
+      });
+    });
   });
   box.querySelectorAll('.px-rm').forEach(b => b.addEventListener('click', () => { pxCampers.splice(+b.dataset.i,1); renderPxCalc(); }));
-  document.getElementById('px-add-camper').addEventListener('click', () => { pxCampers.push({weeks:'8',days:'5',transport:'none'}); renderPxCalc(); });
+  document.getElementById('px-add-camper').addEventListener('click', () => { pxCampers.push({weeks:'8',days:'5',transport:'none',disc:0,discMode:'pct'}); renderPxCalc(); });
   ['px-cc-on','px-cc-days','px-cc-kids','px-cc-weeks'].forEach(id => {
     document.getElementById(id).addEventListener('change', () => {
       pxCC.on = document.getElementById('px-cc-on').value === 'yes';
@@ -5055,19 +5062,18 @@ function renderPxCalc() {
 
 function renderPxCalcTotal() {
   const tiers = pricing.camp.tiers[pxTier] || {}, dm = pricing.camp.day_mult || {};
-  const sib = pricing.camp.sibling_discount || {mode:'pct', value:0};
-  const sibVal = Number(sib.value||0);
   let lines = [], campGrand = 0;
   pxCampers.forEach((c,i) => {
     const base = Number(tiers[c.weeks]||0);
     const mult = Number(dm[c.days]!=null ? dm[c.days] : 1);
     const tuition = base*mult; let sub = tuition;
     let detail = pxMoney(tuition)+' tuition ('+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+(mult!==1?' ×'+mult:'')+')';
-    // Multi-camper (sibling) discount on every camper after the first
-    if (i > 0 && sibVal > 0) {
-      const disc = sib.mode === 'amt' ? Math.min(sibVal, tuition) : tuition * sibVal/100;
+    // Per-camper sibling discount entered case-by-case (2nd+ camper only)
+    const dv = Number(c.disc||0);
+    if (i > 0 && dv > 0) {
+      const disc = c.discMode === 'amt' ? Math.min(dv, tuition) : tuition * dv/100;
       sub -= disc;
-      detail += ' − '+pxMoney(disc)+' sibling discount'+(sib.mode==='amt'?'':' ('+sibVal+'%)');
+      detail += ' − '+pxMoney(disc)+' sibling discount'+(c.discMode==='amt'?'':' ('+dv+'%)');
     }
     const wksNum = parseInt(c.weeks,10)||0;
     if (c.transport!=='none' && wksNum) {
@@ -5197,13 +5203,7 @@ function renderPxRates() {
   const pct = v => parseFloat((Number(v||0) * 100).toFixed(2));
   const pctInp = (id,v) => inp(id, pct(v)) + ' %';
   h += '<table class="px-tbl"><thead><tr><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody><tr>'+
-    '<td style="color:#888">100% <span style="font-size:.75rem">(base)</span></td><td>'+pctInp('px-dm-4', pricing.camp.day_mult['4'])+'</td><td>'+pctInp('px-dm-3', pricing.camp.day_mult['3'])+'</td></tr></tbody></table>';
-  const sib = pricing.camp.sibling_discount || {mode:'pct', value:0};
-  h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Multi-camper (sibling) discount:</strong> applied to each camper after the first in the Calculator. Leave the value at 0 for no discount.</div>' +
-    '<div class="px-controls">' +
-    '<label class="px-field">Type<select id="px-sib-mode"><option value="pct"'+(sib.mode!=='amt'?' selected':'')+'>% off tuition</option><option value="amt"'+(sib.mode==='amt'?' selected':'')+'>$ off tuition</option></select></label>' +
-    '<label class="px-field">Value<input class="px-rate-inp" id="px-sib-val" style="text-align:left" value="'+Number(sib.value||0)+'"></label>' +
-    '</div></div>';
+    '<td style="color:#888">100% <span style="font-size:.75rem">(base)</span></td><td>'+pctInp('px-dm-4', pricing.camp.day_mult['4'])+'</td><td>'+pctInp('px-dm-3', pricing.camp.day_mult['3'])+'</td></tr></tbody></table></div>';
   h += '<div class="px-sec"><div class="px-sec-title">Transportation (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Type</th><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody>';
   [['2way','2-way'],['1way','1-way']].forEach(([k,l]) => h += '<tr><td class="px-l">'+l+'</td><td>'+inp('px-tr-'+k+'-5', pricing.transport[k]['5'])+'</td><td>'+inp('px-tr-'+k+'-4', pricing.transport[k]['4'])+'</td><td>'+inp('px-tr-'+k+'-3', pricing.transport[k]['3'])+'</td></tr>');
   h += '</tbody></table></div>';
@@ -5223,8 +5223,6 @@ async function savePxRates() {
   ['5','4','3'].forEach(d => { pricing.childcare[d].base = num('px-cc-'+d+'-base'); pricing.childcare[d].sibling2 = num('px-cc-'+d+'-sib'); });
   pricing.camp.day_mult['5'] = 1;   // 5-day is the base (always 100%)
   ['4','3'].forEach(d => { pricing.camp.day_mult[d] = num('px-dm-'+d) / 100; });
-  const sibMode = document.getElementById('px-sib-mode');
-  pricing.camp.sibling_discount = { mode: (sibMode && sibMode.value) || 'pct', value: num('px-sib-val') };
   ['2way','1way'].forEach(k => ['5','4','3'].forEach(d => pricing.transport[k][d] = num('px-tr-'+k+'-'+d)));
   const msg = document.getElementById('px-save-msg'); msg.textContent = 'Saving…'; msg.style.color = '#777';
   try {
