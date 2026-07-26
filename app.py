@@ -5363,8 +5363,8 @@ function renderPxSheet() {
     return s + '</tbody></table></div></div>';
   }
 
-  let h = '<div class="px-noprint" style="margin-bottom:.8rem;display:flex;gap:.7rem;align-items:center">' +
-    '<button class="px-btn" id="px-print">🖨 Print / Save PDF</button>' +
+  let h = '<div class="px-noprint" style="margin-bottom:.8rem;display:flex;gap:.7rem;align-items:flex-end">' +
+    '<button class="px-btn" id="px-print" style="height:38px">🖨 Print / Save PDF</button>' +
     '<label class="px-field" style="margin:0">Season<select id="px-sheet-season">' +
     '<option value="proposed"'+(pxSheetSeason==='proposed'?' selected':'')+'>Proposed ('+famEsc(pricing.proposed_label||'')+')</option>' +
     '<option value="current"'+(pxSheetSeason==='current'?' selected':'')+'>Current ('+famEsc(pricing.season_label||'')+')</option></select></label></div>';
