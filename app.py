@@ -3235,7 +3235,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do I model a price increase for next season?</summary>
       <div class="faq-body">
-        <p>On the <strong>Explorer</strong> sub-tab, set the <strong>Annual increase %</strong>, the <strong>Early Signup discount</strong> (a % or $ off the regular price), and a <strong>rounding</strong> rule ($1 / $25 / $50 / $100). It shows the proposed Regular and Early Signup tuition (with the discount amount) and childcare, alongside the dollar and percent difference versus the current rates. It's a preview and changes nothing on its own.</p>
+        <p>On the <strong>Explorer</strong> sub-tab, set the <strong>Annual increase %</strong>, the <strong>Early Signup discount</strong> (a % or $ off the regular price), and a rounding rule for each ($1 / $25 / $50 / $100). Regular and Early Signup round separately, so each can land on its own clean numbers. It shows the proposed Regular and Early Signup tuition (with the discount amount) and childcare, alongside the dollar and percent difference versus the current rates. It's a preview and changes nothing on its own.</p>
         <p>When you're happy with a scenario, click <strong>Apply to Rate Settings</strong>. The new figures load into Rate Settings (and update the season label as needed); <strong>review them and click Save rates</strong> to make them official. Nothing is saved until you do.</p>
       </div>
     </details>
@@ -4981,7 +4981,7 @@ let pricing = null, pxLoaded = false;
 let pxTier = 'ES';
 let pxCampers = [{weeks:'8', days:'5', transport:'none', disc:0, discMode:'pct'}];
 let pxCC = {on:false, days:'5', kids:1, weeks:0};
-let pxExp = {pct:3, round:50, esMode:'pct', esDisc:7};
+let pxExp = {pct:3, round:50, esRound:25, esMode:'pct', esDisc:7};
 const pxMoney = n => '$' + (Math.round(Number(n)||0)).toLocaleString('en-US');
 
 async function loadPricing(force) {
@@ -5098,7 +5098,9 @@ function renderPxCalcTotal() {
 }
 
 // ---------- Explorer ----------
-function pxRound(x) { const s = pxExp.round; return s ? Math.round(x/s)*s : Math.round(x); }
+function pxRoundStep(x, step) { return step ? Math.round(x/step)*step : Math.round(x); }
+function pxRound(x) { return pxRoundStep(x, pxExp.round); }        // regular tuition + childcare
+function pxRoundES(x) { return pxRoundStep(x, pxExp.esRound); }    // early-signup rates
 function pxExpTable(title, table, order, rowLabel) {
   let h = '<div class="px-sec"><div class="px-sec-title">'+title+'</div><table class="px-tbl"><thead><tr>' +
     '<th class="px-l">'+rowLabel+'</th><th>Current</th><th>+'+pxExp.pct+'%</th><th>$ diff</th><th>% diff</th></tr></thead><tbody>';
@@ -5117,18 +5119,19 @@ function pxPropFinal(base) { return pxRound(Number(base||0) * (1 + pxExp.pct/100
 // Proposed Early Signup price = regular price minus the discount (% or $), rounded.
 function pxPropES(regular) {
   const d = Number(pxExp.esDisc||0);
-  return pxRound(pxExp.esMode === 'amt' ? (regular - d) : (regular * (1 - d/100)));
+  return pxRoundES(pxExp.esMode === 'amt' ? (regular - d) : (regular * (1 - d/100)));
 }
 
 function renderPxExplore() {
   if (!pricing) return;
   const box = document.getElementById('px-explore');
-  const roundOpts = [['0','$1'],['25','$25'],['50','$50'],['100','$100']].map(([v,l])=>`<option value="${v}"${pxExp.round==+v?' selected':''}>${l}</option>`).join('');
+  const roundOptsFor = cur => [['0','$1'],['25','$25'],['50','$50'],['100','$100']].map(([v,l])=>`<option value="${v}"${cur==+v?' selected':''}>${l}</option>`).join('');
   box.innerHTML = '<div class="px-controls">' +
     '<label class="px-field">Annual increase %<input type="number" id="px-exp-pct" step="0.1" value="'+pxExp.pct+'"></label>' +
+    '<label class="px-field">Round regular to<select id="px-exp-round">'+roundOptsFor(pxExp.round)+'</select></label>' +
     '<label class="px-field">Early Signup discount<select id="px-exp-esmode"><option value="pct"'+(pxExp.esMode==='pct'?' selected':'')+'>% off regular</option><option value="amt"'+(pxExp.esMode==='amt'?' selected':'')+'>$ off regular</option></select></label>' +
     '<label class="px-field">Discount value<input type="number" id="px-exp-esdisc" step="0.1" value="'+pxExp.esDisc+'"></label>' +
-    '<label class="px-field">Round to<select id="px-exp-round">'+roundOpts+'</select></label>' +
+    '<label class="px-field">Round Early Signup to<select id="px-exp-esround">'+roundOptsFor(pxExp.esRound)+'</select></label>' +
     '<button class="px-btn" id="px-apply" style="align-self:center">Apply to Rate Settings</button>' +
     '</div>' +
     '<div style="font-size:.8rem;color:#888;margin-bottom:1rem">Preview only. The <strong>Regular</strong> price is the current price increased by the percentage above; <strong>Early Signup</strong> is the regular price minus the discount. Use <strong>Apply to Rate Settings</strong> to load these into the editable rates, then Save. Transportation is not changed here.</div>' +
@@ -5138,6 +5141,7 @@ function renderPxExplore() {
   g('px-exp-esmode').addEventListener('change', e => { pxExp.esMode = e.target.value; renderPxExploreResults(); });
   g('px-exp-esdisc').addEventListener('input', e => { pxExp.esDisc = parseFloat(e.target.value)||0; renderPxExploreResults(); });
   g('px-exp-round').addEventListener('change', e => { pxExp.round = parseInt(e.target.value,10); renderPxExploreResults(); });
+  g('px-exp-esround').addEventListener('change', e => { pxExp.esRound = parseInt(e.target.value,10); renderPxExploreResults(); });
   g('px-apply').addEventListener('click', pxApplyExplore);
   renderPxExploreResults();
 }
@@ -5171,8 +5175,9 @@ function renderPxExploreResults() {
 
 function pxApplyExplore() {
   const roundLbl = pxExp.round ? ('$' + pxExp.round) : '$1';
+  const esRoundLbl = pxExp.esRound ? ('$' + pxExp.esRound) : '$1';
   const discLbl = pxExp.esMode === 'amt' ? ('$' + pxExp.esDisc + ' off') : (pxExp.esDisc + '% off');
-  if (!confirm('Apply a ' + pxExp.pct + '% increase to Regular tuition and an Early Signup discount of ' + discLbl + ' the regular price (rounded to ' + roundLbl + ')? Childcare also increases by ' + pxExp.pct + '%. New figures load into Rate Settings for review; nothing is saved until you click Save rates.')) return;
+  if (!confirm('Apply a ' + pxExp.pct + '% increase to Regular tuition (rounded to ' + roundLbl + ') and an Early Signup discount of ' + discLbl + ' the regular price (rounded to ' + esRoundLbl + ')? Childcare also increases by ' + pxExp.pct + '%. New figures load into Rate Settings for review; nothing is saved until you click Save rates.')) return;
   pricing.camp.week_order.forEach(w => {
     const reg = pxPropFinal(Number(pricing.camp.tiers.Final[w]||0));
     pricing.camp.tiers.Final[w] = reg;
