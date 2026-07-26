@@ -2104,6 +2104,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 /* Every value column (anything but the left label) is the same fixed width */
 .px-tbl th:not(.px-l),.px-tbl td:not(.px-l){width:90px;min-width:90px;box-sizing:border-box}
 .px-tbl td:not(.px-l) .px-rate-inp{width:100%;box-sizing:border-box}
+.px-tbl td:not(.px-l) .px-pct{width:52px}
 .px-tbl tr.px-total td{background:#fde9cf;font-weight:700}
 .px-rate-inp{width:78px;border:1px solid var(--border);border-radius:5px;padding:.25rem .35rem;text-align:right;font-size:.85rem}
 .px-field{display:inline-flex;flex-direction:column;gap:.2rem;margin:0 .9rem .8rem 0;font-size:.8rem;color:#555}
@@ -3238,7 +3239,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <div class="faq-body">
         <p>On the <strong>Calculator</strong> sub-tab, choose <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
         <p>For families with more than one camper, each camper after the first has a <strong>sibling discount</strong> field (% or $ off that camper's tuition). These are handled case by case, so you enter the amount per family; it is shown as a line on that camper's subtotal.</p>
-        <p>For before/after-camp <strong>Childcare</strong>, switch its <em>Include</em> to Yes and pick days per week and number of children (2 uses the sibling rate); enter weeks to get a childcare total. Childcare is billed separately from camp.</p>
+        <p>For <strong>Childcare / School</strong>, switch its <em>Include</em> to Yes, pick days per week, and enter how many <strong>preschool students</strong> and <strong>older siblings</strong> there are. Each pays its own weekly rate (they are separate rates, not a combined total); enter weeks to get a total. Childcare is billed separately from camp.</p>
       </div>
     </details>
 
@@ -4990,7 +4991,7 @@ function famCardHTML(f) {
 let pricing = null, pxLoaded = false;
 let pxTier = 'ES';
 let pxCampers = [{weeks:'8', days:'5', transport:'none', disc:0, discMode:'pct'}];
-let pxCC = {on:false, days:'5', kids:1, weeks:0};
+let pxCC = {on:false, days:'5', nPre:1, nSib:0, weeks:0};
 let pxExp = {pct:3, round:50, esRound:25, esMode:'pct', esDisc:7};
 const pxMoney = n => '$' + (Math.round(Number(n)||0)).toLocaleString('en-US');
 
@@ -5039,7 +5040,8 @@ function renderPxCalc() {
   h += '<div class="px-sec"><div class="px-sec-title">Childcare / School <span style="font-weight:400;color:#999;font-size:.8rem">(separate from camp)</span></div><div class="px-controls">' +
     '<label class="px-field">Include<select id="px-cc-on"><option value="no"'+(pxCC.on?'':' selected')+'>No</option><option value="yes"'+(pxCC.on?' selected':'')+'>Yes</option></select></label>' +
     '<label class="px-field">Days/wk<select id="px-cc-days">'+['5','4','3'].map(d=>`<option value="${d}"${pxCC.days===d?' selected':''}>${d}</option>`).join('')+'</select></label>' +
-    '<label class="px-field">Children<select id="px-cc-kids"><option value="1"'+(pxCC.kids===1?' selected':'')+'>1</option><option value="2"'+(pxCC.kids===2?' selected':'')+'>2 (siblings)</option></select></label>' +
+    '<label class="px-field">Preschool students<input type="number" id="px-cc-pre" min="0" value="'+(pxCC.nPre)+'" style="width:70px"></label>' +
+    '<label class="px-field">Older siblings<input type="number" id="px-cc-sib" min="0" value="'+(pxCC.nSib)+'" style="width:70px"></label>' +
     '<label class="px-field">Weeks<input type="number" id="px-cc-weeks" min="0" value="'+(pxCC.weeks||'')+'" placeholder="#"></label>' +
     '</div></div><div id="px-calc-total"></div>';
   box.innerHTML = h;
@@ -5058,13 +5060,16 @@ function renderPxCalc() {
   });
   box.querySelectorAll('.px-rm').forEach(b => b.addEventListener('click', () => { pxCampers.splice(+b.dataset.i,1); renderPxCalc(); }));
   document.getElementById('px-add-camper').addEventListener('click', () => { pxCampers.push({weeks:'8',days:'5',transport:'none',disc:0,discMode:'pct'}); renderPxCalc(); });
-  ['px-cc-on','px-cc-days','px-cc-kids','px-cc-weeks'].forEach(id => {
-    document.getElementById(id).addEventListener('change', () => {
+  ['px-cc-on','px-cc-days','px-cc-pre','px-cc-sib','px-cc-weeks'].forEach(id => {
+    const el = document.getElementById(id);
+    const ev = el.tagName === 'SELECT' ? 'change' : 'input';
+    el.addEventListener(ev, () => {
       pxCC.on = document.getElementById('px-cc-on').value === 'yes';
       pxCC.days = document.getElementById('px-cc-days').value;
-      pxCC.kids = +document.getElementById('px-cc-kids').value;
+      pxCC.nPre = +document.getElementById('px-cc-pre').value || 0;
+      pxCC.nSib = +document.getElementById('px-cc-sib').value || 0;
       pxCC.weeks = +document.getElementById('px-cc-weeks').value || 0;
-      renderPxCalc();
+      renderPxCalcTotal();
     });
   });
   renderPxCalcTotal();
@@ -5098,10 +5103,15 @@ function renderPxCalcTotal() {
   let html = '<div class="px-total-box">'+lines.join('')+'<div class="px-line px-sub"><span>Camp total ('+tierLbl+')</span><span class="px-grand">'+pxMoney(campGrand)+'</span></div></div>';
   if (pxCC.on) {
     const row = pricing.childcare[pxCC.days] || {};
-    const weekly = pxCC.kids===2 ? Number(row.sibling2||0) : Number(row.base||0);
-    const wks = pxCC.weeks||0; const ccTotal = wks ? weekly*wks : weekly;
-    const lbl = pxCC.kids===2 ? '2 siblings' : '1 child';
-    html += '<div class="px-total-box" style="margin-top:.8rem"><div class="px-line"><span>Childcare ('+pxCC.days+' days/wk, '+lbl+')'+(wks?': '+pxMoney(weekly)+'/wk × '+wks+' wks':'')+'</span><span>'+pxMoney(ccTotal)+'</span></div>' +
+    const preRate = Number(row.base||0), sibRate = Number(row.sibling2||0);
+    const nPre = Number(pxCC.nPre||0), nSib = Number(pxCC.nSib||0), wks = pxCC.weeks||0;
+    const mult = wks || 1, showWks = wks ? ' × '+wks+' wks' : '';
+    let ccLines = '';
+    if (nPre>0) ccLines += '<div class="px-line"><span>'+nPre+' preschool student'+(nPre>1?'s':'')+' × '+pxMoney(preRate)+'/wk'+showWks+'</span><span>'+pxMoney(nPre*preRate*mult)+'</span></div>';
+    if (nSib>0) ccLines += '<div class="px-line"><span>'+nSib+' older sibling'+(nSib>1?'s':'')+' × '+pxMoney(sibRate)+'/wk'+showWks+'</span><span>'+pxMoney(nSib*sibRate*mult)+'</span></div>';
+    const ccTotal = (nPre*preRate + nSib*sibRate) * mult;
+    if (!ccLines) ccLines = '<div class="px-line"><span>Enter a number of preschool students or older siblings.</span><span></span></div>';
+    html += '<div class="px-total-box" style="margin-top:.8rem">'+ccLines +
       '<div class="px-line px-sub"><span>Childcare total'+(wks?'':' (weekly rate)')+'</span><span class="px-grand">'+pxMoney(ccTotal)+'</span></div></div>';
   }
   document.getElementById('px-calc-total').innerHTML = html;
@@ -5234,13 +5244,15 @@ function renderPxRates() {
   h += '<div style="margin:.3rem 0 .9rem"><button class="px-btn ghost" id="px-copy-cur">Copy Current → Proposed</button> <span style="font-size:.78rem;color:#888">prefills the Proposed columns from Current as a starting point</span></div>';
   h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the percentage of the full 5-day tuition charged to a 4-day or 3-day camper, where 100% is the full rate (for example, 90% applies a 10% reduction). Each value is currently 100%, so the number of days attended does not yet affect camp tuition.</div>';
   const pct = v => parseFloat((Number(v||0) * 100).toFixed(2));
-  const pctInp = (id,v) => inp(id, pct(v)) + ' %';
+  const pctInp = (id,v) => '<input class="px-rate-inp px-pct" id="'+id+'" value="'+pct(v)+'"> %';
   h += '<table class="px-tbl"><thead><tr><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody><tr>'+
     '<td style="color:#888">100% <span style="font-size:.75rem">(base)</span></td><td>'+pctInp('px-dm-4', pricing.camp.day_mult['4'])+'</td><td>'+pctInp('px-dm-3', pricing.camp.day_mult['3'])+'</td></tr></tbody></table></div>';
   h += '<div class="px-sec"><div class="px-sec-title">Transportation (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Type</th><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody>';
   [['2way','2-way'],['1way','1-way']].forEach(([k,l]) => h += '<tr><td class="px-l">'+l+'</td><td>'+inp('px-tr-'+k+'-5', pricing.transport[k]['5'])+'</td><td>'+inp('px-tr-'+k+'-4', pricing.transport[k]['4'])+'</td><td>'+inp('px-tr-'+k+'-3', pricing.transport[k]['3'])+'</td></tr>');
   h += '</tbody></table></div>';
-  h += '<div class="px-sec"><div class="px-sec-title">Childcare / School (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Days/wk</th><th>1 child</th><th>2 siblings (combined)</th></tr></thead><tbody>';
+  h += '<div class="px-sec"><div class="px-sec-title">Childcare / School (weekly)</div>' +
+    '<div style="font-size:.8rem;color:#888;margin-bottom:.3rem">Weekly summer rate a preschool-aged student pays, and the weekly rate their older sibling pays. These are separate per-child rates, not a combined total.</div>' +
+    '<table class="px-tbl"><thead><tr><th class="px-l">Days/wk</th><th>Preschool student</th><th>Older sibling</th></tr></thead><tbody>';
   ['5','4','3'].forEach(d => h += '<tr><td class="px-l">'+d+'</td><td>'+inp('px-cc-'+d+'-base', pricing.childcare[d].base)+'</td><td>'+inp('px-cc-'+d+'-sib', pricing.childcare[d].sibling2)+'</td></tr>');
   h += '</tbody></table></div>';
   h += '<div style="margin-top:.5rem"><button class="px-btn" id="px-save">💾 Save rates</button><span class="px-msg" id="px-save-msg"></span></div>';
@@ -5322,7 +5334,7 @@ function renderPxSheet() {
   [['2way','2-way'],['1way','1-way']].forEach(([k,l]) => h += '<tr><td class="px-l">'+l+'</td><td>'+pxMoney(pricing.transport[k]['5'])+'</td><td>'+pxMoney(pricing.transport[k]['4'])+'</td><td>'+pxMoney(pricing.transport[k]['3'])+'</td></tr>');
   h += '</tbody></table></div>';
   // Childcare
-  h += '<div><div class="px-sec-title">Childcare / School (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Days/wk</th><th>1 child</th><th>2 siblings</th></tr></thead><tbody>';
+  h += '<div><div class="px-sec-title">Childcare / School (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Days/wk</th><th>Preschool student</th><th>Older sibling</th></tr></thead><tbody>';
   ['5','4','3'].forEach(d => h += '<tr><td class="px-l">'+d+'</td><td>'+pxMoney(pricing.childcare[d].base)+'</td><td>'+pxMoney(pricing.childcare[d].sibling2)+'</td></tr>');
   h += '</tbody></table></div>';
   h += '</div>';
