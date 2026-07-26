@@ -5433,7 +5433,7 @@ function renderPxSheet() {
   h += section('junior','ES',     'Early Season Junior Camp Rates (PS through 1st Grade)');
   h += section('twoGrade','Final','Rates (2nd Grade+)');
   h += section('junior','Final',  'Junior Camp Rates (PS through 1st Grade)');
-  h += '<div style="font-size:.78rem;color:#666;margin-top:.6rem;max-width:700px">Sibling tuition is 10% off and assumes 5 days per week. Junior Camp tuition is 90% of the 2nd Grade+ rate; 4-day and 3-day tuition are rounded to the nearest $25. Tuition with Transportation adds 2-way transportation for that column&rsquo;s number of days (weekly, times the number of weeks); one-way transportation is $120 per week. Siblings receive 10% off transportation.</div>';
+  h += '<div class="px-foot" style="font-size:.78rem;color:#666;margin-top:.6rem;max-width:700px">Sibling tuition is 10% off and assumes 5 days per week. Junior Camp tuition is 90% of the 2nd Grade+ rate; 4-day and 3-day tuition are rounded to the nearest $25. Tuition with Transportation adds 2-way transportation for that column&rsquo;s number of days (weekly, times the number of weeks); one-way transportation is $120 per week. Siblings receive 10% off transportation.</div>';
   box.innerHTML = h;
   document.getElementById('px-print').addEventListener('click', () => {
     let st = document.getElementById('px-print-style');
@@ -5444,13 +5444,15 @@ function renderPxSheet() {
       ' #px-sheet{position:absolute;left:0;top:0;width:100%}' +
       ' .px-noprint{display:none!important}' +
       ' #px-sheet .px-sheet-tbl{width:100%!important;table-layout:fixed}' +
-      ' #px-sheet .px-sheet-tbl th,#px-sheet .px-sheet-tbl td{font-size:12px!important;padding:4px 3px!important;width:auto!important;min-width:0!important}' +
-      ' #px-sheet .px-sheet-sectitle{font-size:14px!important;padding:5px!important}' +
-      ' #px-sheet .px-sec{margin-bottom:10px!important}' +
-      ' #px-sheet .px-sheet-head h2{font-size:20px!important;margin:2px 0!important}' +
-      ' #px-sheet .px-sheet-head div{font-size:12px!important}' +
+      ' #px-sheet .px-sheet-tbl th,#px-sheet .px-sheet-tbl td{font-size:11px!important;padding:1px 2px!important;width:auto!important;min-width:0!important;line-height:1.1!important}' +
+      ' #px-sheet .px-sheet-sectitle{font-size:12px!important;padding:2px!important}' +
+      ' #px-sheet .px-sec{margin-bottom:5px!important}' +
+      ' #px-sheet .px-sheet-head{margin-bottom:4px!important}' +
+      ' #px-sheet .px-sheet-head h2{font-size:16px!important;margin:1px 0!important}' +
+      ' #px-sheet .px-sheet-head div{font-size:10px!important}' +
+      ' #px-sheet .px-foot{font-size:7px!important;margin-top:3px!important;max-width:none!important}' +
       ' #px-sheet div{overflow:visible!important}' +
-      ' @page{size:portrait;margin:.25in}' +
+      ' @page{size:portrait;margin:.2in}' +
       '}';
     window.print();
   });
