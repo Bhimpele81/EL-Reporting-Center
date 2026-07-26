@@ -2123,6 +2123,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 #px-sheet .px-sheet-head{text-align:center;margin-bottom:1rem}
 #px-sheet .px-sheet-head h2{font-family:'Roboto Slab',serif;color:var(--brand-dark);margin:.2rem 0}
 .px-sheet-grid{display:flex;flex-wrap:wrap;gap:1.6rem;align-items:flex-start}
+.px-sheet-tbl th{font-size:.72rem;line-height:1.12;white-space:normal}
+.px-sheet-tbl td{font-size:.82rem}
+.px-sheet-tbl td:not(.px-l),.px-sheet-tbl th:not(.px-l){width:78px;min-width:78px}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
 .payroll-table td{height:42px}
@@ -3262,7 +3265,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do I share the rates as a PDF?</summary>
       <div class="faq-body">
-        <p>Open the <strong>Rate Sheet</strong> sub-tab and click <strong>Print / Save PDF</strong>. It prints just the one-page rate summary (camp tuition, transportation, childcare) with the season label, suitable for sharing internally or with families.</p>
+        <p>Open the <strong>Rate Sheet</strong> sub-tab and click <strong>Print / Save PDF</strong>. It prints the full rate grid for both programs (<strong>2nd Grade+</strong> and <strong>Junior Camp, PS through 1st Grade</strong>), Early Season and Regular, with tuition, sibling, and with-transportation columns by days per week. Use the <strong>Season</strong> selector to print the Current or Proposed rates. The sheet is derived from your Rate Settings: Junior Camp is 90% of 2nd Grade+ (rounded to $25), sibling tuition is 10% off (rounded to $1, assumes 5 days), and transportation assumes 5 days both ways with a 10% sibling discount.</p>
       </div>
     </details>
 
@@ -5317,34 +5320,67 @@ async function savePxRates() {
   } catch(e) { msg.textContent = 'Save failed — try again'; msg.style.color = '#c0392b'; }
 }
 
-// ---------- Rate Sheet (printable one-pager) ----------
+// ---------- Rate Sheet (printable) ----------
+// Derivation rules:
+//   2nd Grade+ tuition   = entered base (5-day) x day factor
+//   Junior Camp tuition  = 90% of 2nd Grade+, rounded to $25
+//   Sibling tuition      = 10% off (assumes 5 days/week), rounded to $1
+//   Transportation       = 5 days, both ways (weekly x weeks); sibling transport 10% off
+let pxSheetSeason = 'proposed';
 function renderPxSheet() {
   if (!pricing) return;
   const box = document.getElementById('px-sheet');
   const wk = pricing.camp.week_order;
-  let h = '<div style="margin-bottom:.8rem" class="px-noprint"><button class="px-btn" id="px-print">🖨 Print / Save PDF</button></div>';
-  h += '<div class="px-sheet-head"><h2>Elbow Lane Day Camp</h2><div style="color:#666;font-weight:600">'+famEsc(pricing.season_label||'')+' Rates</div></div>';
-  h += '<div class="px-sheet-grid">';
-  // Camp tuition
-  h += '<div><div class="px-sec-title">Summer Camp Tuition</div><table class="px-tbl"><thead><tr><th class="px-l">Weeks</th><th>Early Signup</th><th>Regular</th></tr></thead><tbody>';
-  wk.forEach(w => h += '<tr><td class="px-l">'+w+'</td><td>'+pxMoney(pricing.camp.tiers.ES[w])+'</td><td>'+pxMoney(pricing.camp.tiers.Final[w])+'</td></tr>');
-  h += '</tbody></table></div>';
-  // Transport
-  h += '<div><div class="px-sec-title">Transportation (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Type</th><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody>';
-  [['2way','2-way'],['1way','1-way']].forEach(([k,l]) => h += '<tr><td class="px-l">'+l+'</td><td>'+pxMoney(pricing.transport[k]['5'])+'</td><td>'+pxMoney(pricing.transport[k]['4'])+'</td><td>'+pxMoney(pricing.transport[k]['3'])+'</td></tr>');
-  h += '</tbody></table></div>';
-  // Childcare
-  h += '<div><div class="px-sec-title">Childcare / School (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Days/wk</th><th>Preschool student</th><th>Older sibling</th></tr></thead><tbody>';
-  ['5','4','3'].forEach(d => h += '<tr><td class="px-l">'+d+'</td><td>'+pxMoney(pricing.childcare[d].base)+'</td><td>'+pxMoney(pricing.childcare[d].sibling2)+'</td></tr>');
-  h += '</tbody></table></div>';
-  h += '</div>';
+  const dm = pricing.camp.day_mult || {};
+  const dayF = d => d === '5' ? 1 : Number(dm[d] != null ? dm[d] : 1);
+  const tr5 = Number((pricing.transport['2way'] || {})['5'] || 0);   // 5-day 2-way weekly
+  const SIB = 0.90, JR = 0.90;
+  const r1 = x => Math.round(x), r25 = x => Math.round(x/25)*25, wnum = w => parseInt(w,10)||0;
+  const tiers = pxSheetSeason === 'current' ? (pricing.camp.current || pricing.camp.tiers) : pricing.camp.tiers;
+  const seasonLbl = pxSheetSeason === 'current' ? (pricing.season_label || 'Current') : (pricing.proposed_label || 'Proposed');
+  const t2G = (tier,w,d) => r1(Number((tiers[tier] || {})[w] || 0) * dayF(d));
+  const tui = (prog,tier,w,d) => prog === 'junior' ? r25(JR * t2G(tier,w,d)) : t2G(tier,w,d);
+
+  function section(prog, tier, title) {
+    let s = '<div class="px-sec"><div class="px-sec-title">'+title+'</div><div style="overflow-x:auto"><table class="px-tbl px-sheet-tbl"><thead>' +
+      '<tr><th class="px-l" rowspan="2">Weeks</th><th colspan="4">5 days</th><th colspan="2">4 days</th><th colspan="2">3 days</th></tr>' +
+      '<tr><th>Tuition</th><th>Sibling</th><th>Tuition + Transp</th><th>Sibling + Transp</th><th>Tuition</th><th>Tuition + Transp</th><th>Tuition</th><th>Tuition + Transp</th></tr>' +
+      '</thead><tbody>';
+    wk.forEach(w => {
+      const wn = wnum(w), transp = tr5*wn, sibTransp = r1(SIB*transp);
+      const t5 = tui(prog,tier,w,'5'), sib5 = r1(SIB*t5), t4 = tui(prog,tier,w,'4'), t3 = tui(prog,tier,w,'3');
+      if (wn === 0) {   // Mini: tuition only
+        s += '<tr><td class="px-l">'+w+'</td><td>'+pxMoney(t5)+'</td><td></td><td></td><td></td><td>'+pxMoney(t4)+'</td><td></td><td>'+pxMoney(t3)+'</td><td></td></tr>';
+      } else {
+        s += '<tr><td class="px-l">'+w+'</td>' +
+          '<td>'+pxMoney(t5)+'</td><td>'+pxMoney(sib5)+'</td><td>'+pxMoney(t5+transp)+'</td><td>'+pxMoney(sib5+sibTransp)+'</td>' +
+          '<td>'+pxMoney(t4)+'</td><td>'+pxMoney(t4+transp)+'</td>' +
+          '<td>'+pxMoney(t3)+'</td><td>'+pxMoney(t3+transp)+'</td></tr>';
+      }
+    });
+    return s + '</tbody></table></div></div>';
+  }
+
+  let h = '<div class="px-noprint" style="margin-bottom:.8rem;display:flex;gap:.7rem;align-items:center">' +
+    '<button class="px-btn" id="px-print">🖨 Print / Save PDF</button>' +
+    '<label class="px-field" style="margin:0">Season<select id="px-sheet-season">' +
+    '<option value="proposed"'+(pxSheetSeason==='proposed'?' selected':'')+'>Proposed ('+famEsc(pricing.proposed_label||'')+')</option>' +
+    '<option value="current"'+(pxSheetSeason==='current'?' selected':'')+'>Current ('+famEsc(pricing.season_label||'')+')</option></select></label></div>';
+  h += '<div class="px-sheet-head"><h2>Elbow Lane Day Camp</h2><div style="color:#666;font-weight:600">'+famEsc(seasonLbl)+' Rates (2nd Grade+)</div></div>';
+  h += section('twoGrade','ES',   famEsc(seasonLbl)+' Early Season Rates (2nd Grade+)');
+  h += section('junior','ES',     famEsc(seasonLbl)+' Early Season Junior Camp Rates (PS through 1st Grade)');
+  h += section('twoGrade','Final',famEsc(seasonLbl)+' Rates (2nd Grade+)');
+  h += section('junior','Final',  famEsc(seasonLbl)+' Junior Camp Rates (PS through 1st Grade)');
+  h += '<div style="font-size:.78rem;color:#666;margin-top:.6rem;max-width:680px">Sibling tuition is 10% off and assumes 5 days per week. Junior Camp tuition is 90% of the 2nd Grade+ rate. Tuition with Transportation assumes 5 days, both ways; one-way transportation is $120 per week. Siblings receive 10% off transportation.</div>';
   box.innerHTML = h;
   document.getElementById('px-print').addEventListener('click', () => {
     let st = document.getElementById('px-print-style');
     if (!st) { st = document.createElement('style'); st.id = 'px-print-style'; document.head.appendChild(st); }
-    st.textContent = '@media print{ body *{visibility:hidden!important} #px-sheet,#px-sheet *{visibility:visible!important} #px-sheet{position:absolute;left:0;top:0;width:100%} .px-noprint{display:none!important} @page{margin:.5in} }';
+    st.textContent = '@media print{ body *{visibility:hidden!important} #px-sheet,#px-sheet *{visibility:visible!important} #px-sheet{position:absolute;left:0;top:0;width:100%} .px-noprint{display:none!important} @page{size:landscape;margin:.4in} }';
     window.print();
   });
+  const seasonSel = document.getElementById('px-sheet-season');
+  if (seasonSel) seasonSel.addEventListener('change', e => { pxSheetSeason = e.target.value; renderPxSheet(); });
 }
 
 // ---- First-time "Utilities" notice (shows once per browser, after sign-in) ----
