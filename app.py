@@ -1002,14 +1002,12 @@ def api_schedules_save():
 
 
 @app.route("/api/pricing", methods=["GET"])
-@admin_required
 def api_pricing():
     """Editable pricing config (camp tuition tiers, transport, childcare)."""
     return jsonify(_pricing_load())
 
 
 @app.route("/api/pricing", methods=["POST"])
-@admin_required
 def api_pricing_save():
     """Replace the pricing config with the posted body (validated-filled)."""
     body = request.get_json(force=True, silent=True) or {}
@@ -2547,7 +2545,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
   <div class="tab" data-tab="snap" id="tab-snap-nav">📸 <span>Camp Snapshot</span></div>
   <div class="tab" data-tab="families">👪 <span>Families</span></div>
-  <div class="tab" data-tab="pricing" id="tab-pricing-nav" style="display:none">💲 <span>Pricing</span><span class="nav-new">NEW</span></div>
+  <div class="tab" data-tab="pricing" id="tab-pricing-nav">💲 <span>Pricing</span><span class="nav-new">NEW</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
   <div class="tab" data-tab="help">❓ <span>FAQs</span></div>
 </nav>
@@ -3206,6 +3204,53 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li><strong>Schedules</strong> — tap the day buttons (green = attending, red = not) for each enrolled week, per camper.</li>
         </ul>
         <p>Click <strong>Save</strong> to keep your changes or <strong>Cancel</strong> to discard them. Schedule changes save just the weeks you touched and behave exactly like the <strong>Camper Schedules</strong> tool — they're applied to the week-specific reports and kept even after a new master sheet is uploaded.</p>
+      </div>
+    </details>
+
+    <div class="help-sub">Pricing</div>
+
+    <details class="faq">
+      <summary>What is the Pricing tab for?</summary>
+      <div class="faq-body">
+        <p>It's a shared pricing workspace with four sub-tabs, all reading from one set of editable rates:</p>
+        <ul>
+          <li><strong>Calculator</strong> — work out what a family owes.</li>
+          <li><strong>Explorer</strong> — model a price change for an upcoming season.</li>
+          <li><strong>Rate Settings</strong> — the master rate tables everything reads from.</li>
+          <li><strong>Rate Sheet</strong> — a printable one-page summary to share.</li>
+        </ul>
+        <p><strong>Heads up:</strong> the rates are shared by everyone. Saving in Rate Settings (or clicking Apply in the Explorer, then Save) changes them for all users, so treat edits with care.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>How do I calculate what a family owes?</summary>
+      <div class="faq-body">
+        <p>On the <strong>Calculator</strong> sub-tab, choose <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
+        <p>For before/after-camp <strong>Childcare</strong>, switch its <em>Include</em> to Yes and pick days per week and number of children (2 uses the sibling rate); enter weeks to get a childcare total. Childcare is billed separately from camp.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>How do I model a price increase for next season?</summary>
+      <div class="faq-body">
+        <p>On the <strong>Explorer</strong> sub-tab, enter a <strong>% increase</strong> and a <strong>rounding</strong> rule ($1 / $25 / $50 / $100). It shows the resulting camp tuition and childcare with the dollar and percent difference versus the current rates. It's a preview and changes nothing on its own.</p>
+        <p>When you're happy with a scenario, click <strong>Apply to Rate Settings</strong>. The new figures load into Rate Settings (and update the season label as needed); <strong>review them and click Save rates</strong> to make them official. Nothing is saved until you do.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>How do the rate tables and the day rate factor work?</summary>
+      <div class="faq-body">
+        <p><strong>Rate Settings</strong> holds the camp tuition (Early Signup and Regular, by number of weeks), transportation, and childcare rates. Edit any value and click <strong>Save rates</strong>.</p>
+        <p>The <strong>day rate factor</strong> is the percentage of the full 5-day tuition a 4-day or 3-day camper pays (100% = full price; 90% = a 10% reduction). The 5-day column is the base and is always 100%. It's set to 100% everywhere right now, so days do not change camp tuition yet.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>How do I share the rates as a PDF?</summary>
+      <div class="faq-body">
+        <p>Open the <strong>Rate Sheet</strong> sub-tab and click <strong>Print / Save PDF</strong>. It prints just the one-page rate summary (camp tuition, transportation, childcare) with the season label, suitable for sharing internally or with families.</p>
       </div>
     </details>
 
@@ -4939,7 +4984,7 @@ let pxExp = {pct:3, round:50};
 const pxMoney = n => '$' + (Math.round(Number(n)||0)).toLocaleString('en-US');
 
 async function loadPricing(force) {
-  if (!currentUser || !currentUser.is_admin) return;
+  if (!currentUser) return;
   if (pxLoaded && !force) return;
   try {
     const r = await fetch('/api/pricing');
@@ -5304,8 +5349,6 @@ document.getElementById('usr-copy').addEventListener('click', async () => {
     overlay.classList.add('hidden');
     document.getElementById('h-user').style.display = 'flex';
     document.getElementById('h-user-name').textContent = user.name || user.username;
-    const pxNav = document.getElementById('tab-pricing-nav');   // admin-only
-    if (pxNav) pxNav.style.display = user.is_admin ? '' : 'none';
     loadAllData();
     maybeShowNotice();
   }
