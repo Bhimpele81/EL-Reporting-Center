@@ -2133,8 +2133,17 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-sheet-tbl td{font-size:.82rem}
 .px-sheet-tbl td:not(.px-l),.px-sheet-tbl th:not(.px-l){width:78px;min-width:78px}
 .px-sheet-sectitle{background:var(--brand);color:#fff;font-weight:700;text-align:center;padding:.35rem .5rem;border-radius:5px;font-size:1rem;margin:.2rem 0 .4rem;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.px-sheet-tbl thead th{background:var(--brand)!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.px-sheet-tbl .px-grp{border-left:3px solid var(--gold)}
+/* Rate sheet colors mirror the source sheet: each day group has its own hue
+   (5=blue, 4=green, 3=gold); the plain "Tuition" column is a darker shade */
+.px-sheet-tbl thead th,.px-sheet-tbl td{color:#222!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.px-sheet-tbl .c5l{background:#d3dcee!important}
+.px-sheet-tbl .c5m{background:#a9bde0!important}
+.px-sheet-tbl .c4l{background:#d8e6ce!important}
+.px-sheet-tbl .c4m{background:#aecb99!important}
+.px-sheet-tbl .c3l{background:#ece0c3!important}
+.px-sheet-tbl .c3m{background:#dbc57e!important}
+.px-sheet-tbl .px-l{background:#efecec!important}
+.px-sheet-tbl .px-grp{border-left:2px solid #fff}
 .px-chgs{font-size:.9em;font-weight:600}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
@@ -5366,9 +5375,11 @@ function renderPxSheet() {
     if (wn === 0) return [null, null, t5, null, null, t4, null, t3];   // Mini: tuition only
     return [t5+tr('5'), sib5+r1(SIB*tr('5')), t5, sib5, t4+tr('4'), t4, t3+tr('3'), t3];
   }
-  const grpCol = i => i === 0 || i === 4 || i === 6;
-  function cell(prim, comp, grp) {
-    const cls = grp ? ' class="px-grp"' : '';
+  // Per-column background hue (5d=blue, 4d=green, 3d=gold; plain Tuition = darker "m" shade)
+  const COLHUE = ['c5l','c5l','c5m','c5l','c4l','c4m','c3l','c3m'];
+  const ccls = i => COLHUE[i] + ((i === 0 || i === 4 || i === 6) ? ' px-grp' : '');
+  function cell(prim, comp, i) {
+    const cls = ' class="'+ccls(i)+'"';
     if (prim == null) return '<td'+cls+'></td>';
     let inner = pxMoney(prim);
     if (comparing && comp != null && comp > 0) {
@@ -5377,17 +5388,18 @@ function renderPxSheet() {
     }
     return '<td'+cls+'>'+inner+'</td>';
   }
+  const LABELS = ['Tuition with Transportation','Sibling Tuition w/ Transportation','Tuition','Sibling Tuition',
+                  'Tuition w/ Transportation','Tuition','Tuition w/ Transportation','Tuition'];
   function section(prog, tier, title) {
     let s = '<div class="px-sec"><div class="px-sheet-sectitle">'+title+'</div><div style="overflow-x:auto"><table class="px-tbl px-sheet-tbl"><thead>' +
-      '<tr><th class="px-l" rowspan="2">Weeks</th><th colspan="4" class="px-grp">5</th><th colspan="2" class="px-grp">4</th><th colspan="2" class="px-grp">3</th></tr>' +
-      '<tr><th class="px-grp">Tuition with Transportation</th><th>Sibling Tuition w/ Transportation</th><th>Tuition</th><th>Sibling Tuition</th>' +
-      '<th class="px-grp">Tuition w/ Transportation</th><th>Tuition</th><th class="px-grp">Tuition w/ Transportation</th><th>Tuition</th></tr>' +
+      '<tr><th class="px-l" rowspan="2">Weeks</th><th colspan="4" class="c5m px-grp">5</th><th colspan="2" class="c4m px-grp">4</th><th colspan="2" class="c3m px-grp">3</th></tr>' +
+      '<tr>' + LABELS.map((lbl,i) => '<th class="'+ccls(i)+'">'+lbl+'</th>').join('') + '</tr>' +
       '</thead><tbody>';
     wk.forEach(w => {
       const pv = rowVals(pBase, prog, tier, w);
       const cv = comparing ? rowVals(cBase, prog, tier, w) : null;
       s += '<tr><td class="px-l">'+w+'</td>';
-      for (let i = 0; i < 8; i++) s += cell(pv[i], cv ? cv[i] : null, grpCol(i));
+      for (let i = 0; i < 8; i++) s += cell(pv[i], cv ? cv[i] : null, i);
       s += '</tr>';
     });
     return s + '</tbody></table></div></div>';
