@@ -417,6 +417,9 @@ _DEFAULT_PRICING = {
         # Multiplier applied to the (weeks) tuition for 5/4/3 days per week.
         # Flat (1.0) for now — camp may provide day-based rates later.
         "day_mult": {"5": 1.0, "4": 1.0, "3": 1.0},
+        # Multi-camper (sibling) discount applied to each camper after the first.
+        # mode "pct" = value% off that camper's tuition; "amt" = flat $ off. 0 = none.
+        "sibling_discount": {"mode": "pct", "value": 0},
     },
     # Weekly transportation add-on, by days per week
     "transport": {
@@ -3227,6 +3230,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <summary>How do I calculate what a family owes?</summary>
       <div class="faq-body">
         <p>On the <strong>Calculator</strong> sub-tab, choose <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
+        <p>If a <strong>multi-camper (sibling) discount</strong> is set in Rate Settings, it is applied automatically to each camper after the first and shown as a line on their subtotal.</p>
         <p>For before/after-camp <strong>Childcare</strong>, switch its <em>Include</em> to Yes and pick days per week and number of children (2 uses the sibling rate); enter weeks to get a childcare total. Childcare is billed separately from camp.</p>
       </div>
     </details>
@@ -3234,7 +3238,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do I model a price increase for next season?</summary>
       <div class="faq-body">
-        <p>On the <strong>Explorer</strong> sub-tab, set the <strong>Regular increase %</strong>, the <strong>Early Signup discount</strong> (a % or $ off the regular price), and a <strong>rounding</strong> rule ($1 / $25 / $50 / $100). It shows the proposed Regular and Early Signup tuition (with the discount amount) and childcare, alongside the dollar and percent difference versus the current rates. It's a preview and changes nothing on its own.</p>
+        <p>On the <strong>Explorer</strong> sub-tab, set the <strong>Annual increase %</strong>, the <strong>Early Signup discount</strong> (a % or $ off the regular price), and a <strong>rounding</strong> rule ($1 / $25 / $50 / $100). It shows the proposed Regular and Early Signup tuition (with the discount amount) and childcare, alongside the dollar and percent difference versus the current rates. It's a preview and changes nothing on its own.</p>
         <p>When you're happy with a scenario, click <strong>Apply to Rate Settings</strong>. The new figures load into Rate Settings (and update the season label as needed); <strong>review them and click Save rates</strong> to make them official. Nothing is saved until you do.</p>
       </div>
     </details>
@@ -5051,12 +5055,20 @@ function renderPxCalc() {
 
 function renderPxCalcTotal() {
   const tiers = pricing.camp.tiers[pxTier] || {}, dm = pricing.camp.day_mult || {};
+  const sib = pricing.camp.sibling_discount || {mode:'pct', value:0};
+  const sibVal = Number(sib.value||0);
   let lines = [], campGrand = 0;
   pxCampers.forEach((c,i) => {
     const base = Number(tiers[c.weeks]||0);
     const mult = Number(dm[c.days]!=null ? dm[c.days] : 1);
     const tuition = base*mult; let sub = tuition;
     let detail = pxMoney(tuition)+' tuition ('+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+(mult!==1?' ×'+mult:'')+')';
+    // Multi-camper (sibling) discount on every camper after the first
+    if (i > 0 && sibVal > 0) {
+      const disc = sib.mode === 'amt' ? Math.min(sibVal, tuition) : tuition * sibVal/100;
+      sub -= disc;
+      detail += ' − '+pxMoney(disc)+' sibling discount'+(sib.mode==='amt'?'':' ('+sibVal+'%)');
+    }
     const wksNum = parseInt(c.weeks,10)||0;
     if (c.transport!=='none' && wksNum) {
       const wkr = Number((pricing.transport[c.transport]||{})[c.days]||0);
@@ -5107,7 +5119,7 @@ function renderPxExplore() {
   const box = document.getElementById('px-explore');
   const roundOpts = [['0','$1'],['25','$25'],['50','$50'],['100','$100']].map(([v,l])=>`<option value="${v}"${pxExp.round==+v?' selected':''}>${l}</option>`).join('');
   box.innerHTML = '<div class="px-controls">' +
-    '<label class="px-field">Regular increase %<input type="number" id="px-exp-pct" step="0.1" value="'+pxExp.pct+'"></label>' +
+    '<label class="px-field">Annual increase %<input type="number" id="px-exp-pct" step="0.1" value="'+pxExp.pct+'"></label>' +
     '<label class="px-field">Early Signup discount<select id="px-exp-esmode"><option value="pct"'+(pxExp.esMode==='pct'?' selected':'')+'>% off regular</option><option value="amt"'+(pxExp.esMode==='amt'?' selected':'')+'>$ off regular</option></select></label>' +
     '<label class="px-field">Discount value<input type="number" id="px-exp-esdisc" step="0.1" value="'+pxExp.esDisc+'"></label>' +
     '<label class="px-field">Round to<select id="px-exp-round">'+roundOpts+'</select></label>' +
@@ -5185,7 +5197,13 @@ function renderPxRates() {
   const pct = v => parseFloat((Number(v||0) * 100).toFixed(2));
   const pctInp = (id,v) => inp(id, pct(v)) + ' %';
   h += '<table class="px-tbl"><thead><tr><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody><tr>'+
-    '<td style="color:#888">100% <span style="font-size:.75rem">(base)</span></td><td>'+pctInp('px-dm-4', pricing.camp.day_mult['4'])+'</td><td>'+pctInp('px-dm-3', pricing.camp.day_mult['3'])+'</td></tr></tbody></table></div>';
+    '<td style="color:#888">100% <span style="font-size:.75rem">(base)</span></td><td>'+pctInp('px-dm-4', pricing.camp.day_mult['4'])+'</td><td>'+pctInp('px-dm-3', pricing.camp.day_mult['3'])+'</td></tr></tbody></table>';
+  const sib = pricing.camp.sibling_discount || {mode:'pct', value:0};
+  h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Multi-camper (sibling) discount:</strong> applied to each camper after the first in the Calculator. Leave the value at 0 for no discount.</div>' +
+    '<div class="px-controls">' +
+    '<label class="px-field">Type<select id="px-sib-mode"><option value="pct"'+(sib.mode!=='amt'?' selected':'')+'>% off tuition</option><option value="amt"'+(sib.mode==='amt'?' selected':'')+'>$ off tuition</option></select></label>' +
+    '<label class="px-field">Value<input class="px-rate-inp" id="px-sib-val" style="text-align:left" value="'+Number(sib.value||0)+'"></label>' +
+    '</div></div>';
   h += '<div class="px-sec"><div class="px-sec-title">Transportation (weekly)</div><table class="px-tbl"><thead><tr><th class="px-l">Type</th><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody>';
   [['2way','2-way'],['1way','1-way']].forEach(([k,l]) => h += '<tr><td class="px-l">'+l+'</td><td>'+inp('px-tr-'+k+'-5', pricing.transport[k]['5'])+'</td><td>'+inp('px-tr-'+k+'-4', pricing.transport[k]['4'])+'</td><td>'+inp('px-tr-'+k+'-3', pricing.transport[k]['3'])+'</td></tr>');
   h += '</tbody></table></div>';
@@ -5205,6 +5223,8 @@ async function savePxRates() {
   ['5','4','3'].forEach(d => { pricing.childcare[d].base = num('px-cc-'+d+'-base'); pricing.childcare[d].sibling2 = num('px-cc-'+d+'-sib'); });
   pricing.camp.day_mult['5'] = 1;   // 5-day is the base (always 100%)
   ['4','3'].forEach(d => { pricing.camp.day_mult[d] = num('px-dm-'+d) / 100; });
+  const sibMode = document.getElementById('px-sib-mode');
+  pricing.camp.sibling_discount = { mode: (sibMode && sibMode.value) || 'pct', value: num('px-sib-val') };
   ['2way','1way'].forEach(k => ['5','4','3'].forEach(d => pricing.transport[k][d] = num('px-tr-'+k+'-'+d)));
   const msg = document.getElementById('px-save-msg'); msg.textContent = 'Saving…'; msg.style.color = '#777';
   try {
