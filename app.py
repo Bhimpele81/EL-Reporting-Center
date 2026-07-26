@@ -2101,6 +2101,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-tbl th,.px-tbl td{border:1px solid #d8d8d8;padding:.35rem .55rem;text-align:center;white-space:nowrap}
 .px-tbl thead th{background:var(--brand);color:#fff;font-weight:700}
 .px-tbl td.px-l,.px-tbl th.px-l{text-align:left;font-weight:600}
+/* Every value column (anything but the left label) is the same fixed width */
+.px-tbl th:not(.px-l),.px-tbl td:not(.px-l){width:90px;min-width:90px;box-sizing:border-box}
+.px-tbl td:not(.px-l) .px-rate-inp{width:100%;box-sizing:border-box}
 .px-tbl tr.px-total td{background:#fde9cf;font-weight:700}
 .px-rate-inp{width:78px;border:1px solid var(--border);border-radius:5px;padding:.25rem .35rem;text-align:right;font-size:.85rem}
 .px-field{display:inline-flex;flex-direction:column;gap:.2rem;margin:0 .9rem .8rem 0;font-size:.8rem;color:#555}
