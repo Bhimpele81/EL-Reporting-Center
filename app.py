@@ -3265,7 +3265,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do I share the rates as a PDF?</summary>
       <div class="faq-body">
-        <p>Open the <strong>Rate Sheet</strong> sub-tab and click <strong>Print / Save PDF</strong>. It prints the full rate grid for both programs (<strong>2nd Grade+</strong> and <strong>Junior Camp, PS through 1st Grade</strong>), Early Season and Regular, with tuition, sibling, and with-transportation columns by days per week. Use the <strong>Season</strong> selector to print the Current or Proposed rates. The sheet is derived from your Rate Settings: Junior Camp is 90% of 2nd Grade+ (rounded to $25), sibling tuition is 10% off (rounded to $1, assumes 5 days), and transportation assumes 5 days both ways with a 10% sibling discount.</p>
+        <p>Open the <strong>Rate Sheet</strong> sub-tab and click <strong>Print / Save PDF</strong>. It prints the full rate grid for both programs (<strong>2nd Grade+</strong> and <strong>Junior Camp, PS through 1st Grade</strong>), Early Season and Regular, with tuition, sibling, and with-transportation columns by days per week. Use the <strong>Season</strong> selector to print the Current or Proposed rates. The sheet is derived from your Rate Settings: Junior Camp is 90% of 2nd Grade+ (rounded to $25), sibling tuition is 10% off (rounded to $1, assumes 5 days), and transportation is 2-way for that column's day count with a 10% sibling discount.</p>
       </div>
     </details>
 
@@ -5325,7 +5325,7 @@ async function savePxRates() {
 //   2nd Grade+ tuition   = entered base (5-day) x day factor
 //   Junior Camp tuition  = 90% of 2nd Grade+, rounded to $25
 //   Sibling tuition      = 10% off (assumes 5 days/week), rounded to $1
-//   Transportation       = 5 days, both ways (weekly x weeks); sibling transport 10% off
+//   Transportation       = 2-way, per the column's day count (weekly x weeks); sibling transport 10% off
 let pxSheetSeason = 'proposed';
 function renderPxSheet() {
   if (!pricing) return;
@@ -5333,7 +5333,7 @@ function renderPxSheet() {
   const wk = pricing.camp.week_order;
   const dm = pricing.camp.day_mult || {};
   const dayF = d => d === '5' ? 1 : Number(dm[d] != null ? dm[d] : 1);
-  const tr5 = Number((pricing.transport['2way'] || {})['5'] || 0);   // 5-day 2-way weekly
+  const trWk = d => Number((pricing.transport['2way'] || {})[d] || 0);   // 2-way weekly rate for that day count
   const SIB = 0.90, JR = 0.90;
   const r1 = x => Math.round(x), r25 = x => Math.round(x/25)*25, wnum = w => parseInt(w,10)||0;
   const tiers = pxSheetSeason === 'current' ? (pricing.camp.current || pricing.camp.tiers) : pricing.camp.tiers;
@@ -5348,16 +5348,18 @@ function renderPxSheet() {
       '<th>Tuition w/ Transportation</th><th>Tuition</th><th>Tuition w/ Transportation</th><th>Tuition</th></tr>' +
       '</thead><tbody>';
     wk.forEach(w => {
-      const wn = wnum(w), transp = tr5*wn, sibTransp = r1(SIB*transp);
+      const wn = wnum(w);
+      const tr5v = trWk('5')*wn, tr4v = trWk('4')*wn, tr3v = trWk('3')*wn;   // per-day transport totals
+      const sibTransp = r1(SIB*tr5v);   // sibling transport (5-day, 10% off)
       const t5 = tui(prog,tier,w,'5'), sib5 = r1(SIB*t5), t4 = tui(prog,tier,w,'4'), t3 = tui(prog,tier,w,'3');
       if (wn === 0) {   // Mini: plain tuition only
         s += '<tr><td class="px-l">'+w+'</td><td></td><td></td><td>'+pxMoney(t5)+'</td><td></td>' +
           '<td></td><td>'+pxMoney(t4)+'</td><td></td><td>'+pxMoney(t3)+'</td></tr>';
       } else {
         s += '<tr><td class="px-l">'+w+'</td>' +
-          '<td>'+pxMoney(t5+transp)+'</td><td>'+pxMoney(sib5+sibTransp)+'</td><td>'+pxMoney(t5)+'</td><td>'+pxMoney(sib5)+'</td>' +
-          '<td>'+pxMoney(t4+transp)+'</td><td>'+pxMoney(t4)+'</td>' +
-          '<td>'+pxMoney(t3+transp)+'</td><td>'+pxMoney(t3)+'</td></tr>';
+          '<td>'+pxMoney(t5+tr5v)+'</td><td>'+pxMoney(sib5+sibTransp)+'</td><td>'+pxMoney(t5)+'</td><td>'+pxMoney(sib5)+'</td>' +
+          '<td>'+pxMoney(t4+tr4v)+'</td><td>'+pxMoney(t4)+'</td>' +
+          '<td>'+pxMoney(t3+tr3v)+'</td><td>'+pxMoney(t3)+'</td></tr>';
       }
     });
     return s + '</tbody></table></div></div>';
@@ -5373,7 +5375,7 @@ function renderPxSheet() {
   h += section('junior','ES',     famEsc(seasonLbl)+' Early Season Junior Camp Rates (PS through 1st Grade)');
   h += section('twoGrade','Final',famEsc(seasonLbl)+' Rates (2nd Grade+)');
   h += section('junior','Final',  famEsc(seasonLbl)+' Junior Camp Rates (PS through 1st Grade)');
-  h += '<div style="font-size:.78rem;color:#666;margin-top:.6rem;max-width:680px">Sibling tuition is 10% off and assumes 5 days per week. Junior Camp tuition is 90% of the 2nd Grade+ rate. Tuition with Transportation assumes 5 days, both ways; one-way transportation is $120 per week. Siblings receive 10% off transportation.</div>';
+  h += '<div style="font-size:.78rem;color:#666;margin-top:.6rem;max-width:700px">Sibling tuition is 10% off and assumes 5 days per week. Junior Camp tuition is 90% of the 2nd Grade+ rate. Tuition with Transportation adds 2-way transportation for that column&rsquo;s number of days (weekly, times the number of weeks); one-way transportation is $120 per week. Siblings receive 10% off transportation.</div>';
   box.innerHTML = h;
   document.getElementById('px-print').addEventListener('click', () => {
     let st = document.getElementById('px-print-style');
