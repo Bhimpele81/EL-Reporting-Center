@@ -4951,14 +4951,11 @@ async function loadPricing(force) {
 }
 
 // Sub-tab switching
-document.querySelectorAll('.pxtab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.pxtab').forEach(b => b.classList.remove('on'));
-    document.querySelectorAll('.px-view').forEach(v => v.classList.remove('on'));
-    btn.classList.add('on');
-    document.getElementById('px-' + btn.dataset.px).classList.add('on');
-  });
-});
+function pxShowSub(name) {
+  document.querySelectorAll('.pxtab').forEach(b => b.classList.toggle('on', b.dataset.px === name));
+  document.querySelectorAll('.px-view').forEach(v => v.classList.toggle('on', v.id === 'px-' + name));
+}
+document.querySelectorAll('.pxtab').forEach(btn => btn.addEventListener('click', () => pxShowSub(btn.dataset.px)));
 
 // ---------- Calculator ----------
 function renderPxCalc() {
@@ -5058,7 +5055,9 @@ function renderPxExplore() {
   let h = '<div class="px-controls">' +
     '<label class="px-field">% increase<input type="number" id="px-exp-pct" step="0.1" value="'+pxExp.pct+'"></label>' +
     '<label class="px-field">Round to<select id="px-exp-round">'+[['0','$1'],['25','$25'],['50','$50'],['100','$100']].map(([v,l])=>`<option value="${v}"${pxExp.round==+v?' selected':''}>${l}</option>`).join('')+'</select></label>' +
-    '</div>';
+    '<button class="px-btn" id="px-apply" style="align-self:center">Apply to Rate Settings</button>' +
+    '</div>' +
+    '<div style="font-size:.8rem;color:#888;margin-bottom:1rem">This is a preview. Use <strong>Apply to Rate Settings</strong> to copy these camp tuition and childcare figures into the editable rates, where you can review and Save them. Transportation is not changed by the explorer.</div>';
   const ccBase = {}, ccOrder = ['5','4','3'];
   ccOrder.forEach(d => ccBase[d] = pricing.childcare[d].base);
   h += pxExpTable('Summer Camp — Early Signup (ES)', pricing.camp.tiers.ES, pricing.camp.week_order, 'Weeks');
@@ -5067,6 +5066,24 @@ function renderPxExplore() {
   box.innerHTML = h;
   document.getElementById('px-exp-pct').addEventListener('input', e => { pxExp.pct = parseFloat(e.target.value)||0; renderPxExplore(); });
   document.getElementById('px-exp-round').addEventListener('change', e => { pxExp.round = parseInt(e.target.value,10); renderPxExplore(); });
+  document.getElementById('px-apply').addEventListener('click', pxApplyExplore);
+}
+
+function pxApplyExplore() {
+  const roundLbl = pxExp.round ? ('$' + pxExp.round) : '$1';
+  if (!confirm('Apply a ' + pxExp.pct + '% increase (rounded to ' + roundLbl + ') to the camp tuition (ES and Regular) and childcare rates? The new figures load into Rate Settings for you to review, and nothing is saved until you click Save there.')) return;
+  const bump = obj => Object.keys(obj).forEach(k => { obj[k] = pxRound(Number(obj[k]||0) * (1 + pxExp.pct/100)); });
+  bump(pricing.camp.tiers.ES);
+  bump(pricing.camp.tiers.Final);
+  ['5','4','3'].forEach(d => {
+    const r = pricing.childcare[d];
+    r.base = pxRound(Number(r.base||0) * (1 + pxExp.pct/100));
+    r.sibling2 = pxRound(Number(r.sibling2||0) * (1 + pxExp.pct/100));
+  });
+  renderPxRates();
+  pxShowSub('rates');
+  const msg = document.getElementById('px-save-msg');
+  if (msg) { msg.textContent = 'New rates loaded. Review, then click Save rates to keep them.'; msg.style.color = '#b26a00'; }
 }
 
 // ---------- Rate Settings ----------
@@ -5075,7 +5092,8 @@ function renderPxRates() {
   const box = document.getElementById('px-rates');
   const wk = pricing.camp.week_order;
   const inp = (id,v) => `<input class="px-rate-inp" id="${id}" value="${v==null?'':v}">`;
-  let h = '<div class="px-sec"><div class="px-sec-title">Summer Camp tuition</div><table class="px-tbl"><thead><tr><th class="px-l">Weeks</th><th>Early Signup (ES)</th><th>Regular (Final)</th></tr></thead><tbody>';
+  let h = '<div class="px-controls"><label class="px-field">Season label<input id="px-season-label" style="min-width:110px;text-align:left" value="'+famEsc(pricing.season_label||'')+'"></label></div>';
+  h += '<div class="px-sec"><div class="px-sec-title">Summer Camp tuition</div><table class="px-tbl"><thead><tr><th class="px-l">Weeks</th><th>Early Signup (ES)</th><th>Regular (Final)</th></tr></thead><tbody>';
   wk.forEach(w => h += '<tr><td class="px-l">'+w+'</td><td>'+inp('px-camp-ES-'+w, pricing.camp.tiers.ES[w])+'</td><td>'+inp('px-camp-Final-'+w, pricing.camp.tiers.Final[w])+'</td></tr>');
   h += '</tbody></table>';
   h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the proportion of the full 5-day tuition charged to a 4-day or 3-day camper, where 1.0 represents the full rate (for example, 0.90 applies a 10% reduction). Each value is currently set to 1.0, so the number of days attended does not yet affect camp tuition.</div>';
@@ -5094,6 +5112,8 @@ function renderPxRates() {
 
 async function savePxRates() {
   const num = id => { const el = document.getElementById(id); const v = parseFloat((el && el.value || '').replace(/[^0-9.]/g,'')); return isNaN(v) ? 0 : v; };
+  const lblEl = document.getElementById('px-season-label');
+  if (lblEl) pricing.season_label = lblEl.value.trim();
   pricing.camp.week_order.forEach(w => { pricing.camp.tiers.ES[w] = num('px-camp-ES-'+w); pricing.camp.tiers.Final[w] = num('px-camp-Final-'+w); });
   ['5','4','3'].forEach(d => { pricing.camp.day_mult[d] = num('px-dm-'+d); pricing.childcare[d].base = num('px-cc-'+d+'-base'); pricing.childcare[d].sibling2 = num('px-cc-'+d+'-sib'); });
   ['2way','1way'].forEach(k => ['5','4','3'].forEach(d => pricing.transport[k][d] = num('px-tr-'+k+'-'+d)));
