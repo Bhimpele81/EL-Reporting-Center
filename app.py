@@ -406,7 +406,8 @@ def _schedules_load() -> dict:
 
 # Seeded from the 2026 worksheets; all values are editable in the app.
 _DEFAULT_PRICING = {
-    "season_label": "2026",
+    "season_label": "2026",      # current season label
+    "proposed_label": "2027",    # proposed/upcoming season label
     "camp": {
         "week_order": ["8", "7", "6", "5", "4", "Mini"],
         # Two rate tiers by week-count: ES = early-signup (fall), Final = regular
@@ -3249,7 +3250,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do the rate tables and the day rate factor work?</summary>
       <div class="faq-body">
-        <p><strong>Rate Settings</strong> holds the camp tuition (Early Signup and Regular, by number of weeks), transportation, and childcare rates. Edit any value and click <strong>Save rates</strong>.</p>
+        <p><strong>Rate Settings</strong> holds the camp tuition, transportation, and childcare rates. Camp tuition has a <strong>Current</strong> column set (the season now in effect, e.g. 2026) and a <strong>Proposed</strong> column set (the upcoming season, e.g. 2027), each with Early Signup and Regular by number of weeks. Enter both and the <strong>Change</strong> column shows the effective percent increase. The Proposed rates are what the Calculator and Explorer use. Set the season labels at the top, edit any value, and click <strong>Save rates</strong>.</p>
         <p>The <strong>day rate factor</strong> is the percentage of the full 5-day tuition a 4-day or 3-day camper pays (100% = full price; 90% = a 10% reduction). The 5-day column is the base and is always 100%. It's set to 100% everywhere right now, so days do not change camp tuition yet.</p>
       </div>
     </details>
@@ -5154,21 +5155,23 @@ function renderPxExplore() {
 
 function renderPxExploreResults() {
   const wk = pricing.camp.week_order;
-  // Regular (Final)
+  const cur = pricing.camp.current || {ES:{}, Final:{}};
+  const curL = pricing.season_label || 'Current';
+  // Regular (Final) — modeled from the current-season base
   let h = '<div class="px-sec"><div class="px-sec-title">Summer Camp — Regular</div><table class="px-tbl"><thead><tr>' +
-    '<th class="px-l">Weeks</th><th>Current</th><th>Proposed (+'+pxExp.pct+'%)</th><th>$ diff</th><th>% diff</th></tr></thead><tbody>';
+    '<th class="px-l">Weeks</th><th>Current ('+famEsc(curL)+')</th><th>Proposed (+'+pxExp.pct+'%)</th><th>$ diff</th><th>% diff</th></tr></thead><tbody>';
   wk.forEach(w => {
-    const base = Number(pricing.camp.tiers.Final[w]||0), nw = pxPropFinal(base);
+    const base = Number(cur.Final[w]||0), nw = pxPropFinal(base);
     const diff = nw-base, p = base ? diff/base*100 : 0, cls = diff ? 'px-diff-up' : 'px-diff-flat';
     h += '<tr><td class="px-l">'+w+'</td><td>'+pxMoney(base)+'</td><td>'+pxMoney(nw)+'</td><td class="'+cls+'">'+(diff>0?'+':'')+pxMoney(diff)+'</td><td class="'+cls+'">'+p.toFixed(2)+'%</td></tr>';
   });
   h += '</tbody></table></div>';
   // Early Signup (derived from regular minus discount)
   h += '<div class="px-sec"><div class="px-sec-title">Summer Camp — Early Signup</div><table class="px-tbl"><thead><tr>' +
-    '<th class="px-l">Weeks</th><th>Regular</th><th>Early Signup</th><th>Discount</th><th>Current ES</th><th>Change</th></tr></thead><tbody>';
+    '<th class="px-l">Weeks</th><th>Regular</th><th>Early Signup</th><th>Discount</th><th>Current ES ('+famEsc(curL)+')</th><th>Change</th></tr></thead><tbody>';
   wk.forEach(w => {
-    const reg = pxPropFinal(Number(pricing.camp.tiers.Final[w]||0)), es = pxPropES(reg);
-    const disc = reg-es, curES = Number(pricing.camp.tiers.ES[w]||0), chg = es-curES, cls = chg ? 'px-diff-up' : 'px-diff-flat';
+    const reg = pxPropFinal(Number(cur.Final[w]||0)), es = pxPropES(reg);
+    const disc = reg-es, curES = Number(cur.ES[w]||0), chg = es-curES, cls = chg ? 'px-diff-up' : 'px-diff-flat';
     h += '<tr><td class="px-l">'+w+'</td><td>'+pxMoney(reg)+'</td><td>'+pxMoney(es)+'</td><td>'+pxMoney(disc)+'</td><td>'+pxMoney(curES)+'</td><td class="'+cls+'">'+(chg>0?'+':'')+pxMoney(chg)+'</td></tr>';
   });
   h += '</tbody></table></div>';
@@ -5184,9 +5187,10 @@ function pxApplyExplore() {
   const esRoundLbl = pxExp.esRound ? ('$' + pxExp.esRound) : '$1';
   const discLbl = pxExp.esMode === 'amt' ? ('$' + pxExp.esDisc + ' off') : (pxExp.esDisc + '% off');
   if (!confirm('Apply a ' + pxExp.pct + '% increase to Regular tuition (rounded to ' + roundLbl + ') and an Early Signup discount of ' + discLbl + ' the regular price (rounded to ' + esRoundLbl + ')? Childcare also increases by ' + pxExp.pct + '%. New figures load into Rate Settings for review; nothing is saved until you click Save rates.')) return;
+  const cur = pricing.camp.current || {ES:{}, Final:{}};
   pricing.camp.week_order.forEach(w => {
-    const reg = pxPropFinal(Number(pricing.camp.tiers.Final[w]||0));
-    pricing.camp.tiers.Final[w] = reg;
+    const reg = pxPropFinal(Number(cur.Final[w]||0));
+    pricing.camp.tiers.Final[w] = reg;   // proposed
     pricing.camp.tiers.ES[w] = pxPropES(reg);
   });
   ['5','4','3'].forEach(d => {
@@ -5206,18 +5210,25 @@ function renderPxRates() {
   const box = document.getElementById('px-rates');
   const wk = pricing.camp.week_order;
   const inp = (id,v) => `<input class="px-rate-inp" id="${id}" value="${v==null?'':v}">`;
-  let h = '<div class="px-controls"><label class="px-field">Season label<input id="px-season-label" style="min-width:110px;text-align:left" value="'+famEsc(pricing.season_label||'')+'"></label></div>';
+  const curL = pricing.season_label || 'Current', propL = pricing.proposed_label || 'Proposed';
   const cur = pricing.camp.current || {ES:{}, Final:{}};
+  let h = '<div class="px-controls">' +
+    '<label class="px-field">Current season<input id="px-season-cur" style="min-width:90px;text-align:left" value="'+famEsc(pricing.season_label||'')+'"></label>' +
+    '<label class="px-field">Proposed season<input id="px-season-prop" style="min-width:90px;text-align:left" value="'+famEsc(pricing.proposed_label||'')+'"></label>' +
+    '</div>';
   h += '<div class="px-sec"><div class="px-sec-title">Summer Camp tuition</div>' +
-    '<div style="font-size:.8rem;color:#888;margin-bottom:.3rem">The <strong>Current</strong> columns are a reference for the season now in effect; the <strong>Early Signup</strong> and <strong>Regular</strong> columns are the live rates the calculator uses. All are editable.</div>' +
-    '<table class="px-tbl"><thead><tr><th class="px-l">Weeks</th><th>Current ES</th><th>Current Regular</th><th>Early Signup (ES)</th><th>Regular (Final)</th></tr></thead><tbody>';
+    '<div style="font-size:.8rem;color:#888;margin-bottom:.3rem">Enter the <strong>Current ('+famEsc(curL)+')</strong> and <strong>Proposed ('+famEsc(propL)+')</strong> rates. The change column shows the effective increase. The Proposed columns are the live rates the calculator and Explorer use.</div>' +
+    '<table class="px-tbl"><thead>' +
+    '<tr><th class="px-l" rowspan="2">Weeks</th><th colspan="2">Current ('+famEsc(curL)+')</th><th colspan="2">Proposed ('+famEsc(propL)+')</th><th colspan="2">Change</th></tr>' +
+    '<tr><th>ES</th><th>Regular</th><th>ES</th><th>Regular</th><th>ES</th><th>Regular</th></tr></thead><tbody>';
   wk.forEach(w => h += '<tr><td class="px-l">'+w+'</td>'+
     '<td>'+inp('px-cur-ES-'+w, cur.ES[w])+'</td>'+
     '<td>'+inp('px-cur-Final-'+w, cur.Final[w])+'</td>'+
     '<td>'+inp('px-camp-ES-'+w, pricing.camp.tiers.ES[w])+'</td>'+
-    '<td>'+inp('px-camp-Final-'+w, pricing.camp.tiers.Final[w])+'</td></tr>');
+    '<td>'+inp('px-camp-Final-'+w, pricing.camp.tiers.Final[w])+'</td>'+
+    '<td id="px-chg-ES-'+w+'" class="px-diff-flat"></td><td id="px-chg-Final-'+w+'" class="px-diff-flat"></td></tr>');
   h += '</tbody></table>';
-  h += '<div style="margin:.3rem 0 .9rem"><button class="px-btn ghost" id="px-snap-current">Copy live rates → Current</button> <span style="font-size:.78rem;color:#888">fills the Current columns with the Early Signup / Regular values on the right</span></div>';
+  h += '<div style="margin:.3rem 0 .9rem"><button class="px-btn ghost" id="px-copy-cur">Copy Current → Proposed</button> <span style="font-size:.78rem;color:#888">prefills the Proposed columns from Current as a starting point</span></div>';
   h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the percentage of the full 5-day tuition charged to a 4-day or 3-day camper, where 100% is the full rate (for example, 90% applies a 10% reduction). Each value is currently 100%, so the number of days attended does not yet affect camp tuition.</div>';
   const pct = v => parseFloat((Number(v||0) * 100).toFixed(2));
   const pctInp = (id,v) => inp(id, pct(v)) + ' %';
@@ -5232,24 +5243,47 @@ function renderPxRates() {
   h += '<div style="margin-top:.5rem"><button class="px-btn" id="px-save">💾 Save rates</button><span class="px-msg" id="px-save-msg"></span></div>';
   box.innerHTML = h;
   document.getElementById('px-save').addEventListener('click', savePxRates);
-  const snap = document.getElementById('px-snap-current');
-  if (snap) snap.addEventListener('click', pxSnapshotCurrent);
+  const copyBtn = document.getElementById('px-copy-cur');
+  if (copyBtn) copyBtn.addEventListener('click', pxCopyCurrentToProposed);
+  // Live effective-% change (Current -> Proposed), updated as you type, without re-render
+  box.querySelectorAll('[id^="px-cur-"],[id^="px-camp-"]').forEach(el => el.addEventListener('input', pxUpdateRateChange));
+  pxUpdateRateChange();
 }
 
-// Copy the live (editable) Early Signup / Regular rates into the Current reference columns
-function pxSnapshotCurrent() {
-  const num = id => { const el = document.getElementById(id); const v = parseFloat((el && el.value || '').replace(/[^0-9.]/g,'')); return isNaN(v) ? 0 : v; };
-  pricing.camp.current = pricing.camp.current || {ES:{}, Final:{}};
-  pricing.camp.week_order.forEach(w => { pricing.camp.current.ES[w] = num('px-camp-ES-'+w); pricing.camp.current.Final[w] = num('px-camp-Final-'+w); });
-  renderPxRates();
+function pxRateNum(id) { const el = document.getElementById(id); const v = parseFloat((el && el.value || '').replace(/[^0-9.]/g,'')); return isNaN(v) ? 0 : v; }
+
+function pxUpdateRateChange() {
+  pricing.camp.week_order.forEach(w => {
+    [['ES','ES'], ['Final','Final']].forEach(([liveKey, curKey]) => {
+      const c = pxRateNum('px-cur-'+curKey+'-'+w), p = pxRateNum('px-camp-'+liveKey+'-'+w);
+      const cell = document.getElementById('px-chg-'+liveKey+'-'+w);
+      if (!cell) return;
+      if (!c) { cell.textContent = ''; cell.className = 'px-diff-flat'; return; }
+      const pct = (p-c)/c*100;
+      cell.textContent = (pct>0?'+':'') + pct.toFixed(1) + '%';
+      cell.className = Math.abs(pct) < 0.05 ? 'px-diff-flat' : 'px-diff-up';
+    });
+  });
+}
+
+// Prefill the Proposed columns from the Current columns as a starting point
+function pxCopyCurrentToProposed() {
+  pricing.camp.week_order.forEach(w => {
+    const cs = document.getElementById('px-cur-ES-'+w), cf = document.getElementById('px-cur-Final-'+w);
+    const ps = document.getElementById('px-camp-ES-'+w), pf = document.getElementById('px-camp-Final-'+w);
+    if (ps && cs) ps.value = cs.value;
+    if (pf && cf) pf.value = cf.value;
+  });
+  pxUpdateRateChange();
   const m = document.getElementById('px-save-msg');
-  if (m) { m.textContent = 'Current columns filled from the live rates. Click Save rates to keep.'; m.style.color = '#b26a00'; }
+  if (m) { m.textContent = 'Proposed columns prefilled from Current. Adjust and Save.'; m.style.color = '#b26a00'; }
 }
 
 async function savePxRates() {
   const num = id => { const el = document.getElementById(id); const v = parseFloat((el && el.value || '').replace(/[^0-9.]/g,'')); return isNaN(v) ? 0 : v; };
-  const lblEl = document.getElementById('px-season-label');
-  if (lblEl) pricing.season_label = lblEl.value.trim();
+  const curLbl = document.getElementById('px-season-cur'), propLbl = document.getElementById('px-season-prop');
+  if (curLbl) pricing.season_label = curLbl.value.trim();
+  if (propLbl) pricing.proposed_label = propLbl.value.trim();
   pricing.camp.current = pricing.camp.current || {ES:{}, Final:{}};
   pricing.camp.week_order.forEach(w => {
     pricing.camp.tiers.ES[w] = num('px-camp-ES-'+w); pricing.camp.tiers.Final[w] = num('px-camp-Final-'+w);
