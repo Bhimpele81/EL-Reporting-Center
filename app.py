@@ -2144,7 +2144,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-sheet-tbl .c3m{background:#dbc57e!important}
 .px-sheet-tbl .px-l{background:#efecec!important}
 .px-sheet-tbl td.px-l,.px-sheet-tbl th.px-l{text-align:center}
-.px-sheet-tbl .px-grp{border-left:2px solid #fff}
+.px-sheet-tbl th,.px-sheet-tbl td{border:1px solid #333!important}
+.px-sheet-tbl .px-grp{border-left:2.5px solid #000!important}
+.px-sheet-sectitle{display:table-caption}
 .px-chgs{font-size:.9em;font-weight:600}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
@@ -5398,7 +5400,7 @@ function renderPxSheet() {
   const LABELS = ['Tuition with Transportation','Sibling Tuition w/ Transportation','Tuition','Sibling Tuition',
                   'Tuition w/ Transportation','Tuition','Tuition w/ Transportation','Tuition'];
   function section(prog, tier, title) {
-    let s = '<div class="px-sec"><div class="px-sheet-sectitle">'+title+'</div><div style="overflow-x:auto"><table class="px-tbl px-sheet-tbl"><thead>' +
+    let s = '<div class="px-sec"><div style="overflow-x:auto"><table class="px-tbl px-sheet-tbl"><caption class="px-sheet-sectitle">'+title+'</caption><thead>' +
       '<tr><th class="px-l" rowspan="2">Weeks</th><th colspan="4" class="c5m px-grp">5</th><th colspan="2" class="c4m px-grp">4</th><th colspan="2" class="c3m px-grp">3</th></tr>' +
       '<tr>' + LABELS.map((lbl,i) => '<th class="'+ccls(i)+'">'+lbl+'</th>').join('') + '</tr>' +
       '</thead><tbody>';
@@ -5441,13 +5443,14 @@ function renderPxSheet() {
       ' #px-sheet,#px-sheet *{visibility:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}' +
       ' #px-sheet{position:absolute;left:0;top:0;width:100%}' +
       ' .px-noprint{display:none!important}' +
-      ' #px-sheet .px-sheet-tbl th,#px-sheet .px-sheet-tbl td{font-size:8px!important;padding:1px 3px!important;width:auto!important;min-width:0!important}' +
-      ' #px-sheet .px-sec{margin-bottom:6px!important}' +
-      ' #px-sheet .px-sheet-head h2{font-size:15px!important;margin:1px 0!important}' +
-      ' #px-sheet .px-sheet-head div{font-size:10px!important}' +
+      ' #px-sheet .px-sheet-tbl{width:100%!important;table-layout:fixed}' +
+      ' #px-sheet .px-sheet-tbl th,#px-sheet .px-sheet-tbl td{font-size:12px!important;padding:4px 3px!important;width:auto!important;min-width:0!important}' +
+      ' #px-sheet .px-sheet-sectitle{font-size:14px!important;padding:5px!important}' +
+      ' #px-sheet .px-sec{margin-bottom:10px!important}' +
+      ' #px-sheet .px-sheet-head h2{font-size:20px!important;margin:2px 0!important}' +
+      ' #px-sheet .px-sheet-head div{font-size:12px!important}' +
       ' #px-sheet div{overflow:visible!important}' +
-      ' #px-sheet .px-sheet-tbl{width:100%!important}' +
-      ' @page{size:portrait;margin:.35in}' +
+      ' @page{size:portrait;margin:.25in}' +
       '}';
     window.print();
   });
