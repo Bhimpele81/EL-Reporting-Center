@@ -421,6 +421,12 @@ _DEFAULT_PRICING = {
             "ES":    {"8": 5580, "7": 5415, "6": 5080, "5": 4575, "4": 3905, "Mini": 550},
             "Final": {"8": 6000, "7": 5820, "6": 5460, "5": 4920, "4": 4200, "Mini": 550},
         },
+        # Fixed "Original" reference (the as-published 2026 rate sheet 5-day base tuition),
+        # used by the Rate Sheet's Original view and comparisons.
+        "original": {
+            "ES":    {"8": 5580, "7": 5415, "6": 5080, "5": 4575, "4": 3905, "Mini": 550},
+            "Final": {"8": 6000, "7": 5820, "6": 5460, "5": 4920, "4": 4200, "Mini": 550},
+        },
         # Multiplier applied to the (weeks) tuition for 5/4/3 days per week
         # (4-day = 88% of 5-day, 3-day = 80%, per the 2026 rate sheet).
         "day_mult": {"5": 1.0, "4": 0.88, "3": 0.80},
@@ -2129,6 +2135,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-sheet-sectitle{background:var(--brand);color:#fff;font-weight:700;text-align:center;padding:.35rem .5rem;border-radius:5px;font-size:1rem;margin:.2rem 0 .4rem;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .px-sheet-tbl thead th{background:var(--brand)!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .px-sheet-tbl .px-grp{border-left:3px solid var(--gold)}
+.px-chgs{font-size:.9em;font-weight:600}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
 .payroll-table td{height:42px}
@@ -5087,7 +5094,9 @@ function renderPxCalcTotal() {
   pxCampers.forEach((c,i) => {
     const base = Number(tiers[c.weeks]||0);
     const mult = Number(dm[c.days]!=null ? dm[c.days] : 1);
-    const tuition = base*mult; let sub = tuition;
+    let tuition = base*mult;
+    if (c.days !== '5') tuition = Math.round(tuition/25)*25;   // 4/3-day rounded to nearest $25
+    let sub = tuition;
     let detail = pxMoney(tuition)+' tuition ('+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+(mult!==1?' ×'+mult:'')+')';
     // Per-camper sibling discount entered case-by-case (2nd+ camper only)
     const dv = Number(c.disc||0);
@@ -5329,21 +5338,45 @@ async function savePxRates() {
 //   Junior Camp tuition  = 90% of 2nd Grade+, rounded to $25
 //   Sibling tuition      = 10% off (assumes 5 days/week), rounded to $1
 //   Transportation       = 2-way, per the column's day count (weekly x weeks); sibling transport 10% off
-let pxSheetSeason = 'proposed';
+let pxSheetSeason = 'proposed';   // primary sheet shown
+let pxSheetCompare = 'none';      // optional comparison sheet
 function renderPxSheet() {
   if (!pricing) return;
   const box = document.getElementById('px-sheet');
   const wk = pricing.camp.week_order;
   const dm = pricing.camp.day_mult || {};
   const dayF = d => d === '5' ? 1 : Number(dm[d] != null ? dm[d] : 1);
-  const trWk = d => Number((pricing.transport['2way'] || {})[d] || 0);   // 2-way weekly rate for that day count
+  const trWk = d => Number((pricing.transport['2way'] || {})[d] || 0);
   const SIB = 0.90, JR = 0.90;
   const r1 = x => Math.round(x), r25 = x => Math.round(x/25)*25, wnum = w => parseInt(w,10)||0;
-  const tiers = pxSheetSeason === 'current' ? (pricing.camp.current || pricing.camp.tiers) : pricing.camp.tiers;
-  const seasonLbl = pxSheetSeason === 'current' ? (pricing.season_label || 'Current') : (pricing.proposed_label || 'Proposed');
-  const t2G = (tier,w,d) => r1(Number((tiers[tier] || {})[w] || 0) * dayF(d));
-  const tui = (prog,tier,w,d) => prog === 'junior' ? r25(JR * t2G(tier,w,d)) : t2G(tier,w,d);
 
+  const baseFor = k => k === 'original' ? (pricing.camp.original || {}) : k === 'current' ? (pricing.camp.current || {}) : pricing.camp.tiers;
+  const labelFor = k => k === 'original' ? 'Original' : k === 'current' ? ('Current ('+(pricing.season_label||'')+')') : ('Proposed ('+(pricing.proposed_label||'')+')');
+  const primary = pxSheetSeason, compareKey = pxSheetCompare;
+  const comparing = compareKey !== 'none' && compareKey !== primary;
+  const pBase = baseFor(primary), cBase = baseFor(compareKey);
+
+  // 8 column values for a row: [5d T+Tr, 5d Sib+Tr, 5d T, 5d Sib, 4d T+Tr, 4d T, 3d T+Tr, 3d T]
+  function rowVals(base, prog, tier, w) {
+    const wn = wnum(w);
+    const t2 = d => { const raw = Number((base[tier]||{})[w]||0) * dayF(d); return d === '5' ? r1(raw) : r25(raw); };
+    const tuiP = d => prog === 'junior' ? r25(JR * t2(d)) : t2(d);
+    const tr = d => trWk(d) * wn;
+    const t5 = tuiP('5'), sib5 = r1(SIB*t5), t4 = tuiP('4'), t3 = tuiP('3');
+    if (wn === 0) return [null, null, t5, null, null, t4, null, t3];   // Mini: tuition only
+    return [t5+tr('5'), sib5+r1(SIB*tr('5')), t5, sib5, t4+tr('4'), t4, t3+tr('3'), t3];
+  }
+  const grpCol = i => i === 0 || i === 4 || i === 6;
+  function cell(prim, comp, grp) {
+    const cls = grp ? ' class="px-grp"' : '';
+    if (prim == null) return '<td'+cls+'></td>';
+    let inner = pxMoney(prim);
+    if (comparing && comp != null && comp > 0) {
+      const pct = (prim - comp) / comp * 100;
+      inner += '<br><span class="px-chgs '+(Math.abs(pct) < 0.05 ? 'px-diff-flat' : 'px-diff-up')+'">'+(pct>0?'+':'')+pct.toFixed(1)+'%</span>';
+    }
+    return '<td'+cls+'>'+inner+'</td>';
+  }
   function section(prog, tier, title) {
     let s = '<div class="px-sec"><div class="px-sheet-sectitle">'+title+'</div><div style="overflow-x:auto"><table class="px-tbl px-sheet-tbl"><thead>' +
       '<tr><th class="px-l" rowspan="2">Weeks</th><th colspan="4" class="px-grp">5</th><th colspan="2" class="px-grp">4</th><th colspan="2" class="px-grp">3</th></tr>' +
@@ -5351,34 +5384,30 @@ function renderPxSheet() {
       '<th class="px-grp">Tuition w/ Transportation</th><th>Tuition</th><th class="px-grp">Tuition w/ Transportation</th><th>Tuition</th></tr>' +
       '</thead><tbody>';
     wk.forEach(w => {
-      const wn = wnum(w);
-      const tr5v = trWk('5')*wn, tr4v = trWk('4')*wn, tr3v = trWk('3')*wn;   // per-day transport totals
-      const sibTransp = r1(SIB*tr5v);   // sibling transport (5-day, 10% off)
-      const t5 = tui(prog,tier,w,'5'), sib5 = r1(SIB*t5), t4 = tui(prog,tier,w,'4'), t3 = tui(prog,tier,w,'3');
-      if (wn === 0) {   // Mini: plain tuition only
-        s += '<tr><td class="px-l">'+w+'</td><td class="px-grp"></td><td></td><td>'+pxMoney(t5)+'</td><td></td>' +
-          '<td class="px-grp"></td><td>'+pxMoney(t4)+'</td><td class="px-grp"></td><td>'+pxMoney(t3)+'</td></tr>';
-      } else {
-        s += '<tr><td class="px-l">'+w+'</td>' +
-          '<td class="px-grp">'+pxMoney(t5+tr5v)+'</td><td>'+pxMoney(sib5+sibTransp)+'</td><td>'+pxMoney(t5)+'</td><td>'+pxMoney(sib5)+'</td>' +
-          '<td class="px-grp">'+pxMoney(t4+tr4v)+'</td><td>'+pxMoney(t4)+'</td>' +
-          '<td class="px-grp">'+pxMoney(t3+tr3v)+'</td><td>'+pxMoney(t3)+'</td></tr>';
-      }
+      const pv = rowVals(pBase, prog, tier, w);
+      const cv = comparing ? rowVals(cBase, prog, tier, w) : null;
+      s += '<tr><td class="px-l">'+w+'</td>';
+      for (let i = 0; i < 8; i++) s += cell(pv[i], cv ? cv[i] : null, grpCol(i));
+      s += '</tr>';
     });
     return s + '</tbody></table></div></div>';
   }
 
-  let h = '<div class="px-noprint" style="margin-bottom:.8rem;display:flex;gap:.7rem;align-items:flex-end">' +
+  const opt = (v,l,cur) => '<option value="'+v+'"'+(cur===v?' selected':'')+'>'+famEsc(l)+'</option>';
+  const showOpts = opt('proposed', labelFor('proposed'), primary) + opt('current', labelFor('current'), primary) + opt('original', 'Original', primary);
+  const cmpOpts = opt('none','None',compareKey) + opt('proposed', labelFor('proposed'), compareKey) + opt('current', labelFor('current'), compareKey) + opt('original','Original',compareKey);
+  let h = '<div class="px-noprint" style="margin-bottom:.8rem;display:flex;gap:.7rem;align-items:flex-end;flex-wrap:wrap">' +
     '<button class="px-btn" id="px-print" style="height:38px">🖨 Print / Save PDF</button>' +
-    '<label class="px-field" style="margin:0">Season<select id="px-sheet-season">' +
-    '<option value="proposed"'+(pxSheetSeason==='proposed'?' selected':'')+'>Proposed ('+famEsc(pricing.proposed_label||'')+')</option>' +
-    '<option value="current"'+(pxSheetSeason==='current'?' selected':'')+'>Current ('+famEsc(pricing.season_label||'')+')</option></select></label></div>';
-  h += '<div class="px-sheet-head"><h2>Elbow Lane Day Camp</h2><div style="color:#666;font-weight:600">'+famEsc(seasonLbl)+' Rates (2nd Grade+)</div></div>';
-  h += section('twoGrade','ES',   famEsc(seasonLbl)+' Early Season Rates (2nd Grade+)');
-  h += section('junior','ES',     famEsc(seasonLbl)+' Early Season Junior Camp Rates (PS through 1st Grade)');
-  h += section('twoGrade','Final',famEsc(seasonLbl)+' Rates (2nd Grade+)');
-  h += section('junior','Final',  famEsc(seasonLbl)+' Junior Camp Rates (PS through 1st Grade)');
-  h += '<div style="font-size:.78rem;color:#666;margin-top:.6rem;max-width:700px">Sibling tuition is 10% off and assumes 5 days per week. Junior Camp tuition is 90% of the 2nd Grade+ rate. Tuition with Transportation adds 2-way transportation for that column&rsquo;s number of days (weekly, times the number of weeks); one-way transportation is $120 per week. Siblings receive 10% off transportation.</div>';
+    '<label class="px-field" style="margin:0">Show<select id="px-sheet-season">'+showOpts+'</select></label>' +
+    '<label class="px-field" style="margin:0">Compare to<select id="px-sheet-compare">'+cmpOpts+'</select></label>' +
+    '</div>';
+  const headSub = comparing ? (labelFor(primary)+' vs '+labelFor(compareKey)+' (% change shown per cell)') : (labelFor(primary)+' Rates');
+  h += '<div class="px-sheet-head"><h2>Elbow Lane Day Camp</h2><div style="color:#666;font-weight:600">'+famEsc(headSub)+'</div></div>';
+  h += section('twoGrade','ES',   'Early Season Rates (2nd Grade+)');
+  h += section('junior','ES',     'Early Season Junior Camp Rates (PS through 1st Grade)');
+  h += section('twoGrade','Final','Rates (2nd Grade+)');
+  h += section('junior','Final',  'Junior Camp Rates (PS through 1st Grade)');
+  h += '<div style="font-size:.78rem;color:#666;margin-top:.6rem;max-width:700px">Sibling tuition is 10% off and assumes 5 days per week. Junior Camp tuition is 90% of the 2nd Grade+ rate; 4-day and 3-day tuition are rounded to the nearest $25. Tuition with Transportation adds 2-way transportation for that column&rsquo;s number of days (weekly, times the number of weeks); one-way transportation is $120 per week. Siblings receive 10% off transportation.</div>';
   box.innerHTML = h;
   document.getElementById('px-print').addEventListener('click', () => {
     let st = document.getElementById('px-print-style');
@@ -5390,7 +5419,6 @@ function renderPxSheet() {
       ' .px-noprint{display:none!important}' +
       ' #px-sheet .px-sheet-tbl th,#px-sheet .px-sheet-tbl td{font-size:8px!important;padding:1px 3px!important;width:auto!important;min-width:0!important}' +
       ' #px-sheet .px-sec{margin-bottom:6px!important}' +
-      ' #px-sheet .px-sec-title{font-size:10.5px!important;margin:2px 0!important}' +
       ' #px-sheet .px-sheet-head h2{font-size:15px!important;margin:1px 0!important}' +
       ' #px-sheet .px-sheet-head div{font-size:10px!important}' +
       ' #px-sheet div{overflow:visible!important}' +
@@ -5401,6 +5429,8 @@ function renderPxSheet() {
   });
   const seasonSel = document.getElementById('px-sheet-season');
   if (seasonSel) seasonSel.addEventListener('change', e => { pxSheetSeason = e.target.value; renderPxSheet(); });
+  const cmpSel = document.getElementById('px-sheet-compare');
+  if (cmpSel) cmpSel.addEventListener('change', e => { pxSheetCompare = e.target.value; renderPxSheet(); });
 }
 
 // ---- First-time "Utilities" notice (shows once per browser, after sign-in) ----
