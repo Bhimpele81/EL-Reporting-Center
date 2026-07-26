@@ -5365,11 +5365,15 @@ function renderPxSheet() {
   const comparing = compareKey !== 'none' && compareKey !== primary;
   const pBase = baseFor(primary), cBase = baseFor(compareKey);
 
+  // Rounding step for 4/3-day + Junior tuition. Original mirrors the as-published
+  // sheet (nearest $5); Current/Proposed use the new nearest-$25 rule.
+  const stepFor = k => k === 'original' ? 5 : 25;
   // 8 column values for a row: [5d T+Tr, 5d Sib+Tr, 5d T, 5d Sib, 4d T+Tr, 4d T, 3d T+Tr, 3d T]
-  function rowVals(base, prog, tier, w) {
+  function rowVals(base, prog, tier, w, step) {
     const wn = wnum(w);
-    const t2 = d => { const raw = Number((base[tier]||{})[w]||0) * dayF(d); return d === '5' ? r1(raw) : r25(raw); };
-    const tuiP = d => prog === 'junior' ? r25(JR * t2(d)) : t2(d);
+    const rs = x => Math.round(x/step)*step;
+    const t2 = d => { const raw = Number((base[tier]||{})[w]||0) * dayF(d); return d === '5' ? r1(raw) : rs(raw); };
+    const tuiP = d => prog === 'junior' ? rs(JR * t2(d)) : t2(d);
     const tr = d => trWk(d) * wn;
     const t5 = tuiP('5'), sib5 = r1(SIB*t5), t4 = tuiP('4'), t3 = tuiP('3');
     if (wn === 0) return [null, null, t5, null, null, t4, null, t3];   // Mini: tuition only
@@ -5396,8 +5400,8 @@ function renderPxSheet() {
       '<tr>' + LABELS.map((lbl,i) => '<th class="'+ccls(i)+'">'+lbl+'</th>').join('') + '</tr>' +
       '</thead><tbody>';
     wk.forEach(w => {
-      const pv = rowVals(pBase, prog, tier, w);
-      const cv = comparing ? rowVals(cBase, prog, tier, w) : null;
+      const pv = rowVals(pBase, prog, tier, w, stepFor(primary));
+      const cv = comparing ? rowVals(cBase, prog, tier, w, stepFor(compareKey)) : null;
       s += '<tr><td class="px-l">'+w+'</td>';
       for (let i = 0; i < 8; i++) s += cell(pv[i], cv ? cv[i] : null, i);
       s += '</tr>';
