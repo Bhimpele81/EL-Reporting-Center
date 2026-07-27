@@ -3304,7 +3304,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do I calculate what a family owes?</summary>
       <div class="faq-body">
-        <p>On the <strong>Calculator</strong> sub-tab, choose the <strong>Season</strong> (Current or Proposed) and <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). When transportation is selected, a <strong>Transport days</strong> field appears (defaults to the camper's camp days) so you can charge transport for fewer days than they attend. Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
+        <p>On the <strong>Calculator</strong> sub-tab, choose the <strong>Season</strong> (Current or Proposed) and <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). Transportation is charged for the same number of days the camper attends. Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
         <p>For families with more than one camper, a <strong>10% sibling discount</strong> is applied automatically to each Standard or Junior Camp camper after the first (10% off both tuition and transportation), shown as a line on that camper's subtotal.</p>
         <p>Each camper also has <strong>AM care</strong> and <strong>PM care</strong> pickers for extended hours; pick a drop-off / pickup time and the weekly fee (by that time and the camper's days) is added × the number of weeks. Campers after the first get a <strong>$5-per-week sibling discount</strong> on each of AM and PM care (so $10/week with both).</p>
         <p>Each camper has a <strong>Camp rate</strong> setting with five options: <strong>Standard (2nd Grade+)</strong>, <strong>Junior Camp (PS-1st)</strong> = 90% of 2nd Grade+, <strong>Full-Time CIT</strong> = 33% off the full 2nd Grade+ tuition, <strong>Preschool student</strong> (year-round preschool weekly rate), and <strong>Older sibling of preschool student</strong> (that family's older-sibling weekly rate). These come from the same Rate Settings the Rate Sheet uses, so the numbers stay consistent. The CIT %, sibling %, and sibling extended-care discount all live in the <strong>Derivation rules &amp; rounding</strong> section of Rate Settings.</p>
@@ -5117,7 +5117,6 @@ function renderPxCalc() {
         '<label class="px-field">Weeks<select data-f="weeks">'+weekOpts.map(w=>opt(w,c.weeks)).join('')+'</select></label>' +
         '<label class="px-field">Days/wk<select data-f="days">'+['5','4','3'].map(d=>opt(d,c.days)).join('')+'</select></label>' +
         '<label class="px-field">Transport<select data-f="transport">'+['none','1way','2way'].map(t=>`<option value="${t}"${c.transport===t?' selected':''}>${trLabel[t]}</option>`).join('')+'</select></label>' +
-        (c.transport!=='none' ? '<label class="px-field">Transport days<select data-f="tdays">'+['5','4','3'].map(d=>opt(d,(c.tdays||c.days))).join('')+'</select></label>' : '') +
         '<label class="px-field">AM care<select data-f="am">'+AM_SLOTS.map(([v,l])=>`<option value="${v}"${(c.am||'')===v?' selected':''}>${l}</option>`).join('')+'</select></label>' +
         '<label class="px-field">PM care<select data-f="pm">'+PM_SLOTS.map(([v,l])=>`<option value="${v}"${(c.pm||'')===v?' selected':''}>${l}</option>`).join('')+'</select></label>' +
       '</div>' +
@@ -5135,8 +5134,7 @@ function renderPxCalc() {
       const ev = el.tagName === 'SELECT' ? 'change' : 'input';
       el.addEventListener(ev, () => {
         pxCampers[i][el.dataset.f] = el.value;
-        // Transport on/off shows/hides the Transport days field, so re-render the rows
-        if (el.dataset.f === 'transport') renderPxCalc(); else renderPxCalcTotal();
+        renderPxCalcTotal();
       });
     });
   });
@@ -5197,7 +5195,7 @@ function renderPxCalcTotal() {
     }
     let sub = tuition;
     if (c.transport!=='none' && wksNum) {
-      const td = c.tdays || c.days;
+      const td = c.days;   // transport days always match the camper's days per week
       const wkr = Number((pricing.transport[c.transport]||{})[td]||0);
       let tr = wkr*wksNum;
       if (isSibling) tr = sibRound(tr * sibF);   // siblings get the same discount off transport
