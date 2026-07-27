@@ -3307,7 +3307,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
         <p>On the <strong>Calculator</strong> sub-tab, choose the <strong>Season</strong> (Current or Proposed) and <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). Transportation is charged for the same number of days the camper attends. Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
         <p>For families with more than one camper, a <strong>10% sibling discount</strong> is applied automatically to each Standard or Junior Camp camper after the first (10% off both tuition and transportation), shown as a line on that camper's subtotal.</p>
         <p>Each camper also has <strong>AM care</strong> and <strong>PM care</strong> pickers for extended hours; pick a drop-off / pickup time and the weekly fee (by that time and the camper's days) is added × the number of weeks. Campers after the first get a <strong>$5-per-week sibling discount</strong> on each of AM and PM care (so $10/week with both).</p>
-        <p>Each camper has a <strong>Camp rate</strong> setting with five options: <strong>Standard (2nd Grade+)</strong>, <strong>Junior Camp (PS-1st)</strong> = 90% of 2nd Grade+, <strong>Full-Time CIT</strong> = 33% off the full 2nd Grade+ tuition, <strong>Preschool student</strong> (year-round preschool weekly rate), and <strong>Older sibling of preschool student</strong> (that family's older-sibling weekly rate). These come from the same Rate Settings the Rate Sheet uses, so the numbers stay consistent. The CIT %, sibling %, and sibling extended-care discount all live in the <strong>Derivation rules &amp; rounding</strong> section of Rate Settings.</p>
+        <p>Each camper has a <strong>Camp rate</strong> setting with five options: <strong>Standard (2nd Grade+)</strong>, <strong>Junior Camp (PS-1st)</strong> = 90% of 2nd Grade+, <strong>Full-Time CIT</strong> = 33% off the full 2nd Grade+ tuition, <strong>Year Round Childcare</strong> (year-round childcare weekly rate), and <strong>CC Sibling/Alumni</strong> (that family's childcare sibling/alumni weekly rate). These come from the same Rate Settings the Rate Sheet uses, so the numbers stay consistent. The CIT %, sibling %, and sibling extended-care discount all live in the <strong>Derivation rules &amp; rounding</strong> section of Rate Settings. Note: the Year Round Childcare rates are already discounted, so the 10% camp sibling discount is never combined with them.</p>
       </div>
     </details>
 
@@ -5106,7 +5106,7 @@ function renderPxCalc() {
       `<option value="ES"${pxTier==='ES'?' selected':''}>Early Signup (fall)</option>` +
       `<option value="Final"${pxTier==='Final'?' selected':''}>Regular</option></select></label>` +
     '</div>';
-  const rateTypes = [['standard','Standard (2nd Grade+)'],['junior','Junior Camp (PS-1st)'],['cit','Full-Time CIT'],['pre','Preschool student'],['sib','Older sibling of preschool student']];
+  const rateTypes = [['standard','Standard (2nd Grade+)'],['junior','Junior Camp (PS-1st)'],['cit','Full-Time CIT'],['pre','Year Round Childcare'],['sib','CC Sibling/Alumni']];
   pxCampers.forEach((c,i) => {
     const opt = (v,cur) => `<option value="${v}"${cur===v?' selected':''}>${v}</option>`;
     const ptype = c.ptype || 'standard';
@@ -5166,11 +5166,12 @@ function renderPxCalcTotal() {
     const wksNum = parseInt(c.weeks,10)||0;
     let tuition, detail;
     if (ptype === 'pre' || ptype === 'sib') {
-      // Year-round preschool family: weekly childcare rate (preschool student / older sibling) x weeks
+      // Year-round childcare family: weekly childcare rate (base / sibling-alumni) x weeks.
+      // These rates are already discounted, so the 10% camp sibling discount never stacks on them (see isSibling below).
       const ccrow = pricing.childcare[c.days] || {};
       const weekly = ptype === 'sib' ? Number(ccrow.sibling2||0) : Number(ccrow.base||0);
       tuition = weekly * wksNum;
-      detail = pxMoney(tuition)+' '+(ptype==='sib'?'older-sibling (of preschooler)':'preschool')+' rate ('+pxMoney(weekly)+'/wk × '+wksNum+' wks, '+c.days+'-day)';
+      detail = pxMoney(tuition)+' '+(ptype==='sib'?'CC Sibling/Alumni':'Year Round Childcare')+' rate ('+pxMoney(weekly)+'/wk × '+wksNum+' wks, '+c.days+'-day)';
     } else {
       const std = stdTuition(c.weeks, c.days);
       const mult = Number(dm[c.days]!=null ? dm[c.days] : 1);
@@ -5185,7 +5186,9 @@ function renderPxCalcTotal() {
         detail = pxMoney(tuition)+' tuition ('+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+(mult!==1?' ×'+mult:'')+')';
       }
     }
-    // Automatic 10% sibling discount for each standard/junior camper after the first
+    // Automatic 10% sibling discount for each standard/junior camper after the first.
+    // Deliberately excludes childcare rates (pre/sib) and CIT: the 10% never combines with an
+    // already-discounted Year Round Childcare / CC Sibling rate or the CIT discount.
     const isSibling = i > 0 && (ptype === 'standard' || ptype === 'junior');
     const sibPct = Math.round((1 - sibF) * 100);
     if (isSibling) {
@@ -5359,8 +5362,8 @@ function renderPxRates() {
   [['2way','2-way'],['1way','1-way']].forEach(([k,l]) => h += '<tr><td class="px-l">'+l+'</td><td>'+inp('px-tr-'+k+'-5', pricing.transport[k]['5'])+'</td><td>'+inp('px-tr-'+k+'-4', pricing.transport[k]['4'])+'</td><td>'+inp('px-tr-'+k+'-3', pricing.transport[k]['3'])+'</td></tr>');
   h += '</tbody></table></div>';
   h += '<div class="px-sec"><div class="px-sec-title">Childcare / School (weekly)</div>' +
-    '<div style="font-size:.8rem;color:#888;margin-bottom:.3rem">Weekly summer rate a preschool-aged student pays, and the weekly rate their older sibling pays. These are separate per-child rates, not a combined total.</div>' +
-    '<table class="px-tbl"><thead><tr><th class="px-l">Days/wk</th><th>Preschool student</th><th>Older sibling</th></tr></thead><tbody>';
+    '<div style="font-size:.8rem;color:#888;margin-bottom:.3rem">Weekly summer rate a year-round childcare student pays, and the weekly rate their CC sibling/alumni pays. These are separate per-child rates, not a combined total. These rates are already discounted, so the 10% camp sibling discount is never applied on top of them.</div>' +
+    '<table class="px-tbl"><thead><tr><th class="px-l">Days/wk</th><th>Year Round Childcare</th><th>CC Sibling/Alumni</th></tr></thead><tbody>';
   ['5','4','3'].forEach(d => h += '<tr><td class="px-l">'+d+'</td><td>'+inp('px-cc-'+d+'-base', pricing.childcare[d].base)+'</td><td>'+inp('px-cc-'+d+'-sib', pricing.childcare[d].sibling2)+'</td></tr>');
   h += '</tbody></table></div>';
   // Extended-hours (extended care) weekly fees
