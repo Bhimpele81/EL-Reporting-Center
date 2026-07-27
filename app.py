@@ -5514,7 +5514,10 @@ function renderPxSheet() {
     const wn = wnum(w);
     const rs = x => Math.round(x/step)*step;
     const t2 = d => { const raw = Number((base[tier]||{})[w]||0) * dayF(d); return d === '5' ? Math.round(raw) : rs(raw); };
-    const tuiP = d => prog === 'junior' ? rs(JR * t2(d)) : t2(d);
+    // Junior 4/3-day derive from the program's own rounded 5-day tuition (apply the day factor to
+    // the Junior 5-day rate), not 90% of the already-rounded 2nd Grade+ day-rate, which double-rounds.
+    const jr5 = rs(JR * t2('5'));
+    const tuiP = d => prog !== 'junior' ? t2(d) : (d === '5' ? jr5 : rs(jr5 * dayF(d)));
     const tr = d => trWk(d) * wn;
     const t5 = tuiP('5'), sib5 = sib(SIB*t5), t4 = tuiP('4'), t3 = tuiP('3');
     if (wn === 0) return [null, null, t5, null, null, t4, null, t3];   // Mini: tuition only
