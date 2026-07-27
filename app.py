@@ -5433,7 +5433,6 @@ function renderPxSheet() {
   h += section('junior','ES',     'Early Season Junior Camp Rates (PS through 1st Grade)');
   h += section('twoGrade','Final','Rates (2nd Grade+)');
   h += section('junior','Final',  'Junior Camp Rates (PS through 1st Grade)');
-  h += '<div class="px-foot" style="font-size:.78rem;color:#666;margin-top:.6rem;max-width:700px">Sibling tuition is 10% off and assumes 5 days per week. Junior Camp tuition is 90% of the 2nd Grade+ rate; 4-day and 3-day tuition are rounded to the nearest $25. Tuition with Transportation adds 2-way transportation for that column&rsquo;s number of days (weekly, times the number of weeks); one-way transportation is $120 per week. Siblings receive 10% off transportation.</div>';
   box.innerHTML = h;
   document.getElementById('px-print').addEventListener('click', () => {
     let st = document.getElementById('px-print-style');
