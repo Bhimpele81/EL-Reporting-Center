@@ -2807,13 +2807,11 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <button class="snap-subtab pxtab on" data-px="calc">Calculator</button>
       <button class="snap-subtab pxtab" data-px="explore">Explorer</button>
       <button class="snap-subtab pxtab" data-px="rates">Rate Settings</button>
-      <button class="snap-subtab pxtab" data-px="assumptions">Assumptions</button>
       <button class="snap-subtab pxtab" data-px="sheet">Rate Sheet</button>
     </div>
     <div class="px-view on" id="px-calc"></div>
     <div class="px-view" id="px-explore"></div>
     <div class="px-view" id="px-rates"></div>
-    <div class="px-view" id="px-assumptions"></div>
     <div class="px-view" id="px-sheet"></div>
   </div>
 </div>
@@ -3327,14 +3325,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <div class="faq-body">
         <p><strong>Rate Settings</strong> holds the camp tuition, transportation, and childcare rates. Camp tuition has a <strong>Current</strong> column set (the season now in effect, e.g. 2026) and a <strong>Proposed</strong> column set (the upcoming season, e.g. 2027), each with Early Signup and Regular by number of weeks. Enter both and the <strong>Change</strong> column shows the effective percent increase. The Proposed rates are what the Calculator and Explorer use. Set the season labels at the top, edit any value, and click <strong>Save rates</strong>.</p>
         <p>The <strong>day rate factor</strong> is the percentage of the full 5-day tuition a 4-day or 3-day camper pays (100% = full price). It defaults to 88% for 4-day and 70% for 3-day; the 5-day column is the base and is always 100%.</p>
-      </div>
-    </details>
-
-    <details class="faq">
-      <summary>What is the Assumptions tab?</summary>
-      <div class="faq-body">
-        <p>The <strong>Assumptions</strong> sub-tab is the single source of truth for the pricing rules that both the Calculator and Rate Sheet use, so they never drift apart. You can edit the <strong>Junior Camp %</strong> (of 2nd Grade+), the <strong>sibling discount %</strong>, and the <strong>rounding</strong> rules (4/3-day &amp; Junior, sibling, and the Original sheet). Extended-hours (AM/PM care) weekly fees are edited on the <strong>Rate Settings</strong> tab.</p>
-        <p>Use the <strong>Lock / Unlock</strong> button to protect the assumptions from accidental edits: unlock, make changes, click <strong>Save</strong>, then lock again. Add-on amounts left at 0 are recorded on the Calculator but don't change the price yet.</p>
+        <p>At the bottom of Rate Settings, the <strong>Derivation rules &amp; rounding</strong> section holds the rules that turn tuition into the other prices, shared by the Calculator and Rate Sheet so they never drift apart: the <strong>Junior Camp %</strong> (of 2nd Grade+), the <strong>sibling discount %</strong>, and the <strong>rounding</strong> rules. These rarely change, so a <strong>Lock / Unlock</strong> button protects them: unlock, edit, click <strong>Save rates</strong>, then lock again. The rest of the tab (tuition, transportation, childcare, extended care) stays editable regardless of the lock.</p>
       </div>
     </details>
 
@@ -5091,7 +5082,7 @@ async function loadPricing(force) {
     pricing = await r.json();
     pxLoaded = true;
   } catch(e) { return; }
-  renderPxCalc(); renderPxExplore(); renderPxRates(); renderPxAssumptions(); renderPxSheet();
+  renderPxCalc(); renderPxExplore(); renderPxRates(); renderPxSheet();
 }
 
 // Sub-tab switching
@@ -5352,7 +5343,6 @@ function renderPxRates() {
     '<td>'+inp('px-camp-Final-'+w, pricing.camp.tiers.Final[w])+'</td>'+
     '<td id="px-chg-ES-'+w+'" class="px-diff-flat"></td><td id="px-chg-Final-'+w+'" class="px-diff-flat"></td></tr>');
   h += '</tbody></table>';
-  h += '<div style="margin:.3rem 0 .9rem"><button class="px-btn ghost" id="px-copy-cur">Copy Current → Proposed</button> <span style="font-size:.78rem;color:#888">prefills the Proposed columns from Current as a starting point</span></div>';
   h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the percentage of the full 5-day tuition charged to a 4-day or 3-day camper (100% is the full rate). Defaults to 88% for 4-day and 70% for 3-day. The 5-day column is the base and is always 100%.</div>';
   const pct = v => parseFloat((Number(v||0) * 100).toFixed(2));
   const pctInp = (id,v) => '<input class="px-rate-inp px-pct" id="'+id+'" value="'+pct(v)+'"> %';
@@ -5376,11 +5366,38 @@ function renderPxRates() {
   };
   h += exTable('Extended Hours — AM (weekly)', 'am', AM_SLOTS);
   h += exTable('Extended Hours — PM (weekly)', 'pm', PM_SLOTS);
+  // Derivation rules & rounding (was the separate Assumptions tab) — lockable, shared by Calculator + Rate Sheet
+  const a = pricing.assumptions || (pricing.assumptions = {});
+  const locked = !!a.locked;
+  const rdis = locked ? ' disabled' : '';
+  const rinp = (id,v) => '<input class="px-rate-inp" id="'+id+'" style="text-align:left" value="'+(v==null?'':v)+'"'+rdis+'>';
+  const rrow = (label,cell) => '<tr><td class="px-l">'+label+'</td><td style="text-align:left">'+cell+'</td></tr>';
+  h += '<div class="px-sec"><div class="px-sec-title">Derivation rules &amp; rounding</div>' +
+    '<div style="font-size:.8rem;color:#888;margin-bottom:.4rem">These rules turn the tuition above into the other prices, and are shared by the Calculator and Rate Sheet so they never drift apart. They rarely change, so keep them locked.</div>' +
+    '<div class="px-controls" style="align-items:center;margin-bottom:.5rem">' +
+      '<button class="px-btn'+(locked?'':' ghost')+'" id="px-asm-lock" type="button">'+(locked?'🔒 Locked':'🔓 Unlocked')+'</button>' +
+      '<span class="px-msg" id="px-asm-msg" style="color:#888">'+(locked?'Unlock to edit these rules.':'')+'</span></div>' +
+    '<table class="px-tbl"><thead><tr><th class="px-l">Rule</th><th>Value</th></tr></thead><tbody>' +
+      rrow('Junior Camp tuition (% of 2nd Grade+)', rinp('px-asm-junior', a.junior_pct)) +
+      rrow('Sibling discount (% off tuition &amp; transport, 2nd+ camper)', rinp('px-asm-sibdisc', a.sibling_disc_pct)) +
+      rrow('Round tuition (4/3-day &amp; Junior), nearest $', rinp('px-asm-rt', a.round_tuition)) +
+      rrow('Round sibling tuition, nearest $', rinp('px-asm-rs', a.round_sibling)) +
+      rrow('Round Original sheet, nearest $', rinp('px-asm-ro', a.round_original)) +
+    '</tbody></table></div>';
   h += '<div style="margin-top:.5rem"><button class="px-btn" id="px-save">💾 Save rates</button><span class="px-msg" id="px-save-msg"></span></div>';
   box.innerHTML = h;
   document.getElementById('px-save').addEventListener('click', savePxRates);
-  const copyBtn = document.getElementById('px-copy-cur');
-  if (copyBtn) copyBtn.addEventListener('click', pxCopyCurrentToProposed);
+  // Lock toggle for the rules section: enable/disable those inputs in place (no re-render, so unsaved rate edits are kept)
+  const lockBtn = document.getElementById('px-asm-lock');
+  if (lockBtn) lockBtn.addEventListener('click', async () => {
+    const asm = pricing.assumptions = pricing.assumptions || {};
+    asm.locked = !asm.locked;
+    ['px-asm-junior','px-asm-sibdisc','px-asm-rt','px-asm-rs','px-asm-ro'].forEach(id => { const el=document.getElementById(id); if (el) el.disabled = asm.locked; });
+    lockBtn.textContent = asm.locked ? '🔒 Locked' : '🔓 Unlocked';
+    lockBtn.classList.toggle('ghost', !asm.locked);
+    const am = document.getElementById('px-asm-msg'); if (am) am.textContent = asm.locked ? 'Unlock to edit these rules.' : '';
+    try { await fetch('/api/pricing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pricing)}); } catch(e){}
+  });
   // Live effective-% change (Current -> Proposed), updated as you type, without re-render
   box.querySelectorAll('[id^="px-cur-"],[id^="px-camp-"]').forEach(el => el.addEventListener('input', pxUpdateRateChange));
   pxUpdateRateChange();
@@ -5402,18 +5419,6 @@ function pxUpdateRateChange() {
   });
 }
 
-// Prefill the Proposed columns from the Current columns as a starting point
-function pxCopyCurrentToProposed() {
-  pricing.camp.week_order.forEach(w => {
-    const cs = document.getElementById('px-cur-ES-'+w), cf = document.getElementById('px-cur-Final-'+w);
-    const ps = document.getElementById('px-camp-ES-'+w), pf = document.getElementById('px-camp-Final-'+w);
-    if (ps && cs) ps.value = cs.value;
-    if (pf && cf) pf.value = cf.value;
-  });
-  pxUpdateRateChange();
-  const m = document.getElementById('px-save-msg');
-  if (m) { m.textContent = 'Proposed columns prefilled from Current. Adjust and Save.'; m.style.color = '#b26a00'; }
-}
 
 async function savePxRates() {
   const num = id => { const el = document.getElementById(id); const v = parseFloat((el && el.value || '').replace(/[^0-9.]/g,'')); return isNaN(v) ? 0 : v; };
@@ -5435,6 +5440,13 @@ async function savePxRates() {
     slots.forEach(([v]) => { if (!v) return; pricing.extended[side][v] = pricing.extended[side][v] || {};
       ['5','4','3'].forEach(d => pricing.extended[side][v][d] = num('px-ex-'+side+'-'+v+'-'+d)); });
   });
+  // Derivation rules & rounding (disabled inputs still read fine when the section is locked)
+  const a = pricing.assumptions = pricing.assumptions || {};
+  a.junior_pct = num('px-asm-junior');
+  a.sibling_disc_pct = num('px-asm-sibdisc');
+  a.round_tuition = num('px-asm-rt');
+  a.round_sibling = num('px-asm-rs');
+  a.round_original = num('px-asm-ro');
   const msg = document.getElementById('px-save-msg'); msg.textContent = 'Saving…'; msg.style.color = '#777';
   try {
     const r = await fetch('/api/pricing', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(pricing)});
@@ -5442,63 +5454,6 @@ async function savePxRates() {
     msg.textContent = '✓ Saved'; msg.style.color = '#2e7d32';
     renderPxCalc(); renderPxExplore(); renderPxSheet();
   } catch(e) { msg.textContent = 'Save failed — try again'; msg.style.color = '#c0392b'; }
-}
-
-// ---------- Assumptions (single source of truth for the pricing rules) ----------
-function renderPxAssumptions() {
-  if (!pricing) return;
-  const box = document.getElementById('px-assumptions');
-  const a = pricing.assumptions || (pricing.assumptions = {});
-  const locked = !!a.locked;
-  const dis = locked ? ' disabled' : '';
-  const inp = (id,v) => '<input class="px-rate-inp" id="'+id+'" style="text-align:left" value="'+(v==null?'':v)+'"'+dis+'>';
-  const arow = (label, cell) => '<tr><td class="px-l">'+label+'</td><td style="text-align:left">'+cell+'</td></tr>';
-  const dm = pricing.camp.day_mult || {};
-  const pctVal = v => parseFloat((Number(v||0)*100).toFixed(2));
-  const basisSel = (id,val) => '<select class="px-rate-inp" id="'+id+'" style="width:auto;text-align:left"'+dis+'>'+
-    [['week','per week'],['season','per season (flat)'],['pct_off','% off tuition']].map(([v,l])=>'<option value="'+v+'"'+(val===v?' selected':'')+'>'+l+'</option>').join('')+'</select>';
-
-  let h = '<div class="px-controls" style="align-items:center">' +
-    '<button class="px-btn'+(locked?'':' ghost')+'" id="px-asm-lock">'+(locked?'🔒 Locked':'🔓 Unlocked')+'</button>' +
-    '<button class="px-btn" id="px-asm-save"'+dis+' style="'+(locked?'opacity:.5;cursor:default':'')+'">💾 Save</button>' +
-    '<span class="px-msg" id="px-asm-msg" style="color:#888">'+(locked?'Unlock to edit these assumptions.':'')+'</span></div>';
-  h += '<div class="px-sec"><div class="px-sec-title">Camp pricing assumptions</div><table class="px-tbl"><thead><tr><th class="px-l">Assumption</th><th>Value</th></tr></thead><tbody>';
-  h += arow('Junior Camp tuition (% of 2nd Grade+)', inp('px-asm-junior', a.junior_pct));
-  h += arow('Sibling discount (% off tuition &amp; transport, 2nd+ camper)', inp('px-asm-sibdisc', a.sibling_disc_pct));
-  h += arow('Round tuition (4/3-day &amp; Junior), nearest $', inp('px-asm-rt', a.round_tuition));
-  h += arow('Round sibling tuition, nearest $', inp('px-asm-rs', a.round_sibling));
-  h += arow('Round Original sheet, nearest $', inp('px-asm-ro', a.round_original));
-  h += '</tbody></table></div>';
-  h += '<div class="px-sec"><div class="px-sec-title">For reference (edit in Rate Settings)</div><table class="px-tbl"><thead><tr><th class="px-l">Item</th><th>Value</th></tr></thead><tbody>' +
-    arow('Day rate factor', '5-day 100%, 4-day '+pctVal(dm['4'])+'%, 3-day '+pctVal(dm['3'])+'%') +
-    arow('Transportation', '2-way by day count (weekly × weeks); 1-way $120/wk; sibling 10% off') +
-    '</tbody></table></div>';
-  box.innerHTML = h;
-  document.getElementById('px-asm-lock').addEventListener('click', async () => {
-    pricing.assumptions.locked = !pricing.assumptions.locked;
-    try { await fetch('/api/pricing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pricing)}); } catch(e){}
-    renderPxAssumptions();
-  });
-  const sv = document.getElementById('px-asm-save');
-  if (sv && !locked) sv.addEventListener('click', savePxAssumptions);
-}
-
-async function savePxAssumptions() {
-  const num = id => { const el=document.getElementById(id); const v=parseFloat((el&&el.value||'').replace(/[^0-9.]/g,'')); return isNaN(v)?0:v; };
-  const a = pricing.assumptions = pricing.assumptions || {};
-  a.junior_pct = num('px-asm-junior');
-  a.sibling_disc_pct = num('px-asm-sibdisc');
-  a.round_tuition = num('px-asm-rt');
-  a.round_sibling = num('px-asm-rs');
-  a.round_original = num('px-asm-ro');
-  const msg = document.getElementById('px-asm-msg');
-  if (msg) { msg.textContent = 'Saving…'; msg.style.color = '#777'; }
-  try {
-    const r = await fetch('/api/pricing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pricing)});
-    if (!r.ok) throw 0;
-    if (msg) { msg.textContent = '✓ Saved'; msg.style.color = '#2e7d32'; }
-    renderPxCalc(); renderPxSheet();
-  } catch(e) { if (msg) { msg.textContent = 'Save failed — try again'; msg.style.color = '#c0392b'; } }
 }
 
 // ---------- Rate Sheet (printable) ----------
