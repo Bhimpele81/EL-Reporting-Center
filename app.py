@@ -2543,6 +2543,8 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li>Up to 50 reports per month</li>
           <li>Up to 10 staff logins</li>
           <li>Payroll &amp; staff attendance tracking</li>
+          <li>Pricing workspace: calculate any family's cost (every camp rate type, siblings, transportation &amp; AM/PM extended care)</li>
+          <li>Model next season's tuition and print a shareable one-page rate sheet, all from one editable set of rates</li>
           <li>Camper Schedules: set each camper's weekly attendance days</li>
           <li>Families directory: search a family, view &amp; edit contacts and schedules</li>
           <li>Family contacts + custom mailing &amp; transportation labels</li>
