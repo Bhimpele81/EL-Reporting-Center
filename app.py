@@ -3262,7 +3262,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do I calculate what a family owes?</summary>
       <div class="faq-body">
-        <p>On the <strong>Calculator</strong> sub-tab, choose <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
+        <p>On the <strong>Calculator</strong> sub-tab, choose <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). When transportation is selected, a <strong>Transport days</strong> field appears (defaults to the camper's camp days) so you can charge transport for fewer days than they attend. Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
         <p>For families with more than one camper, each camper after the first has a <strong>sibling discount</strong> field (% or $ off that camper's tuition). These are handled case by case, so you enter the amount per family; it is shown as a line on that camper's subtotal.</p>
         <p>For <strong>Childcare / School</strong>, switch its <em>Include</em> to Yes, pick days per week, and enter how many <strong>preschool students</strong> and <strong>older siblings</strong> there are. Each pays its own weekly rate (they are separate rates, not a combined total); enter weeks to get a total. Childcare is billed separately from camp.</p>
       </div>
@@ -5058,6 +5058,7 @@ function renderPxCalc() {
       '<label class="px-field">Weeks<select data-f="weeks">'+weekOpts.map(w=>opt(w,c.weeks)).join('')+'</select></label>' +
       '<label class="px-field">Days/wk<select data-f="days">'+['5','4','3'].map(d=>opt(d,c.days)).join('')+'</select></label>' +
       '<label class="px-field">Transport<select data-f="transport">'+['none','1way','2way'].map(t=>`<option value="${t}"${c.transport===t?' selected':''}>${trLabel[t]}</option>`).join('')+'</select></label>' +
+      (c.transport!=='none' ? '<label class="px-field">Transport days<select data-f="tdays">'+['5','4','3'].map(d=>opt(d,(c.tdays||c.days))).join('')+'</select></label>' : '') +
       (i>0 ? '<label class="px-field">Sibling disc.<select data-f="discMode"><option value="pct"'+(c.discMode!=='amt'?' selected':'')+'>% off</option><option value="amt"'+(c.discMode==='amt'?' selected':'')+'>$ off</option></select></label>' +
              '<label class="px-field">Amount<input type="number" data-f="disc" min="0" step="1" value="'+(c.disc||'')+'" placeholder="0" style="width:80px;padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px"></label>' : '') +
       (pxCampers.length>1?'<button class="px-btn ghost px-rm" data-i="'+i+'" style="padding:.35rem .6rem">✕</button>':'') +
@@ -5081,7 +5082,8 @@ function renderPxCalc() {
         let v = el.value;
         if (el.dataset.f === 'disc') v = parseFloat(v)||0;
         pxCampers[i][el.dataset.f] = v;
-        renderPxCalcTotal();   // partial update keeps input focus
+        // Transport on/off shows/hides the Transport days field, so re-render the rows
+        if (el.dataset.f === 'transport') renderPxCalc(); else renderPxCalcTotal();
       });
     });
   });
@@ -5121,9 +5123,10 @@ function renderPxCalcTotal() {
     }
     const wksNum = parseInt(c.weeks,10)||0;
     if (c.transport!=='none' && wksNum) {
-      const wkr = Number((pricing.transport[c.transport]||{})[c.days]||0);
+      const td = c.tdays || c.days;
+      const wkr = Number((pricing.transport[c.transport]||{})[td]||0);
       const tr = wkr*wksNum; sub += tr;
-      detail += ' + '+pxMoney(tr)+' transport ('+pxMoney(wkr)+'/wk × '+wksNum+')';
+      detail += ' + '+pxMoney(tr)+' transport ('+(c.transport==='1way'?'1-way':'2-way')+', '+td+'-day, '+pxMoney(wkr)+'/wk × '+wksNum+')';
     }
     campGrand += sub;
     lines.push('<div class="px-line"><span>Camper '+(i+1)+': '+detail+'</span><span>'+pxMoney(sub)+'</span></div>');
