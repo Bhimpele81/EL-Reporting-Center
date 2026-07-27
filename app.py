@@ -2144,7 +2144,11 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-field{display:inline-flex;flex-direction:column;gap:.2rem;margin:0 .9rem .8rem 0;font-size:.8rem;color:#555}
 .px-field select,.px-field input{padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.9rem;min-width:120px}
 .px-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.4rem;margin-bottom:1rem}
-.px-camper-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem;padding:.6rem .7rem;border:1px solid #eee;border-radius:8px;margin-bottom:.6rem;background:#fafafa}
+.px-camper-row{display:flex;align-items:center;gap:.5rem;padding:.6rem .7rem;border:1px solid #eee;border-radius:8px;margin-bottom:.6rem;background:#fafafa}
+.px-camper-label{flex:0 0 auto;font-weight:700;color:#555;min-width:66px}
+/* Fields wrap as their own group so the label + remove button never steal row width */
+.px-camper-fields{flex:1 1 auto;display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem}
+.px-camper-row .px-rm{flex:0 0 auto}
 /* Compact camper-row fields so the row fits on one line on a normal screen */
 .px-camper-row .px-field select,.px-camper-row .px-field input{min-width:74px;font-size:.85rem;padding:.35rem .4rem}
 .px-camper-row select[data-f="ptype"]{min-width:150px}
@@ -5117,19 +5121,20 @@ function renderPxCalc() {
     const opt = (v,cur) => `<option value="${v}"${cur===v?' selected':''}>${v}</option>`;
     const ptype = c.ptype || 'standard';
     h += '<div class="px-camper-row" data-i="'+i+'">' +
-      '<span style="font-weight:700;color:#555">Camper '+(i+1)+'</span>' +
-      '<label class="px-field">Camp rate<select data-f="ptype">'+rateTypes.map(([v,l])=>`<option value="${v}"${ptype===v?' selected':''}>${l}</option>`).join('')+'</select></label>' +
-      '<label class="px-field">Weeks<select data-f="weeks">'+weekOpts.map(w=>opt(w,c.weeks)).join('')+'</select></label>' +
-      '<label class="px-field">Days/wk<select data-f="days">'+['5','4','3'].map(d=>opt(d,c.days)).join('')+'</select></label>' +
-      '<label class="px-field">Transport<select data-f="transport">'+['none','1way','2way'].map(t=>`<option value="${t}"${c.transport===t?' selected':''}>${trLabel[t]}</option>`).join('')+'</select></label>' +
-      (c.transport!=='none' ? '<label class="px-field">Transport days<select data-f="tdays">'+['5','4','3'].map(d=>opt(d,(c.tdays||c.days))).join('')+'</select></label>' : '') +
-      '<label class="px-field">AM care<select data-f="am">'+AM_SLOTS.map(([v,l])=>`<option value="${v}"${(c.am||'')===v?' selected':''}>${l}</option>`).join('')+'</select></label>' +
-      '<label class="px-field">PM care<select data-f="pm">'+PM_SLOTS.map(([v,l])=>`<option value="${v}"${(c.pm||'')===v?' selected':''}>${l}</option>`).join('')+'</select></label>' +
+      '<span class="px-camper-label">Camper '+(i+1)+'</span>' +
+      '<div class="px-camper-fields">' +
+        '<label class="px-field">Camp rate<select data-f="ptype">'+rateTypes.map(([v,l])=>`<option value="${v}"${ptype===v?' selected':''}>${l}</option>`).join('')+'</select></label>' +
+        '<label class="px-field">Weeks<select data-f="weeks">'+weekOpts.map(w=>opt(w,c.weeks)).join('')+'</select></label>' +
+        '<label class="px-field">Days/wk<select data-f="days">'+['5','4','3'].map(d=>opt(d,c.days)).join('')+'</select></label>' +
+        '<label class="px-field">Transport<select data-f="transport">'+['none','1way','2way'].map(t=>`<option value="${t}"${c.transport===t?' selected':''}>${trLabel[t]}</option>`).join('')+'</select></label>' +
+        (c.transport!=='none' ? '<label class="px-field">Transport days<select data-f="tdays">'+['5','4','3'].map(d=>opt(d,(c.tdays||c.days))).join('')+'</select></label>' : '') +
+        '<label class="px-field">AM care<select data-f="am">'+AM_SLOTS.map(([v,l])=>`<option value="${v}"${(c.am||'')===v?' selected':''}>${l}</option>`).join('')+'</select></label>' +
+        '<label class="px-field">PM care<select data-f="pm">'+PM_SLOTS.map(([v,l])=>`<option value="${v}"${(c.pm||'')===v?' selected':''}>${l}</option>`).join('')+'</select></label>' +
+      '</div>' +
       (pxCampers.length>1?'<button class="px-btn ghost px-rm" data-i="'+i+'" style="padding:.35rem .6rem">✕</button>':'') +
       '</div>';
   });
   h += '<button class="px-btn ghost" id="px-add-camper">＋ Add camper</button></div>';
-  h += '<div style="font-size:.8rem;color:#888;margin:-.4rem 0 .8rem">Year-round preschool students and their older siblings are priced by setting each camper\'s <strong>Camp rate</strong> above.</div>';
   h += '<div id="px-calc-total"></div>';
   box.innerHTML = h;
   document.getElementById('px-tier').addEventListener('change', e => { pxTier = e.target.value; renderPxCalc(); });
