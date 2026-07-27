@@ -124,9 +124,9 @@ db81d3e Rename Bunks & Camps -> Utilities; move master upload there; add Family 
 
 ## Open / planned follow-ups
 
-- **Extended care** — built. `pricing.extended.{am,pm}` weekly-fee tables by time slot × days (editable on Rate Settings, seeded from the Extended Hours sheet). Calculator has per-camper **AM care** / **PM care** pickers (`c.am`/`c.pm`); fee = rate[slot][days] × weeks. (Sibling discount does NOT apply to extended care — confirm if it should.)
-- **CIT** and future add-ons: `pricing.assumptions.addons` (amount + basis: week/season/pct_off), edited on the **Assumptions** sub-tab; `ADDON_OPTS` currently `[cit]`. CIT amount 0 = recorded only. Need CIT's real amount/basis.
-- Pricing rules (junior %, sibling %, roundings) are config-driven in `pricing.assumptions` (no hardcoded 90/10/25); Calculator + Rate Sheet both read them.
+- **Extended care** — built. `pricing.extended.{am,pm}` weekly-fee tables by time slot × days (editable on Rate Settings, seeded from the Extended Hours sheet). Calculator has per-camper **AM care** / **PM care** pickers (`c.am`/`c.pm`); fee = rate[slot][days] × weeks. Siblings (any camper after the first) get `assumptions.sibling_ext_disc` ($5) off each weekly fee, AM and PM ($10/wk with both).
+- **CIT** — done. `Full-Time CIT` is a Camp-rate option in the Calculator: tuition = full 2nd Grade+ tuition × (1 − `assumptions.cit_disc_pct`/100), rounded to `round_tuition`. Default 33% off. (The old dormant `assumptions.addons` scaffolding was removed.)
+- Pricing rules are config-driven in `pricing.assumptions` (no hardcoded values); Calculator + Rate Sheet both read them. Rules now include `junior_pct`, `sibling_disc_pct`, `cit_disc_pct`, `sibling_ext_disc`, and the roundings. All edited in the **Derivation rules & rounding** section of **Rate Settings** (the separate Assumptions sub-tab was merged in).
 - **Family-contact reports** — build reports that source `families.json` (waiting on the real sample spreadsheet to finalize import column mapping + fields).
 - Optional: disable self-registration (admin-only account creation); inline edit of username; trim `@domain` in the header too (currently only the master blue box does).
 - Password resets are intentionally **admin-driven** (no email provider). Self-service email reset was declined.

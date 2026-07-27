@@ -464,13 +464,12 @@ _DEFAULT_PRICING = {
     "assumptions": {
         "junior_pct": 90,          # Junior Camp tuition = this % of 2nd Grade+
         "sibling_disc_pct": 10,    # sibling discount % (tuition + transport)
+        "cit_disc_pct": 33,        # Full-Time CIT tuition = this % off the full 2nd Grade+ tuition
+        "sibling_ext_disc": 5,     # sibling discount on extended care: $ off per week, each of AM and PM
         "round_tuition": 25,       # 4/3-day and Junior rounding (nearest $)
         "round_sibling": 1,        # sibling tuition rounding
         "round_original": 5,       # Original-sheet rounding (as published)
         "locked": False,
-        "addons": {
-            "cit": {"amount": 0, "basis": "pct_off"},  # % off tuition (a discount)
-        },
     },
 }
 
@@ -3307,8 +3306,8 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <div class="faq-body">
         <p>On the <strong>Calculator</strong> sub-tab, choose the <strong>Season</strong> (Current or Proposed) and <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). When transportation is selected, a <strong>Transport days</strong> field appears (defaults to the camper's camp days) so you can charge transport for fewer days than they attend. Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
         <p>For families with more than one camper, a <strong>10% sibling discount</strong> is applied automatically to each Standard or Junior Camp camper after the first (10% off both tuition and transportation), shown as a line on that camper's subtotal.</p>
-        <p>Each camper also has <strong>AM care</strong> and <strong>PM care</strong> pickers for extended hours; pick a drop-off / pickup time and the weekly fee (by that time and the camper's days) is added × the number of weeks.</p>
-        <p>Each camper has a <strong>Camp rate</strong> setting with four options: <strong>Standard (2nd Grade+)</strong>, <strong>Junior Camp (PS-1st)</strong> = 90% of 2nd Grade+, <strong>Preschool student</strong> (year-round preschool weekly rate), and <strong>Older sibling of preschool student</strong> (that family's older-sibling weekly rate). These come from the same Rate Settings the Rate Sheet uses, so the numbers stay consistent.</p>
+        <p>Each camper also has <strong>AM care</strong> and <strong>PM care</strong> pickers for extended hours; pick a drop-off / pickup time and the weekly fee (by that time and the camper's days) is added × the number of weeks. Campers after the first get a <strong>$5-per-week sibling discount</strong> on each of AM and PM care (so $10/week with both).</p>
+        <p>Each camper has a <strong>Camp rate</strong> setting with five options: <strong>Standard (2nd Grade+)</strong>, <strong>Junior Camp (PS-1st)</strong> = 90% of 2nd Grade+, <strong>Full-Time CIT</strong> = 33% off the full 2nd Grade+ tuition, <strong>Preschool student</strong> (year-round preschool weekly rate), and <strong>Older sibling of preschool student</strong> (that family's older-sibling weekly rate). These come from the same Rate Settings the Rate Sheet uses, so the numbers stay consistent. The CIT %, sibling %, and sibling extended-care discount all live in the <strong>Derivation rules &amp; rounding</strong> section of Rate Settings.</p>
       </div>
     </details>
 
@@ -5107,7 +5106,7 @@ function renderPxCalc() {
       `<option value="ES"${pxTier==='ES'?' selected':''}>Early Signup (fall)</option>` +
       `<option value="Final"${pxTier==='Final'?' selected':''}>Regular</option></select></label>` +
     '</div>';
-  const rateTypes = [['standard','Standard (2nd Grade+)'],['junior','Junior Camp (PS-1st)'],['pre','Preschool student'],['sib','Older sibling of preschool student']];
+  const rateTypes = [['standard','Standard (2nd Grade+)'],['junior','Junior Camp (PS-1st)'],['cit','Full-Time CIT'],['pre','Preschool student'],['sib','Older sibling of preschool student']];
   pxCampers.forEach((c,i) => {
     const opt = (v,cur) => `<option value="${v}"${cur===v?' selected':''}>${v}</option>`;
     const ptype = c.ptype || 'standard';
@@ -5152,6 +5151,8 @@ function renderPxCalcTotal() {
   const A = pricing.assumptions || {};
   const juniorF = (Number(A.junior_pct)||90)/100;
   const sibF = 1 - (Number(A.sibling_disc_pct)||10)/100;
+  const citF = 1 - (Number(A.cit_disc_pct)||33)/100;   // Full-Time CIT tuition = this fraction of full tuition
+  const sibExt = Number(A.sibling_ext_disc)||5;         // sibling discount on extended care: $ off per week, each side
   const rT = Number(A.round_tuition)||25, rS = Number(A.round_sibling)||1;
   const sibRound = x => Math.round(x/rS)*rS;
   // Standard 2nd Grade+ tuition for a weeks/days combo (4/3-day rounded to round_tuition)
@@ -5178,6 +5179,9 @@ function renderPxCalcTotal() {
       if (ptype === 'junior') {
         tuition = Math.round((juniorF * std)/rT)*rT;   // Junior Camp = junior_pct% of 2nd Grade+, rounded
         detail = pxMoney(tuition)+' Junior Camp tuition ('+Math.round(juniorF*100)+'% of 2nd Grade+, '+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+')';
+      } else if (ptype === 'cit') {
+        tuition = Math.round((citF * std)/rT)*rT;       // Full-Time CIT = cit_disc_pct% off full 2nd Grade+ tuition
+        detail = pxMoney(tuition)+' Full-Time CIT tuition ('+Math.round((1-citF)*100)+'% off 2nd Grade+, '+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+')';
       } else {
         tuition = std;
         detail = pxMoney(tuition)+' tuition ('+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+(mult!==1?' ×'+mult:'')+')';
@@ -5200,15 +5204,17 @@ function renderPxCalcTotal() {
       sub += tr;
       detail += ' + '+pxMoney(tr)+' transport ('+(c.transport==='1way'?'1-way':'2-way')+', '+td+'-day'+(isSibling?', sibling '+sibPct+'% off':'')+')';
     }
-    // Extended care (AM drop-off / PM pickup) weekly fee by time slot x days x weeks
+    // Extended care (AM drop-off / PM pickup) weekly fee by time slot x days x weeks.
+    // Siblings (any camper after the first) get sibling_ext_disc ($) off each weekly fee.
     const ex = pricing.extended || {};
+    const extDisc = i > 0 ? sibExt : 0;
     if (c.am && wksNum) {
-      const r = Number(((ex.am||{})[c.am]||{})[c.days]||0), f = r*wksNum; sub += f;
-      detail += ' + '+pxMoney(f)+' AM care (after '+c.am+', '+pxMoney(r)+'/wk × '+wksNum+')';
+      const r = Number(((ex.am||{})[c.am]||{})[c.days]||0), d = Math.min(r, extDisc), wk = r - d, f = wk*wksNum; sub += f;
+      detail += ' + '+pxMoney(f)+' AM care (after '+c.am+', '+pxMoney(wk)+'/wk'+(d?' after '+pxMoney(d)+' sibling':'')+' × '+wksNum+')';
     }
     if (c.pm && wksNum) {
-      const r = Number(((ex.pm||{})[c.pm]||{})[c.days]||0), f = r*wksNum; sub += f;
-      detail += ' + '+pxMoney(f)+' PM care (before '+c.pm+', '+pxMoney(r)+'/wk × '+wksNum+')';
+      const r = Number(((ex.pm||{})[c.pm]||{})[c.days]||0), d = Math.min(r, extDisc), wk = r - d, f = wk*wksNum; sub += f;
+      detail += ' + '+pxMoney(f)+' PM care (before '+c.pm+', '+pxMoney(wk)+'/wk'+(d?' after '+pxMoney(d)+' sibling':'')+' × '+wksNum+')';
     }
     campGrand += sub;
     lines.push('<div class="px-line"><span>Camper '+(i+1)+': '+detail+'</span><span>'+pxMoney(sub)+'</span></div>');
@@ -5383,6 +5389,8 @@ function renderPxRates() {
     '<table class="px-tbl"><thead><tr><th class="px-l">Rule</th><th>Value</th></tr></thead><tbody>' +
       rrow('Junior Camp tuition (% of 2nd Grade+)', rinp('px-asm-junior', a.junior_pct)) +
       rrow('Sibling discount (% off tuition &amp; transport, 2nd+ camper)', rinp('px-asm-sibdisc', a.sibling_disc_pct)) +
+      rrow('Full-Time CIT tuition (% off the full 2nd Grade+ tuition)', rinp('px-asm-cit', a.cit_disc_pct)) +
+      rrow('Sibling extended-care discount ($ off per week, each of AM &amp; PM)', rinp('px-asm-sibext', a.sibling_ext_disc)) +
       rrow('Round tuition (4/3-day &amp; Junior), nearest $', rinp('px-asm-rt', a.round_tuition)) +
       rrow('Round sibling tuition, nearest $', rinp('px-asm-rs', a.round_sibling)) +
       rrow('Round Original sheet, nearest $', rinp('px-asm-ro', a.round_original)) +
@@ -5395,7 +5403,7 @@ function renderPxRates() {
   if (lockBtn) lockBtn.addEventListener('click', async () => {
     const asm = pricing.assumptions = pricing.assumptions || {};
     asm.locked = !asm.locked;
-    ['px-asm-junior','px-asm-sibdisc','px-asm-rt','px-asm-rs','px-asm-ro'].forEach(id => { const el=document.getElementById(id); if (el) el.disabled = asm.locked; });
+    ['px-asm-junior','px-asm-sibdisc','px-asm-cit','px-asm-sibext','px-asm-rt','px-asm-rs','px-asm-ro'].forEach(id => { const el=document.getElementById(id); if (el) el.disabled = asm.locked; });
     lockBtn.textContent = asm.locked ? '🔒 Locked' : '🔓 Unlocked';
     lockBtn.classList.toggle('ghost', !asm.locked);
     const am = document.getElementById('px-asm-msg'); if (am) am.textContent = asm.locked ? 'Unlock to edit these rules.' : '';
@@ -5447,6 +5455,8 @@ async function savePxRates() {
   const a = pricing.assumptions = pricing.assumptions || {};
   a.junior_pct = num('px-asm-junior');
   a.sibling_disc_pct = num('px-asm-sibdisc');
+  a.cit_disc_pct = num('px-asm-cit');
+  a.sibling_ext_disc = num('px-asm-sibext');
   a.round_tuition = num('px-asm-rt');
   a.round_sibling = num('px-asm-rs');
   a.round_original = num('px-asm-ro');
