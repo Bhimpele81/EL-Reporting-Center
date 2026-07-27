@@ -430,6 +430,8 @@ _DEFAULT_PRICING = {
         # Multiplier applied to the (weeks) tuition for 5/4/3 days per week
         # (4-day = 88% of 5-day, 3-day = 80%, per the rate sheet).
         "day_mult": {"5": 1.0, "4": 0.88, "3": 0.80},
+        # Minicamp flat weekly-block rates (NOT derived; identical for Early Season & Regular).
+        "mini": {"5": 550, "4": 485, "3": 440},
     },
     # Weekly transportation add-on, by days per week
     "transport": {
@@ -466,6 +468,7 @@ _DEFAULT_PRICING = {
         "sibling_disc_pct": 10,    # sibling discount % (tuition + transport)
         "cit_disc_pct": 33,        # Full-Time CIT tuition = this % off the full 2nd Grade+ tuition
         "sibling_ext_disc": 5,     # sibling discount on extended care: $ off per week, each of AM and PM
+        "early_season_pct": 93,    # Early Season tuition = this % of the Regular (Final) rate in each category
         "round_tuition": 25,       # 4/3-day and Junior rounding (nearest $)
         "round_sibling": 1,        # sibling tuition rounding
         "round_original": 5,       # Original-sheet rounding (as published)
@@ -3309,14 +3312,14 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
         <p>On the <strong>Calculator</strong> sub-tab, choose the <strong>Season</strong> (Current or Proposed) and <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). Transportation is charged for the same number of days the camper attends. Use <strong>Add camper</strong> for siblings, or <strong>Reset</strong> to clear any added campers and return every selection (including Season and Rate) to its defaults. The itemized <strong>Camp total</strong> updates as you go.</p>
         <p>For families with more than one camper, a <strong>10% sibling discount</strong> is applied automatically to each Standard or Junior Camp camper after the first (10% off both tuition and transportation), shown as a line on that camper's subtotal.</p>
         <p>Each camper also has <strong>AM care</strong> and <strong>PM care</strong> pickers for extended hours; pick a drop-off / pickup time and the weekly fee (by that time and the camper's days) is added × the number of weeks. Campers after the first get a <strong>$5-per-week sibling discount</strong> on each of AM and PM care (so $10/week with both).</p>
-        <p>Each camper has a <strong>Camp rate</strong> setting with five options: <strong>Standard (2nd Grade+)</strong>, <strong>Junior Camp (PS-1st)</strong> = 90% of 2nd Grade+, <strong>Full-Time CIT</strong> = 33% off the full 2nd Grade+ tuition, <strong>Year Round Childcare</strong> (year-round childcare weekly rate), and <strong>CC Sibling/Alumni</strong> (that family's childcare sibling/alumni weekly rate). These come from the same Rate Settings the Rate Sheet uses, so the numbers stay consistent. The CIT %, sibling %, and sibling extended-care discount all live in the <strong>Derivation rules &amp; rounding</strong> section of Rate Settings. Note: the Year Round Childcare rates are already discounted, so the 10% camp sibling discount is never combined with them.</p>
+        <p>Each camper has a <strong>Camp rate</strong> setting with five options: <strong>Standard (2nd Grade+)</strong>, <strong>Junior Camp (PS-1st)</strong> = 90% of 2nd Grade+, <strong>Full-Time CIT</strong> = 33% off the full 2nd Grade+ tuition, <strong>Year Round Childcare</strong> (year-round childcare weekly rate), and <strong>CC Sibling/Alumni</strong> (that family's childcare sibling/alumni weekly rate). These come from the same Rate Settings the Rate Sheet uses, so the numbers stay consistent. When you pick <strong>Early Signup (fall)</strong>, each tuition is the Early Season rate (a fixed % of the Regular rate, default 93%). The CIT %, sibling %, sibling extended-care discount, and Early Season % all live in the <strong>Derivation rules &amp; rounding</strong> section of Rate Settings. Note: the Year Round Childcare rates are already discounted, so the 10% camp sibling discount is never combined with them.</p>
       </div>
     </details>
 
     <details class="faq">
       <summary>How do I model a price increase for next season?</summary>
       <div class="faq-body">
-        <p>On the <strong>Explorer</strong> sub-tab, set the <strong>Annual increase %</strong>, the <strong>Early Signup discount</strong> (a % or $ off the regular price), and a rounding rule for each ($1 / $25 / $50 / $100). Regular and Early Signup round separately, so each can land on its own clean numbers. It shows the proposed Regular and Early Signup tuition (with the discount amount) and childcare, alongside the dollar and percent difference versus the current rates. It's a preview and changes nothing on its own.</p>
+        <p>On the <strong>Explorer</strong> sub-tab, set the <strong>Annual increase %</strong> and a rounding rule ($1 / $25 / $50 / $100). It shows the proposed <strong>Regular</strong> tuition, the derived <strong>Early Season</strong> (a fixed % of Regular, set in Rate Settings), and childcare, alongside the dollar and percent difference versus the current rates. It's a preview and changes nothing on its own.</p>
         <p>When you're happy with a scenario, click <strong>Apply to Rate Settings</strong>. The new figures load into Rate Settings (and update the season label as needed); <strong>review them and click Save rates</strong> to make them official. Nothing is saved until you do.</p>
       </div>
     </details>
@@ -3324,9 +3327,9 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do the rate tables and the day rate factor work?</summary>
       <div class="faq-body">
-        <p><strong>Rate Settings</strong> holds the camp tuition, transportation, childcare, and extended-care rates (plus the derivation rules, below). Camp tuition has a <strong>Current</strong> column set (the season now in effect, e.g. 2026) and a <strong>Proposed</strong> column set (the upcoming season, e.g. 2027), each with Early Signup and Regular by number of weeks. Enter both and the <strong>Change</strong> column shows the effective percent increase. The Proposed rates are what the Calculator and Explorer use. Set the season labels at the top, edit any value, and click <strong>Save rates</strong>.</p>
+        <p><strong>Rate Settings</strong> holds the camp tuition, transportation, childcare, and extended-care rates (plus the derivation rules, below). You enter only the 5-day <strong>Regular</strong> tuition for the <strong>Current</strong> season (e.g. 2026) and <strong>Proposed</strong> season (e.g. 2027); the <strong>Change</strong> column shows the effective percent increase. Everything else derives from the Regular rate: 4-day and 3-day by the day factor, Junior Camp by the Junior %, and <strong>Early Season</strong> as a fixed % of each Regular rate (default 93%, i.e. a 7% early-season savings, rounded to the nearest $25). <strong>Minicamp</strong> is a flat rate entered directly, not calculated. The Proposed rates are what the Calculator, Rate Sheet, and Explorer use. Set the season labels at the top, edit any value, and click <strong>Save rates</strong>.</p>
         <p>The <strong>day rate factor</strong> is the percentage of the full 5-day tuition a 4-day or 3-day camper pays (100% = full price). It defaults to 88% for 4-day and 80% for 3-day; the 5-day column is the base and is always 100%.</p>
-        <p>At the bottom of Rate Settings, the <strong>Derivation rules &amp; rounding</strong> section holds the rules that turn tuition into the other prices, shared by the Calculator and Rate Sheet so they never drift apart: the <strong>Junior Camp %</strong> (of 2nd Grade+), the <strong>sibling discount %</strong> (off tuition &amp; transport), the <strong>Full-Time CIT %</strong> (off the full 2nd Grade+ tuition), the <strong>sibling extended-care discount</strong> ($ off per week, each of AM &amp; PM), and the <strong>rounding</strong> rules. These rarely change, so a <strong>Lock / Unlock</strong> button protects them: unlock, edit, click <strong>Save rates</strong>, then lock again. The rest of the tab (tuition, transportation, childcare, extended care) stays editable regardless of the lock.</p>
+        <p>At the bottom of Rate Settings, the <strong>Derivation rules &amp; rounding</strong> section holds the rules that turn the Regular tuition into every other price, shared by the Calculator and Rate Sheet so they never drift apart: the <strong>Junior Camp %</strong> (of 2nd Grade+), the <strong>sibling discount %</strong> (off tuition &amp; transport), the <strong>Full-Time CIT %</strong> (off the full 2nd Grade+ tuition), the <strong>sibling extended-care discount</strong> ($ off per week, each of AM &amp; PM), the <strong>Early Season %</strong> (of the Regular rate), and the <strong>rounding</strong> rules. These rarely change, so a <strong>Lock / Unlock</strong> button protects them: unlock, edit, click <strong>Save rates</strong>, then lock again. The rest of the tab (tuition, transportation, childcare, extended care) stays editable regardless of the lock.</p>
       </div>
     </details>
 
@@ -3335,7 +3338,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <div class="faq-body">
         <p>Open the <strong>Rate Sheet</strong> sub-tab and click <strong>Print / Save PDF</strong> (prints to a single color page). It shows the full rate grid for both programs (<strong>2nd Grade+</strong> and <strong>Junior Camp, PS through 1st Grade</strong>), Early Season and Regular, with tuition, sibling, and with-transportation columns grouped by days per week (color-coded: 5-day blue, 4-day green, 3-day gold).</p>
         <p>Use the <strong>Show</strong> selector to choose which rates to display: <strong>Original</strong> (the as-published 2026 sheet), <strong>Current</strong>, or <strong>Proposed</strong>. Use <strong>Compare to</strong> to overlay the <strong>% change</strong> in every cell versus another sheet, so you can see new-vs-older side by side.</p>
-        <p>Everything is derived from your Rate Settings: Junior Camp is 90% of 2nd Grade+ (rounded to $25), sibling tuition is 10% off (rounded to $1, assumes 5 days), transportation is 2-way for that column's day count with a 10% sibling discount, and 4/3-day tuition rounds to $25 (the Original view rounds to $5 to match the published numbers).</p>
+        <p>Everything is derived from your Regular Rate Settings: Junior Camp is 90% of 2nd Grade+ (rounded to $25), Early Season is 93% of the matching Regular rate (rounded to $25), sibling tuition is 10% off (rounded to $1, assumes 5 days), transportation is 2-way for that column's day count with a 10% sibling discount, 4/3-day tuition rounds to $25 (the Original view rounds to $5 to match the published numbers), and Minicamp is a flat rate.</p>
       </div>
     </details>
 
@@ -5154,21 +5157,31 @@ function renderPxCalc() {
 
 function renderPxCalcTotal() {
   const baseSet = pxSeason === 'current' ? (pricing.camp.current || {}) : pricing.camp.tiers;
-  const tiers = baseSet[pxTier] || {}, dm = pricing.camp.day_mult || {};
+  const finTiers = baseSet['Final'] || {}, dm = pricing.camp.day_mult || {};
   const A = pricing.assumptions || {};
   const juniorF = (Number(A.junior_pct)||90)/100;
   const sibF = 1 - (Number(A.sibling_disc_pct)||10)/100;
   const citF = 1 - (Number(A.cit_disc_pct)||33)/100;   // Full-Time CIT tuition = this fraction of full tuition
   const sibExt = Number(A.sibling_ext_disc)||5;         // sibling discount on extended care: $ off per week, each side
+  const esF = (Number(A.early_season_pct)||93)/100;     // Early Season = this fraction of the Regular rate
+  const mini = pricing.camp.mini || {};                 // Minicamp flat rates
   const rT = Number(A.round_tuition)||25, rS = Number(A.round_sibling)||1;
   const sibRound = x => Math.round(x/rS)*rS;
-  // Standard 2nd Grade+ tuition for a weeks/days combo (4/3-day rounded to round_tuition)
-  const stdTuition = (weeks, days) => {
-    const base = Number(tiers[weeks]||0), mult = Number(dm[days]!=null ? dm[days] : 1);
-    let t = base*mult;
-    if (days !== '5') t = Math.round(t/rT)*rT;
-    return t;
+  const rTun = x => Math.round(x/rT)*rT;
+  // Regular (Final) 2nd Grade+ tuition for a weeks/days combo (Minicamp flat; 4/3-day rounded)
+  const finStd = (weeks, days) => {
+    if (weeks === 'Mini') return Number(mini[days]||0);
+    const base = Number(finTiers[weeks]||0), mult = Number(dm[days]!=null ? dm[days] : 1);
+    return days === '5' ? base : rTun(base*mult);
   };
+  // Regular Junior tuition: Junior 5-day = junior_pct% of 2nd Grade+ 5-day, then apply the day factor
+  const finJunior = (weeks, days) => {
+    if (weeks === 'Mini') return 0;   // Junior has no Minicamp
+    const j5 = rTun(juniorF * finStd(weeks,'5'));
+    return days === '5' ? j5 : rTun(j5 * Number(dm[days]!=null ? dm[days] : 1));
+  };
+  // Early Season = early_season_pct% of the Regular rate (Minicamp is flat, never discounted)
+  const esAdj = (t, weeks) => (pxTier === 'ES' && weeks !== 'Mini') ? rTun(esF * t) : t;
   let lines = [], campGrand = 0;
   pxCampers.forEach((c,i) => {
     const ptype = c.ptype || 'standard';
@@ -5182,18 +5195,15 @@ function renderPxCalcTotal() {
       tuition = weekly * wksNum;
       detail = pxMoney(tuition)+' '+(ptype==='sib'?'CC Sibling/Alumni':'Year Round Childcare')+' rate ('+pxMoney(weekly)+'/wk × '+wksNum+' wks, '+c.days+'-day)';
     } else {
-      const std = stdTuition(c.weeks, c.days);
-      const mult = Number(dm[c.days]!=null ? dm[c.days] : 1);
-      if (ptype === 'junior') {
-        tuition = Math.round((juniorF * std)/rT)*rT;   // Junior Camp = junior_pct% of 2nd Grade+, rounded
-        detail = pxMoney(tuition)+' Junior Camp tuition ('+Math.round(juniorF*100)+'% of 2nd Grade+, '+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+')';
-      } else if (ptype === 'cit') {
-        tuition = Math.round((citF * std)/rT)*rT;       // Full-Time CIT = cit_disc_pct% off full 2nd Grade+ tuition
-        detail = pxMoney(tuition)+' Full-Time CIT tuition ('+Math.round((1-citF)*100)+'% off 2nd Grade+, '+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+')';
-      } else {
-        tuition = std;
-        detail = pxMoney(tuition)+' tuition ('+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+(mult!==1?' ×'+mult:'')+')';
-      }
+      // Compute the Regular-tier tuition first, then apply the Early Season discount at the end
+      let finTui = ptype === 'junior' ? finJunior(c.weeks, c.days) : finStd(c.weeks, c.days);
+      if (ptype === 'cit') finTui = rTun(citF * finTui);   // Full-Time CIT = cit_disc_pct% off full tuition
+      tuition = esAdj(finTui, c.weeks);
+      const esTag = (pxTier === 'ES' && c.weeks !== 'Mini') ? ', Early Season '+Math.round((1-esF)*100)+'% off' : '';
+      const wkLbl = (c.weeks==='Mini'?'Mini':c.weeks+' wks');
+      if (ptype === 'junior') detail = pxMoney(tuition)+' Junior Camp tuition ('+Math.round(juniorF*100)+'% of 2nd Grade+, '+wkLbl+esTag+')';
+      else if (ptype === 'cit') detail = pxMoney(tuition)+' Full-Time CIT tuition ('+Math.round((1-citF)*100)+'% off 2nd Grade+, '+wkLbl+esTag+')';
+      else detail = pxMoney(tuition)+' tuition ('+wkLbl+esTag+')';
     }
     // Automatic 10% sibling discount for each standard/junior camper after the first.
     // Deliberately excludes childcare rates (pre/sib) and CIT: the 10% never combines with an
@@ -5254,24 +5264,23 @@ function pxExpTable(title, table, order, rowLabel) {
 }
 // Proposed regular (Final) price = current base increased by pct, rounded.
 function pxPropFinal(base) { return pxRound(Number(base||0) * (1 + pxExp.pct/100)); }
-// Proposed Early Signup price = regular price minus the discount (% or $), rounded.
+// Proposed Early Season price = early_season_pct% of the regular price, rounded to $25.
 function pxPropES(regular) {
-  const d = Number(pxExp.esDisc||0);
-  return pxRoundES(pxExp.esMode === 'amt' ? (regular - d) : (regular * (1 - d/100)));
+  const A = pricing.assumptions || {};
+  const esF = (Number(A.early_season_pct)||93)/100, rT = Number(A.round_tuition)||25;
+  return Math.round((esF * Number(regular||0))/rT)*rT;
 }
 
 function renderPxExplore() {
   if (!pricing) return;
   const box = document.getElementById('px-explore');
   const roundOptsFor = cur => [['0','$1'],['25','$25'],['50','$50'],['100','$100']].map(([v,l])=>`<option value="${v}"${cur==+v?' selected':''}>${l}</option>`).join('');
+  const esPct = (pricing.assumptions && pricing.assumptions.early_season_pct != null) ? pricing.assumptions.early_season_pct : 93;
   box.innerHTML = '<div class="px-controls">' +
     '<label class="px-field">Annual increase %<input type="number" id="px-exp-pct" step="0.1" value="'+pxExp.pct+'"></label>' +
     '<label class="px-field">Round regular to<select id="px-exp-round">'+roundOptsFor(pxExp.round)+'</select></label>' +
-    '<label class="px-field">Early Signup discount<select id="px-exp-esmode"><option value="pct"'+(pxExp.esMode==='pct'?' selected':'')+'>% off regular</option><option value="amt"'+(pxExp.esMode==='amt'?' selected':'')+'>$ off regular</option></select></label>' +
-    '<label class="px-field">Discount value<input type="number" id="px-exp-esdisc" step="0.1" value="'+pxExp.esDisc+'"></label>' +
-    '<label class="px-field">Round Early Signup to<select id="px-exp-esround">'+roundOptsFor(pxExp.esRound)+'</select></label>' +
     '</div>' +
-    '<div style="font-size:.8rem;color:#888;margin-bottom:1rem">Preview only. The <strong>Regular</strong> price is the current price increased by the percentage above; <strong>Early Signup</strong> is the regular price minus the discount. Transportation is not changed here.</div>' +
+    '<div style="font-size:.8rem;color:#888;margin-bottom:1rem">Preview only. The <strong>Regular</strong> price is the current price increased by the percentage above; <strong>Early Season</strong> is '+esPct+'% of the Regular price (rounded to $25, set in Rate Settings). Transportation is not changed here.</div>' +
     '<div id="px-exp-results"></div>' +
     '<div style="margin-top:1.2rem;padding-top:.9rem;border-top:1px solid #e5e5e5">' +
       '<button class="px-btn" id="px-apply">Apply to Rate Settings</button>' +
@@ -5279,10 +5288,7 @@ function renderPxExplore() {
     '</div>';
   const g = id => document.getElementById(id);
   g('px-exp-pct').addEventListener('input', e => { pxExp.pct = parseFloat(e.target.value)||0; renderPxExploreResults(); });
-  g('px-exp-esmode').addEventListener('change', e => { pxExp.esMode = e.target.value; renderPxExploreResults(); });
-  g('px-exp-esdisc').addEventListener('input', e => { pxExp.esDisc = parseFloat(e.target.value)||0; renderPxExploreResults(); });
   g('px-exp-round').addEventListener('change', e => { pxExp.round = parseInt(e.target.value,10); renderPxExploreResults(); });
-  g('px-exp-esround').addEventListener('change', e => { pxExp.esRound = parseInt(e.target.value,10); renderPxExploreResults(); });
   g('px-apply').addEventListener('click', pxApplyExplore);
   renderPxExploreResults();
 }
@@ -5294,19 +5300,18 @@ function renderPxExploreResults() {
   // Regular (Final) — modeled from the current-season base
   let h = '<div class="px-sec"><div class="px-sec-title">Summer Camp — Regular</div><table class="px-tbl"><thead><tr>' +
     '<th class="px-l">Weeks</th><th>Current ('+famEsc(curL)+')</th><th>Proposed (+'+pxExp.pct+'%)</th><th>$ diff</th><th>% diff</th></tr></thead><tbody>';
-  wk.forEach(w => {
+  wk.filter(w => w !== 'Mini').forEach(w => {
     const base = Number(cur.Final[w]||0), nw = pxPropFinal(base);
     const diff = nw-base, p = base ? diff/base*100 : 0, cls = diff ? 'px-diff-up' : 'px-diff-flat';
     h += '<tr><td class="px-l">'+w+'</td><td>'+pxMoney(base)+'</td><td>'+pxMoney(nw)+'</td><td class="'+cls+'">'+(diff>0?'+':'')+pxMoney(diff)+'</td><td class="'+cls+'">'+p.toFixed(2)+'%</td></tr>';
   });
   h += '</tbody></table></div>';
-  // Early Signup (derived from regular minus discount)
-  h += '<div class="px-sec"><div class="px-sec-title">Summer Camp — Early Signup</div><table class="px-tbl"><thead><tr>' +
-    '<th class="px-l">Weeks</th><th>Regular</th><th>Early Signup</th><th>Discount</th><th>Current ES ('+famEsc(curL)+')</th><th>Change</th></tr></thead><tbody>';
-  wk.forEach(w => {
-    const reg = pxPropFinal(Number(cur.Final[w]||0)), es = pxPropES(reg);
-    const disc = reg-es, curES = Number(cur.ES[w]||0), chg = es-curES, cls = chg ? 'px-diff-up' : 'px-diff-flat';
-    h += '<tr><td class="px-l">'+w+'</td><td>'+pxMoney(reg)+'</td><td>'+pxMoney(es)+'</td><td>'+pxMoney(disc)+'</td><td>'+pxMoney(curES)+'</td><td class="'+cls+'">'+(chg>0?'+':'')+pxMoney(chg)+'</td></tr>';
+  // Early Season = a fixed % of the proposed Regular price (derived, not a separate discount)
+  h += '<div class="px-sec"><div class="px-sec-title">Summer Camp — Early Season</div><table class="px-tbl"><thead><tr>' +
+    '<th class="px-l">Weeks</th><th>Proposed Regular</th><th>Early Season</th><th>Savings</th></tr></thead><tbody>';
+  wk.filter(w => w !== 'Mini').forEach(w => {
+    const reg = pxPropFinal(Number(cur.Final[w]||0)), es = pxPropES(reg), disc = reg-es;
+    h += '<tr><td class="px-l">'+w+'</td><td>'+pxMoney(reg)+'</td><td>'+pxMoney(es)+'</td><td>'+pxMoney(disc)+'</td></tr>';
   });
   h += '</tbody></table></div>';
   // Childcare (1 child, weekly) — % increase only
@@ -5318,14 +5323,10 @@ function renderPxExploreResults() {
 
 function pxApplyExplore() {
   const roundLbl = pxExp.round ? ('$' + pxExp.round) : '$1';
-  const esRoundLbl = pxExp.esRound ? ('$' + pxExp.esRound) : '$1';
-  const discLbl = pxExp.esMode === 'amt' ? ('$' + pxExp.esDisc + ' off') : (pxExp.esDisc + '% off');
-  if (!confirm('Apply a ' + pxExp.pct + '% increase to Regular tuition (rounded to ' + roundLbl + ') and an Early Signup discount of ' + discLbl + ' the regular price (rounded to ' + esRoundLbl + ')? Childcare also increases by ' + pxExp.pct + '%. New figures load into Rate Settings for review; nothing is saved until you click Save rates.')) return;
+  if (!confirm('Apply a ' + pxExp.pct + '% increase to Regular tuition (rounded to ' + roundLbl + ')? Early Season stays a fixed % of Regular, and Childcare also increases by ' + pxExp.pct + '%. New figures load into Rate Settings for review; nothing is saved until you click Save rates.')) return;
   const cur = pricing.camp.current || {ES:{}, Final:{}};
-  pricing.camp.week_order.forEach(w => {
-    const reg = pxPropFinal(Number(cur.Final[w]||0));
-    pricing.camp.tiers.Final[w] = reg;   // proposed
-    pricing.camp.tiers.ES[w] = pxPropES(reg);
+  pricing.camp.week_order.filter(w => w !== 'Mini').forEach(w => {
+    pricing.camp.tiers.Final[w] = pxPropFinal(Number(cur.Final[w]||0));   // proposed Regular (Early Season derives from it)
   });
   ['5','4','3'].forEach(d => {
     const r = pricing.childcare[d];
@@ -5350,19 +5351,23 @@ function renderPxRates() {
     '<label class="px-field">Current season<input id="px-season-cur" style="min-width:90px;text-align:left" value="'+famEsc(pricing.season_label||'')+'"></label>' +
     '<label class="px-field">Proposed season<input id="px-season-prop" style="min-width:90px;text-align:left" value="'+famEsc(pricing.proposed_label||'')+'"></label>' +
     '</div>';
-  h += '<div class="px-sec"><div class="px-sec-title">Summer Camp tuition</div>' +
-    '<div style="font-size:.8rem;color:#888;margin-bottom:.3rem">Enter the <strong>Current ('+famEsc(curL)+')</strong> and <strong>Proposed ('+famEsc(propL)+')</strong> rates. The change column shows the effective increase. The Proposed columns are the live rates the calculator and Explorer use.</div>' +
+  const mini = pricing.camp.mini || {};
+  const esPct = (pricing.assumptions && pricing.assumptions.early_season_pct != null) ? pricing.assumptions.early_season_pct : 93;
+  h += '<div class="px-sec"><div class="px-sec-title">Summer Camp tuition (Regular)</div>' +
+    '<div style="font-size:.8rem;color:#888;margin-bottom:.3rem">Enter the 5-day <strong>Regular</strong> tuition for the <strong>Current ('+famEsc(curL)+')</strong> and <strong>Proposed ('+famEsc(propL)+')</strong> seasons. Everything else is derived from these: 4/3-day by the day factor, Junior Camp by the Junior %, and <strong>Early Season</strong> as '+esPct+'% of each Regular rate (set in Derivation rules below). The <strong>Change</strong> column shows the effective increase; the Proposed column is what the Calculator and Rate Sheet use.</div>' +
     '<table class="px-tbl"><thead>' +
-    '<tr><th class="px-l" rowspan="2">Weeks</th><th colspan="2">Current ('+famEsc(curL)+')</th><th colspan="2">Proposed ('+famEsc(propL)+')</th><th colspan="2">Change</th></tr>' +
-    '<tr><th>ES</th><th>Regular</th><th>ES</th><th>Regular</th><th>ES</th><th>Regular</th></tr></thead><tbody>';
-  wk.forEach(w => h += '<tr><td class="px-l">'+w+'</td>'+
-    '<td>'+inp('px-cur-ES-'+w, cur.ES[w])+'</td>'+
+    '<tr><th class="px-l">Weeks</th><th>Current ('+famEsc(curL)+')</th><th>Proposed ('+famEsc(propL)+')</th><th>Change</th></tr></thead><tbody>';
+  wk.filter(w => w !== 'Mini').forEach(w => h += '<tr><td class="px-l">'+w+'</td>'+
     '<td>'+inp('px-cur-Final-'+w, cur.Final[w])+'</td>'+
-    '<td>'+inp('px-camp-ES-'+w, pricing.camp.tiers.ES[w])+'</td>'+
     '<td>'+inp('px-camp-Final-'+w, pricing.camp.tiers.Final[w])+'</td>'+
-    '<td id="px-chg-ES-'+w+'" class="px-diff-flat"></td><td id="px-chg-Final-'+w+'" class="px-diff-flat"></td></tr>');
-  h += '</tbody></table>';
-  h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the percentage of the full 5-day tuition charged to a 4-day or 3-day camper (100% is the full rate). Defaults to 88% for 4-day and 80% for 3-day. The 5-day column is the base and is always 100%.</div>';
+    '<td id="px-chg-Final-'+w+'" class="px-diff-flat"></td></tr>');
+  h += '</tbody></table></div>';
+  h += '<div class="px-sec"><div class="px-sec-title">Minicamp (flat rates)</div>' +
+    '<div style="font-size:.8rem;color:#888;margin-bottom:.3rem">Minicamp is a flat weekly-block rate entered directly (not calculated), identical for Early Season and Regular.</div>' +
+    '<table class="px-tbl"><thead><tr><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody><tr>'+
+    '<td>'+inp('px-mini-5', mini['5'])+'</td><td>'+inp('px-mini-4', mini['4'])+'</td><td>'+inp('px-mini-3', mini['3'])+'</td></tr></tbody></table></div>';
+  h += '<div class="px-sec"><div class="px-sec-title">Day rate factor</div>' +
+    '<div style="font-size:.8rem;color:#888;margin:0 0 .3rem">The percentage of the full 5-day tuition charged to a 4-day or 3-day camper (100% is the full rate). Defaults to 88% for 4-day and 80% for 3-day. The 5-day column is the base and is always 100%.</div>';
   const pct = v => parseFloat((Number(v||0) * 100).toFixed(2));
   const pctInp = (id,v) => '<input class="px-rate-inp px-pct" id="'+id+'" value="'+pct(v)+'"> %';
   h += '<table class="px-tbl"><thead><tr><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody><tr>'+
@@ -5401,6 +5406,7 @@ function renderPxRates() {
       rrow('Sibling discount (% off tuition &amp; transport, 2nd+ camper)', rinp('px-asm-sibdisc', a.sibling_disc_pct)) +
       rrow('Full-Time CIT tuition (% off the full 2nd Grade+ tuition)', rinp('px-asm-cit', a.cit_disc_pct)) +
       rrow('Sibling extended-care discount ($ off per week, each of AM &amp; PM)', rinp('px-asm-sibext', a.sibling_ext_disc)) +
+      rrow('Early Season tuition (% of the Regular rate, rounded to nearest $25)', rinp('px-asm-es', a.early_season_pct)) +
       rrow('Round tuition (4/3-day &amp; Junior), nearest $', rinp('px-asm-rt', a.round_tuition)) +
       rrow('Round sibling tuition, nearest $', rinp('px-asm-rs', a.round_sibling)) +
       rrow('Round Original sheet, nearest $', rinp('px-asm-ro', a.round_original)) +
@@ -5413,7 +5419,7 @@ function renderPxRates() {
   if (lockBtn) lockBtn.addEventListener('click', async () => {
     const asm = pricing.assumptions = pricing.assumptions || {};
     asm.locked = !asm.locked;
-    ['px-asm-junior','px-asm-sibdisc','px-asm-cit','px-asm-sibext','px-asm-rt','px-asm-rs','px-asm-ro'].forEach(id => { const el=document.getElementById(id); if (el) el.disabled = asm.locked; });
+    ['px-asm-junior','px-asm-sibdisc','px-asm-cit','px-asm-sibext','px-asm-es','px-asm-rt','px-asm-rs','px-asm-ro'].forEach(id => { const el=document.getElementById(id); if (el) el.disabled = asm.locked; });
     lockBtn.textContent = asm.locked ? '🔒 Locked' : '🔓 Unlocked';
     lockBtn.classList.toggle('ghost', !asm.locked);
     const am = document.getElementById('px-asm-msg'); if (am) am.textContent = asm.locked ? 'Unlock to edit these rules.' : '';
@@ -5447,10 +5453,13 @@ async function savePxRates() {
   if (curLbl) pricing.season_label = curLbl.value.trim();
   if (propLbl) pricing.proposed_label = propLbl.value.trim();
   pricing.camp.current = pricing.camp.current || {ES:{}, Final:{}};
-  pricing.camp.week_order.forEach(w => {
-    pricing.camp.tiers.ES[w] = num('px-camp-ES-'+w); pricing.camp.tiers.Final[w] = num('px-camp-Final-'+w);
-    pricing.camp.current.ES[w] = num('px-cur-ES-'+w); pricing.camp.current.Final[w] = num('px-cur-Final-'+w);
+  // Only the Regular (Final) 5-day base is entered; Early Season is derived (93% of Final). Minicamp is flat.
+  pricing.camp.week_order.filter(w => w !== 'Mini').forEach(w => {
+    pricing.camp.tiers.Final[w] = num('px-camp-Final-'+w);
+    pricing.camp.current.Final[w] = num('px-cur-Final-'+w);
   });
+  pricing.camp.mini = pricing.camp.mini || {};
+  ['5','4','3'].forEach(d => pricing.camp.mini[d] = num('px-mini-'+d));
   ['5','4','3'].forEach(d => { pricing.childcare[d].base = num('px-cc-'+d+'-base'); pricing.childcare[d].sibling2 = num('px-cc-'+d+'-sib'); });
   pricing.camp.day_mult['5'] = 1;   // 5-day is the base (always 100%)
   ['4','3'].forEach(d => { pricing.camp.day_mult[d] = num('px-dm-'+d) / 100; });
@@ -5467,6 +5476,7 @@ async function savePxRates() {
   a.sibling_disc_pct = num('px-asm-sibdisc');
   a.cit_disc_pct = num('px-asm-cit');
   a.sibling_ext_disc = num('px-asm-sibext');
+  a.early_season_pct = num('px-asm-es');
   a.round_tuition = num('px-asm-rt');
   a.round_sibling = num('px-asm-rs');
   a.round_original = num('px-asm-ro');
@@ -5497,6 +5507,8 @@ function renderPxSheet() {
   const A = pricing.assumptions || {};
   const SIB = 1 - (Number(A.sibling_disc_pct)||10)/100;   // sibling multiplier
   const JR = (Number(A.junior_pct)||90)/100;              // Junior Camp factor
+  const ESF = (Number(A.early_season_pct)||93)/100;       // Early Season = this fraction of the Regular cell
+  const mini = pricing.camp.mini || {};                   // Minicamp flat rates (5/4/3-day)
   const rS = Number(A.round_sibling)||1, rT = Number(A.round_tuition)||25, rO = Number(A.round_original)||5;
   const sib = x => Math.round(x/rS)*rS, wnum = w => parseInt(w,10)||0;
 
@@ -5513,14 +5525,21 @@ function renderPxSheet() {
   function rowVals(base, prog, tier, w, step) {
     const wn = wnum(w);
     const rs = x => Math.round(x/step)*step;
-    const t2 = d => { const raw = Number((base[tier]||{})[w]||0) * dayF(d); return d === '5' ? Math.round(raw) : rs(raw); };
-    // Junior 4/3-day derive from the program's own rounded 5-day tuition (apply the day factor to
-    // the Junior 5-day rate), not 90% of the already-rounded 2nd Grade+ day-rate, which double-rounds.
-    const jr5 = rs(JR * t2('5'));
-    const tuiP = d => prog !== 'junior' ? t2(d) : (d === '5' ? jr5 : rs(jr5 * dayF(d)));
+    if (wn === 0) {   // Minicamp: flat rates, identical for Early Season & Regular (no day-factor, no discount)
+      const m = d => Number(mini[d]||0);
+      return [null, null, m('5'), null, null, m('4'), null, m('3')];
+    }
+    // Regular (Final) tuition per day count, from the Final 5-day base.
+    // Junior 4/3-day derive from the Junior 5-day rate (apply the day factor), not 90% of the
+    // already-rounded 2nd Grade+ day-rate, which double-rounds.
+    const fin = base['Final'] || {};
+    const f2 = d => { const raw = Number(fin[w]||0) * dayF(d); return d === '5' ? Math.round(raw) : rs(raw); };
+    const fjr5 = rs(JR * f2('5'));
+    const finTui = d => prog !== 'junior' ? f2(d) : (d === '5' ? fjr5 : rs(fjr5 * dayF(d)));
+    // Early Season = early_season_pct% of the corresponding Regular cell, rounded (Regular passes through).
+    const tuiP = d => tier === 'ES' ? rs(ESF * finTui(d)) : finTui(d);
     const tr = d => trWk(d) * wn;
     const t5 = tuiP('5'), sib5 = sib(SIB*t5), t4 = tuiP('4'), t3 = tuiP('3');
-    if (wn === 0) return [null, null, t5, null, null, t4, null, t3];   // Mini: tuition only
     return [t5+tr('5'), sib5+sib(SIB*tr('5')), t5, sib5, t4+tr('4'), t4, t3+tr('3'), t3];
   }
   // Per-column background hue (5d=blue, 4d=green, 3d=gold; plain Tuition = darker "m" shade)
