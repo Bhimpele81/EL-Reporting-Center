@@ -124,7 +124,9 @@ db81d3e Rename Bunks & Camps -> Utilities; move master upload there; add Family 
 
 ## Open / planned follow-ups
 
-- **Pricing Calculator add-on amounts** (UI + wiring built, amounts pending): each camper has an **Add-ons** multi-select (`ADDON_OPTS` = AM Extended, PM Extended, CIT). Amounts + basis live in `pricing.assumptions.addons` (edited on the **Assumptions** sub-tab); Calculator applies them (week / season / pct_off). All amounts default 0 ("no charge yet"). Just fill in the real amounts/bases in Assumptions when known. The pricing rules (junior %, sibling %, roundings) are all config-driven in `pricing.assumptions` now (no hardcoded 90/10/25); both Calculator and Rate Sheet read them.
+- **Extended care** — built. `pricing.extended.{am,pm}` weekly-fee tables by time slot × days (editable on Rate Settings, seeded from the Extended Hours sheet). Calculator has per-camper **AM care** / **PM care** pickers (`c.am`/`c.pm`); fee = rate[slot][days] × weeks. (Sibling discount does NOT apply to extended care — confirm if it should.)
+- **CIT** and future add-ons: `pricing.assumptions.addons` (amount + basis: week/season/pct_off), edited on the **Assumptions** sub-tab; `ADDON_OPTS` currently `[cit]`. CIT amount 0 = recorded only. Need CIT's real amount/basis.
+- Pricing rules (junior %, sibling %, roundings) are config-driven in `pricing.assumptions` (no hardcoded 90/10/25); Calculator + Rate Sheet both read them.
 - **Family-contact reports** — build reports that source `families.json` (waiting on the real sample spreadsheet to finalize import column mapping + fields).
 - Optional: disable self-registration (admin-only account creation); inline edit of username; trim `@domain` in the header too (currently only the master blue box does).
 - Password resets are intentionally **admin-driven** (no email provider). Self-service email reset was declined.
