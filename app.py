@@ -3304,7 +3304,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do I calculate what a family owes?</summary>
       <div class="faq-body">
-        <p>On the <strong>Calculator</strong> sub-tab, choose the <strong>Season</strong> (Current or Proposed) and <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). Transportation is charged for the same number of days the camper attends. Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
+        <p>On the <strong>Calculator</strong> sub-tab, choose the <strong>Season</strong> (Current or Proposed) and <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). Transportation is charged for the same number of days the camper attends. Use <strong>Add camper</strong> for siblings, or <strong>Reset</strong> to clear any added campers and return every selection (including Season and Rate) to its defaults. The itemized <strong>Camp total</strong> updates as you go.</p>
         <p>For families with more than one camper, a <strong>10% sibling discount</strong> is applied automatically to each Standard or Junior Camp camper after the first (10% off both tuition and transportation), shown as a line on that camper's subtotal.</p>
         <p>Each camper also has <strong>AM care</strong> and <strong>PM care</strong> pickers for extended hours; pick a drop-off / pickup time and the weekly fee (by that time and the camper's days) is added × the number of weeks. Campers after the first get a <strong>$5-per-week sibling discount</strong> on each of AM and PM care (so $10/week with both).</p>
         <p>Each camper has a <strong>Camp rate</strong> setting with five options: <strong>Standard (2nd Grade+)</strong>, <strong>Junior Camp (PS-1st)</strong> = 90% of 2nd Grade+, <strong>Full-Time CIT</strong> = 33% off the full 2nd Grade+ tuition, <strong>Year Round Childcare</strong> (year-round childcare weekly rate), and <strong>CC Sibling/Alumni</strong> (that family's childcare sibling/alumni weekly rate). These come from the same Rate Settings the Rate Sheet uses, so the numbers stay consistent. The CIT %, sibling %, and sibling extended-care discount all live in the <strong>Derivation rules &amp; rounding</strong> section of Rate Settings. Note: the Year Round Childcare rates are already discounted, so the 10% camp sibling discount is never combined with them.</p>
@@ -5123,7 +5123,8 @@ function renderPxCalc() {
       (pxCampers.length>1?'<button class="px-btn ghost px-rm" data-i="'+i+'" style="padding:.35rem .6rem">✕</button>':'') +
       '</div>';
   });
-  h += '<button class="px-btn ghost" id="px-add-camper">＋ Add camper</button></div>';
+  h += '<button class="px-btn ghost" id="px-add-camper">＋ Add camper</button>' +
+       '<button class="px-btn ghost" id="px-reset-calc" style="margin-left:.4rem">↺ Reset</button></div>';
   h += '<div id="px-calc-total"></div>';
   box.innerHTML = h;
   document.getElementById('px-tier').addEventListener('change', e => { pxTier = e.target.value; renderPxCalc(); });
@@ -5140,6 +5141,12 @@ function renderPxCalc() {
   });
   box.querySelectorAll('.px-rm').forEach(b => b.addEventListener('click', () => { pxCampers.splice(+b.dataset.i,1); renderPxCalc(); }));
   document.getElementById('px-add-camper').addEventListener('click', () => { pxCampers.push({weeks:'8',days:'5',transport:'none',ptype:'standard'}); renderPxCalc(); });
+  // Reset: drop any added campers and restore every selection (including Season/Rate) to defaults
+  document.getElementById('px-reset-calc').addEventListener('click', () => {
+    pxCampers = [{weeks:'8',days:'5',transport:'none',ptype:'standard'}];
+    pxSeason = 'proposed'; pxTier = 'ES';
+    renderPxCalc();
+  });
   renderPxCalcTotal();
 }
 
