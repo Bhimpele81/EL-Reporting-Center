@@ -2117,6 +2117,12 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-field select,.px-field input{padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.9rem;min-width:120px}
 .px-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.4rem;margin-bottom:1rem}
 .px-camper-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.6rem;padding:.6rem .7rem;border:1px solid #eee;border-radius:8px;margin-bottom:.6rem;background:#fafafa}
+.px-ao{position:relative;display:inline-block}
+.px-ao>summary{list-style:none;cursor:pointer;padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.9rem;background:#fff;min-width:110px}
+.px-ao>summary::-webkit-details-marker{display:none}
+.px-ao[open]>summary{border-color:var(--brand-mid)}
+.px-ao-menu{position:absolute;z-index:50;background:#fff;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.14);padding:.4rem .55rem;margin-top:.2rem;white-space:nowrap}
+.px-ao-menu label{display:block;font-size:.85rem;padding:.18rem 0;cursor:pointer}
 .px-total-box{margin-top:1rem;padding:1rem 1.2rem;border:2px solid var(--brand);border-radius:10px;background:#faf3f4;max-width:520px}
 .px-total-box .px-grand{font-size:1.6rem;font-weight:800;color:var(--brand-dark)}
 .px-line{display:flex;justify-content:space-between;gap:1.5rem;font-size:.88rem;padding:.15rem 0;border-bottom:1px dashed #e5d9dc}
@@ -3264,6 +3270,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <div class="faq-body">
         <p>On the <strong>Calculator</strong> sub-tab, choose the <strong>Season</strong> (Current or Proposed) and <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). When transportation is selected, a <strong>Transport days</strong> field appears (defaults to the camper's camp days) so you can charge transport for fewer days than they attend. Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
         <p>For families with more than one camper, a <strong>10% sibling discount</strong> is applied automatically to each Standard or Junior Camp camper after the first (10% off both tuition and transportation), shown as a line on that camper's subtotal.</p>
+        <p>Each camper also has an <strong>Add-ons</strong> multi-select (AM Extended, PM Extended, CIT). These are recorded and listed on the camper's line but <strong>do not change the price yet</strong> — pricing will be added once the amounts are set.</p>
         <p>Each camper has a <strong>Camp rate</strong> setting with four options: <strong>Standard (2nd Grade+)</strong>, <strong>Junior Camp (PS-1st)</strong> = 90% of 2nd Grade+, <strong>Preschool student</strong> (year-round preschool weekly rate), and <strong>Older sibling of preschool student</strong> (that family's older-sibling weekly rate). These come from the same Rate Settings the Rate Sheet uses, so the numbers stay consistent.</p>
       </div>
     </details>
@@ -5019,6 +5026,9 @@ let pricing = null, pxLoaded = false;
 let pxTier = 'ES';
 let pxSeason = 'proposed';   // which rate set the calculator prices from (current | proposed)
 let pxCampers = [{weeks:'8', days:'5', transport:'none', ptype:'standard'}];
+// Optional tuition add-ons (multi-select). No price impact yet — amounts pending.
+const ADDON_OPTS = [['am_ext','AM Extended'],['pm_ext','PM Extended'],['cit','CIT']];
+const aoSummary = addons => { const n = (addons||[]).length; return n ? 'Add-ons ('+n+')' : 'None'; };
 let pxExp = {pct:3, round:50, esRound:25, esMode:'pct', esDisc:7};
 const pxMoney = n => '$' + (Math.round(Number(n)||0)).toLocaleString('en-US');
 
@@ -5067,6 +5077,9 @@ function renderPxCalc() {
       '<label class="px-field">Days/wk<select data-f="days">'+['5','4','3'].map(d=>opt(d,c.days)).join('')+'</select></label>' +
       '<label class="px-field">Transport<select data-f="transport">'+['none','1way','2way'].map(t=>`<option value="${t}"${c.transport===t?' selected':''}>${trLabel[t]}</option>`).join('')+'</select></label>' +
       (c.transport!=='none' ? '<label class="px-field">Transport days<select data-f="tdays">'+['5','4','3'].map(d=>opt(d,(c.tdays||c.days))).join('')+'</select></label>' : '') +
+      '<span class="px-field">Add-ons<details class="px-ao"><summary>'+aoSummary(c.addons)+'</summary><div class="px-ao-menu">'+
+        ADDON_OPTS.map(([k,l])=>'<label><input type="checkbox" data-ao="'+k+'"'+((c.addons||[]).includes(k)?' checked':'')+'> '+l+'</label>').join('')+
+      '</div></details></span>' +
       (pxCampers.length>1?'<button class="px-btn ghost px-rm" data-i="'+i+'" style="padding:.35rem .6rem">✕</button>':'') +
       '</div>';
   });
@@ -5086,6 +5099,13 @@ function renderPxCalc() {
         if (el.dataset.f === 'transport') renderPxCalc(); else renderPxCalcTotal();
       });
     });
+    row.querySelectorAll('.px-ao input[data-ao]').forEach(cb => cb.addEventListener('change', () => {
+      const det = cb.closest('.px-ao');
+      const sel = [...det.querySelectorAll('input[data-ao]:checked')].map(x => x.dataset.ao);
+      pxCampers[i].addons = sel;
+      det.querySelector('summary').textContent = aoSummary(sel);
+      renderPxCalcTotal();
+    }));
   });
   box.querySelectorAll('.px-rm').forEach(b => b.addEventListener('click', () => { pxCampers.splice(+b.dataset.i,1); renderPxCalc(); }));
   document.getElementById('px-add-camper').addEventListener('click', () => { pxCampers.push({weeks:'8',days:'5',transport:'none',ptype:'standard'}); renderPxCalc(); });
@@ -5139,6 +5159,12 @@ function renderPxCalcTotal() {
       if (isSibling) tr = Math.round(tr * 0.90);   // siblings get 10% off transport too
       sub += tr;
       detail += ' + '+pxMoney(tr)+' transport ('+(c.transport==='1way'?'1-way':'2-way')+', '+td+'-day'+(isSibling?', sibling 10% off':'')+')';
+    }
+    // Optional add-ons (AM/PM Extended, CIT, ...) — recorded now, no price impact yet
+    const addons = c.addons || [];
+    if (addons.length) {
+      const labels = addons.map(k => (ADDON_OPTS.find(o => o[0] === k) || [])[1] || k);
+      detail += ' + '+labels.join(', ')+' <span style="color:#999">(no charge yet)</span>';
     }
     campGrand += sub;
     lines.push('<div class="px-line"><span>Camper '+(i+1)+': '+detail+'</span><span>'+pxMoney(sub)+'</span></div>');

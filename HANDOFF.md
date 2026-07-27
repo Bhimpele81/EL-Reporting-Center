@@ -124,7 +124,7 @@ db81d3e Rename Bunks & Camps -> Utilities; move master upload there; add Family 
 
 ## Open / planned follow-ups
 
-- **Pricing Calculator enhancements** (planned, not built): add per-camper **Program** (2nd Grade+ vs Junior Camp = 90% rate); **Extended care** (early drop-off / late pickup add-on — need pricing basis: per week/day/flat, AM/PM as separate lines/rates); **Counselors in Training (CIT)** discounted tuition tier (need: % off or flat, which base, interactions with transport/sibling). Confirm rules/rounding for each before building.
+- **Pricing Calculator add-on amounts** (UI built, pricing pending): each camper has an **Add-ons** multi-select (`ADDON_OPTS` = AM Extended, PM Extended, CIT) rendered as a `<details>` dropdown; selections stored in `c.addons` and shown on the camper line as "(no charge yet)". **Need the $ amount + basis (flat / per week / per day) for each** to wire pricing; then add a Rate Settings editor and compute in `renderPxCalcTotal`. List is extensible (more add-ons coming).
 - **Family-contact reports** — build reports that source `families.json` (waiting on the real sample spreadsheet to finalize import column mapping + fields).
 - Optional: disable self-registration (admin-only account creation); inline edit of username; trim `@domain` in the header too (currently only the master blue box does).
 - Password resets are intentionally **admin-driven** (no email provider). Self-service email reset was declined.
