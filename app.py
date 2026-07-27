@@ -3300,7 +3300,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <div class="faq-body">
         <p>On the <strong>Calculator</strong> sub-tab, choose the <strong>Season</strong> (Current or Proposed) and <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). When transportation is selected, a <strong>Transport days</strong> field appears (defaults to the camper's camp days) so you can charge transport for fewer days than they attend. Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
         <p>For families with more than one camper, a <strong>10% sibling discount</strong> is applied automatically to each Standard or Junior Camp camper after the first (10% off both tuition and transportation), shown as a line on that camper's subtotal.</p>
-        <p>Each camper also has <strong>AM care</strong> and <strong>PM care</strong> pickers for extended hours; pick a drop-off / pickup time and the weekly fee (by that time and the camper's days) is added × the number of weeks. The <strong>Add-ons</strong> multi-select covers other items such as <strong>CIT</strong> (priced from the Assumptions tab; amount 0 = recorded only).</p>
+        <p>Each camper also has <strong>AM care</strong> and <strong>PM care</strong> pickers for extended hours; pick a drop-off / pickup time and the weekly fee (by that time and the camper's days) is added × the number of weeks.</p>
         <p>Each camper has a <strong>Camp rate</strong> setting with four options: <strong>Standard (2nd Grade+)</strong>, <strong>Junior Camp (PS-1st)</strong> = 90% of 2nd Grade+, <strong>Preschool student</strong> (year-round preschool weekly rate), and <strong>Older sibling of preschool student</strong> (that family's older-sibling weekly rate). These come from the same Rate Settings the Rate Sheet uses, so the numbers stay consistent.</p>
       </div>
     </details>
@@ -3324,7 +3324,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>What is the Assumptions tab?</summary>
       <div class="faq-body">
-        <p>The <strong>Assumptions</strong> sub-tab is the single source of truth for the pricing rules that both the Calculator and Rate Sheet use, so they never drift apart. You can edit: the <strong>Junior Camp %</strong> (of 2nd Grade+), the <strong>sibling discount %</strong>, the <strong>rounding</strong> rules (4/3-day &amp; Junior, sibling, and the Original sheet), and the <strong>add-on pricing</strong> (e.g. CIT) with an amount and basis (per week / per season / % off). Extended-hours (AM/PM care) weekly fees are edited on the <strong>Rate Settings</strong> tab.</p>
+        <p>The <strong>Assumptions</strong> sub-tab is the single source of truth for the pricing rules that both the Calculator and Rate Sheet use, so they never drift apart. You can edit the <strong>Junior Camp %</strong> (of 2nd Grade+), the <strong>sibling discount %</strong>, and the <strong>rounding</strong> rules (4/3-day &amp; Junior, sibling, and the Original sheet). Extended-hours (AM/PM care) weekly fees are edited on the <strong>Rate Settings</strong> tab.</p>
         <p>Use the <strong>Lock / Unlock</strong> button to protect the assumptions from accidental edits: unlock, make changes, click <strong>Save</strong>, then lock again. Add-on amounts left at 0 are recorded on the Calculator but don't change the price yet.</p>
       </div>
     </details>
@@ -5120,9 +5120,6 @@ function renderPxCalc() {
       (c.transport!=='none' ? '<label class="px-field">Transport days<select data-f="tdays">'+['5','4','3'].map(d=>opt(d,(c.tdays||c.days))).join('')+'</select></label>' : '') +
       '<label class="px-field">AM care<select data-f="am">'+AM_SLOTS.map(([v,l])=>`<option value="${v}"${(c.am||'')===v?' selected':''}>${l}</option>`).join('')+'</select></label>' +
       '<label class="px-field">PM care<select data-f="pm">'+PM_SLOTS.map(([v,l])=>`<option value="${v}"${(c.pm||'')===v?' selected':''}>${l}</option>`).join('')+'</select></label>' +
-      '<span class="px-field">Add-ons<details class="px-ao"><summary>'+aoSummary(c.addons)+'</summary><div class="px-ao-menu">'+
-        ADDON_OPTS.map(([k,l])=>'<label><input type="checkbox" data-ao="'+k+'"'+((c.addons||[]).includes(k)?' checked':'')+'> '+l+'</label>').join('')+
-      '</div></details></span>' +
       (pxCampers.length>1?'<button class="px-btn ghost px-rm" data-i="'+i+'" style="padding:.35rem .6rem">✕</button>':'') +
       '</div>';
   });
@@ -5142,13 +5139,6 @@ function renderPxCalc() {
         if (el.dataset.f === 'transport') renderPxCalc(); else renderPxCalcTotal();
       });
     });
-    row.querySelectorAll('.px-ao input[data-ao]').forEach(cb => cb.addEventListener('change', () => {
-      const det = cb.closest('.px-ao');
-      const sel = [...det.querySelectorAll('input[data-ao]:checked')].map(x => x.dataset.ao);
-      pxCampers[i].addons = sel;
-      det.querySelector('summary').textContent = aoSummary(sel);
-      renderPxCalcTotal();
-    }));
   });
   box.querySelectorAll('.px-rm').forEach(b => b.addEventListener('click', () => { pxCampers.splice(+b.dataset.i,1); renderPxCalc(); }));
   document.getElementById('px-add-camper').addEventListener('click', () => { pxCampers.push({weeks:'8',days:'5',transport:'none',ptype:'standard'}); renderPxCalc(); });
@@ -5219,22 +5209,6 @@ function renderPxCalcTotal() {
       const r = Number(((ex.pm||{})[c.pm]||{})[c.days]||0), f = r*wksNum; sub += f;
       detail += ' + '+pxMoney(f)+' PM care (before '+c.pm+', '+pxMoney(r)+'/wk × '+wksNum+')';
     }
-    // Optional add-ons (CIT, ...) — priced from the Assumptions table
-    (c.addons || []).forEach(k => {
-      const lbl = (ADDON_OPTS.find(o => o[0] === k) || [])[1] || k;
-      const ad = (A.addons && A.addons[k]) || {amount:0, basis:'week'};
-      const amt = Number(ad.amount)||0;
-      if (amt <= 0) { detail += ' + '+lbl+' <span style="color:#999">(no charge yet)</span>'; return; }
-      if (ad.basis === 'pct_off') {
-        const d = Math.round(tuition * amt/100); sub -= d;
-        detail += ' − '+pxMoney(d)+' '+lbl+' ('+amt+'% off)';
-      } else if (ad.basis === 'season') {
-        sub += amt; detail += ' + '+pxMoney(amt)+' '+lbl;
-      } else {   // per week
-        const add = amt*wksNum; sub += add;
-        detail += ' + '+pxMoney(add)+' '+lbl+' ('+pxMoney(amt)+'/wk × '+wksNum+')';
-      }
-    });
     campGrand += sub;
     lines.push('<div class="px-line"><span>Camper '+(i+1)+': '+detail+'</span><span>'+pxMoney(sub)+'</span></div>');
   });
@@ -5479,18 +5453,11 @@ function renderPxAssumptions() {
     '<button class="px-btn" id="px-asm-save"'+dis+' style="'+(locked?'opacity:.5;cursor:default':'')+'">💾 Save</button>' +
     '<span class="px-msg" id="px-asm-msg" style="color:#888">'+(locked?'Unlock to edit these assumptions.':'')+'</span></div>';
   h += '<div class="px-sec"><div class="px-sec-title">Camp pricing assumptions</div><table class="px-tbl"><thead><tr><th class="px-l">Assumption</th><th>Value</th></tr></thead><tbody>';
-  h += arow('Junior Camp tuition', inp('px-asm-junior', a.junior_pct)+' % of 2nd Grade+');
-  h += arow('Sibling discount', inp('px-asm-sibdisc', a.sibling_disc_pct)+' % off tuition &amp; transport (2nd+ camper)');
-  h += arow('Round tuition (4/3-day &amp; Junior) to', '$ '+inp('px-asm-rt', a.round_tuition));
-  h += arow('Round sibling tuition to', '$ '+inp('px-asm-rs', a.round_sibling));
-  h += arow('Round Original sheet to', '$ '+inp('px-asm-ro', a.round_original));
-  h += '</tbody></table></div>';
-  h += '<div class="px-sec"><div class="px-sec-title">Add-on pricing</div><div style="font-size:.8rem;color:#888;margin-bottom:.3rem">Amount 0 = recorded only (no charge). Set an amount to have it affect the Calculator.</div>' +
-    '<table class="px-tbl"><thead><tr><th class="px-l">Add-on</th><th>Amount ($)</th><th>Basis</th></tr></thead><tbody>';
-  ADDON_OPTS.forEach(([k,l]) => {
-    const ad = (a.addons && a.addons[k]) || {amount:0, basis:'week'};
-    h += '<tr><td class="px-l">'+l+'</td><td>'+inp('px-asm-ao-'+k+'-amt', ad.amount)+'</td><td>'+basisSel('px-asm-ao-'+k+'-basis', ad.basis)+'</td></tr>';
-  });
+  h += arow('Junior Camp tuition (% of 2nd Grade+)', inp('px-asm-junior', a.junior_pct));
+  h += arow('Sibling discount (% off tuition &amp; transport, 2nd+ camper)', inp('px-asm-sibdisc', a.sibling_disc_pct));
+  h += arow('Round tuition (4/3-day &amp; Junior), nearest $', inp('px-asm-rt', a.round_tuition));
+  h += arow('Round sibling tuition, nearest $', inp('px-asm-rs', a.round_sibling));
+  h += arow('Round Original sheet, nearest $', inp('px-asm-ro', a.round_original));
   h += '</tbody></table></div>';
   h += '<div class="px-sec"><div class="px-sec-title">For reference (edit in Rate Settings)</div><table class="px-tbl"><thead><tr><th class="px-l">Item</th><th>Value</th></tr></thead><tbody>' +
     arow('Day rate factor', '5-day 100%, 4-day '+pctVal(dm['4'])+'%, 3-day '+pctVal(dm['3'])+'%') +
@@ -5514,13 +5481,6 @@ async function savePxAssumptions() {
   a.round_tuition = num('px-asm-rt');
   a.round_sibling = num('px-asm-rs');
   a.round_original = num('px-asm-ro');
-  a.addons = a.addons || {};
-  ADDON_OPTS.forEach(([k]) => {
-    a.addons[k] = a.addons[k] || {};
-    a.addons[k].amount = num('px-asm-ao-'+k+'-amt');
-    const b = document.getElementById('px-asm-ao-'+k+'-basis');
-    a.addons[k].basis = (b && b.value) || 'week';
-  });
   const msg = document.getElementById('px-asm-msg');
   if (msg) { msg.textContent = 'Saving…'; msg.style.color = '#777'; }
   try {
