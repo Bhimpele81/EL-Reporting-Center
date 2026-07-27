@@ -2799,7 +2799,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <div class="card-hd">
       <div>
         <div class="card-title">Pricing</div>
-        <div class="card-hint">Maintain the rate tables, model price changes for an upcoming season, calculate what a family owes, and print a shareable rate sheet. All parts read from the same editable rates.</div>
+        <div class="card-hint">Calculate what any family owes (every camp rate type, siblings, transportation, and AM/PM extended care), model a price change for an upcoming season, maintain every rate in one place, and print a shareable one-page rate sheet. All four sub-tabs read from the same editable rates.</div>
       </div>
     </div>
     <div class="snap-subtabs">
@@ -3322,9 +3322,9 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do the rate tables and the day rate factor work?</summary>
       <div class="faq-body">
-        <p><strong>Rate Settings</strong> holds the camp tuition, transportation, and childcare rates. Camp tuition has a <strong>Current</strong> column set (the season now in effect, e.g. 2026) and a <strong>Proposed</strong> column set (the upcoming season, e.g. 2027), each with Early Signup and Regular by number of weeks. Enter both and the <strong>Change</strong> column shows the effective percent increase. The Proposed rates are what the Calculator and Explorer use. Set the season labels at the top, edit any value, and click <strong>Save rates</strong>.</p>
+        <p><strong>Rate Settings</strong> holds the camp tuition, transportation, childcare, and extended-care rates (plus the derivation rules, below). Camp tuition has a <strong>Current</strong> column set (the season now in effect, e.g. 2026) and a <strong>Proposed</strong> column set (the upcoming season, e.g. 2027), each with Early Signup and Regular by number of weeks. Enter both and the <strong>Change</strong> column shows the effective percent increase. The Proposed rates are what the Calculator and Explorer use. Set the season labels at the top, edit any value, and click <strong>Save rates</strong>.</p>
         <p>The <strong>day rate factor</strong> is the percentage of the full 5-day tuition a 4-day or 3-day camper pays (100% = full price). It defaults to 88% for 4-day and 70% for 3-day; the 5-day column is the base and is always 100%.</p>
-        <p>At the bottom of Rate Settings, the <strong>Derivation rules &amp; rounding</strong> section holds the rules that turn tuition into the other prices, shared by the Calculator and Rate Sheet so they never drift apart: the <strong>Junior Camp %</strong> (of 2nd Grade+), the <strong>sibling discount %</strong>, and the <strong>rounding</strong> rules. These rarely change, so a <strong>Lock / Unlock</strong> button protects them: unlock, edit, click <strong>Save rates</strong>, then lock again. The rest of the tab (tuition, transportation, childcare, extended care) stays editable regardless of the lock.</p>
+        <p>At the bottom of Rate Settings, the <strong>Derivation rules &amp; rounding</strong> section holds the rules that turn tuition into the other prices, shared by the Calculator and Rate Sheet so they never drift apart: the <strong>Junior Camp %</strong> (of 2nd Grade+), the <strong>sibling discount %</strong> (off tuition &amp; transport), the <strong>Full-Time CIT %</strong> (off the full 2nd Grade+ tuition), the <strong>sibling extended-care discount</strong> ($ off per week, each of AM &amp; PM), and the <strong>rounding</strong> rules. These rarely change, so a <strong>Lock / Unlock</strong> button protects them: unlock, edit, click <strong>Save rates</strong>, then lock again. The rest of the tab (tuition, transportation, childcare, extended care) stays editable regardless of the lock.</p>
       </div>
     </details>
 
