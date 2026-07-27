@@ -124,7 +124,7 @@ db81d3e Rename Bunks & Camps -> Utilities; move master upload there; add Family 
 
 ## Open / planned follow-ups
 
-- **Pricing Calculator add-on amounts** (UI built, pricing pending): each camper has an **Add-ons** multi-select (`ADDON_OPTS` = AM Extended, PM Extended, CIT) rendered as a `<details>` dropdown; selections stored in `c.addons` and shown on the camper line as "(no charge yet)". **Need the $ amount + basis (flat / per week / per day) for each** to wire pricing; then add a Rate Settings editor and compute in `renderPxCalcTotal`. List is extensible (more add-ons coming).
+- **Pricing Calculator add-on amounts** (UI + wiring built, amounts pending): each camper has an **Add-ons** multi-select (`ADDON_OPTS` = AM Extended, PM Extended, CIT). Amounts + basis live in `pricing.assumptions.addons` (edited on the **Assumptions** sub-tab); Calculator applies them (week / season / pct_off). All amounts default 0 ("no charge yet"). Just fill in the real amounts/bases in Assumptions when known. The pricing rules (junior %, sibling %, roundings) are all config-driven in `pricing.assumptions` now (no hardcoded 90/10/25); both Calculator and Rate Sheet read them.
 - **Family-contact reports** — build reports that source `families.json` (waiting on the real sample spreadsheet to finalize import column mapping + fields).
 - Optional: disable self-registration (admin-only account creation); inline edit of username; trim `@domain` in the header too (currently only the master blue box does).
 - Password resets are intentionally **admin-driven** (no email provider). Self-service email reset was declined.

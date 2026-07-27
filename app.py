@@ -444,6 +444,22 @@ _DEFAULT_PRICING = {
         "4": {"base": 435, "sibling2": 530},
         "3": {"base": 395, "sibling2": 485},
     },
+    # Pricing assumptions — the single source of truth the Calculator and Rate
+    # Sheet read from (so the rules aren't hardcoded in two places). Editable,
+    # with a lock. Add-on amounts start at 0 (no charge) until set.
+    "assumptions": {
+        "junior_pct": 90,          # Junior Camp tuition = this % of 2nd Grade+
+        "sibling_disc_pct": 10,    # sibling discount % (tuition + transport)
+        "round_tuition": 25,       # 4/3-day and Junior rounding (nearest $)
+        "round_sibling": 1,        # sibling tuition rounding
+        "round_original": 5,       # Original-sheet rounding (as published)
+        "locked": False,
+        "addons": {
+            "am_ext": {"amount": 0, "basis": "week"},     # per week
+            "pm_ext": {"amount": 0, "basis": "week"},
+            "cit":    {"amount": 0, "basis": "pct_off"},  # % off tuition (a discount)
+        },
+    },
 }
 
 
@@ -2770,11 +2786,13 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <button class="snap-subtab pxtab on" data-px="calc">Calculator</button>
       <button class="snap-subtab pxtab" data-px="explore">Explorer</button>
       <button class="snap-subtab pxtab" data-px="rates">Rate Settings</button>
+      <button class="snap-subtab pxtab" data-px="assumptions">Assumptions</button>
       <button class="snap-subtab pxtab" data-px="sheet">Rate Sheet</button>
     </div>
     <div class="px-view on" id="px-calc"></div>
     <div class="px-view" id="px-explore"></div>
     <div class="px-view" id="px-rates"></div>
+    <div class="px-view" id="px-assumptions"></div>
     <div class="px-view" id="px-sheet"></div>
   </div>
 </div>
@@ -3270,7 +3288,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <div class="faq-body">
         <p>On the <strong>Calculator</strong> sub-tab, choose the <strong>Season</strong> (Current or Proposed) and <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). When transportation is selected, a <strong>Transport days</strong> field appears (defaults to the camper's camp days) so you can charge transport for fewer days than they attend. Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
         <p>For families with more than one camper, a <strong>10% sibling discount</strong> is applied automatically to each Standard or Junior Camp camper after the first (10% off both tuition and transportation), shown as a line on that camper's subtotal.</p>
-        <p>Each camper also has an <strong>Add-ons</strong> multi-select (AM Extended, PM Extended, CIT). These are recorded and listed on the camper's line but <strong>do not change the price yet</strong> — pricing will be added once the amounts are set.</p>
+        <p>Each camper also has an <strong>Add-ons</strong> multi-select (AM Extended, PM Extended, CIT). These are priced from the <strong>Assumptions</strong> tab: an add-on with an amount of 0 is recorded but doesn't change the price; set an amount there and it applies automatically.</p>
         <p>Each camper has a <strong>Camp rate</strong> setting with four options: <strong>Standard (2nd Grade+)</strong>, <strong>Junior Camp (PS-1st)</strong> = 90% of 2nd Grade+, <strong>Preschool student</strong> (year-round preschool weekly rate), and <strong>Older sibling of preschool student</strong> (that family's older-sibling weekly rate). These come from the same Rate Settings the Rate Sheet uses, so the numbers stay consistent.</p>
       </div>
     </details>
@@ -3288,6 +3306,14 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <div class="faq-body">
         <p><strong>Rate Settings</strong> holds the camp tuition, transportation, and childcare rates. Camp tuition has a <strong>Current</strong> column set (the season now in effect, e.g. 2026) and a <strong>Proposed</strong> column set (the upcoming season, e.g. 2027), each with Early Signup and Regular by number of weeks. Enter both and the <strong>Change</strong> column shows the effective percent increase. The Proposed rates are what the Calculator and Explorer use. Set the season labels at the top, edit any value, and click <strong>Save rates</strong>.</p>
         <p>The <strong>day rate factor</strong> is the percentage of the full 5-day tuition a 4-day or 3-day camper pays (100% = full price). It defaults to 88% for 4-day and 70% for 3-day; the 5-day column is the base and is always 100%.</p>
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>What is the Assumptions tab?</summary>
+      <div class="faq-body">
+        <p>The <strong>Assumptions</strong> sub-tab is the single source of truth for the pricing rules that both the Calculator and Rate Sheet use, so they never drift apart. You can edit: the <strong>Junior Camp %</strong> (of 2nd Grade+), the <strong>sibling discount %</strong>, the <strong>rounding</strong> rules (4/3-day &amp; Junior, sibling, and the Original sheet), and the <strong>add-on pricing</strong> (AM Extended, PM Extended, CIT) with an amount and basis (per week / per season / % off).</p>
+        <p>Use the <strong>Lock / Unlock</strong> button to protect the assumptions from accidental edits: unlock, make changes, click <strong>Save</strong>, then lock again. Add-on amounts left at 0 are recorded on the Calculator but don't change the price yet.</p>
       </div>
     </details>
 
@@ -5041,7 +5067,7 @@ async function loadPricing(force) {
     pricing = await r.json();
     pxLoaded = true;
   } catch(e) { return; }
-  renderPxCalc(); renderPxExplore(); renderPxRates(); renderPxSheet();
+  renderPxCalc(); renderPxExplore(); renderPxRates(); renderPxAssumptions(); renderPxSheet();
 }
 
 // Sub-tab switching
@@ -5115,11 +5141,16 @@ function renderPxCalc() {
 function renderPxCalcTotal() {
   const baseSet = pxSeason === 'current' ? (pricing.camp.current || {}) : pricing.camp.tiers;
   const tiers = baseSet[pxTier] || {}, dm = pricing.camp.day_mult || {};
-  // Standard 2nd Grade+ tuition for a weeks/days combo (4/3-day rounded to $25)
+  const A = pricing.assumptions || {};
+  const juniorF = (Number(A.junior_pct)||90)/100;
+  const sibF = 1 - (Number(A.sibling_disc_pct)||10)/100;
+  const rT = Number(A.round_tuition)||25, rS = Number(A.round_sibling)||1;
+  const sibRound = x => Math.round(x/rS)*rS;
+  // Standard 2nd Grade+ tuition for a weeks/days combo (4/3-day rounded to round_tuition)
   const stdTuition = (weeks, days) => {
     const base = Number(tiers[weeks]||0), mult = Number(dm[days]!=null ? dm[days] : 1);
     let t = base*mult;
-    if (days !== '5') t = Math.round(t/25)*25;
+    if (days !== '5') t = Math.round(t/rT)*rT;
     return t;
   };
   let lines = [], campGrand = 0;
@@ -5137,8 +5168,8 @@ function renderPxCalcTotal() {
       const std = stdTuition(c.weeks, c.days);
       const mult = Number(dm[c.days]!=null ? dm[c.days] : 1);
       if (ptype === 'junior') {
-        tuition = Math.round((0.90 * std)/25)*25;   // Junior Camp = 90% of 2nd Grade+, rounded to $25
-        detail = pxMoney(tuition)+' Junior Camp tuition (90% of 2nd Grade+, '+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+')';
+        tuition = Math.round((juniorF * std)/rT)*rT;   // Junior Camp = junior_pct% of 2nd Grade+, rounded
+        detail = pxMoney(tuition)+' Junior Camp tuition ('+Math.round(juniorF*100)+'% of 2nd Grade+, '+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+')';
       } else {
         tuition = std;
         detail = pxMoney(tuition)+' tuition ('+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+(mult!==1?' ×'+mult:'')+')';
@@ -5146,9 +5177,10 @@ function renderPxCalcTotal() {
     }
     // Automatic 10% sibling discount for each standard/junior camper after the first
     const isSibling = i > 0 && (ptype === 'standard' || ptype === 'junior');
+    const sibPct = Math.round((1 - sibF) * 100);
     if (isSibling) {
-      const sibTui = Math.round(tuition * 0.90);
-      detail += ' − '+pxMoney(tuition - sibTui)+' sibling discount (10%)';
+      const sibTui = sibRound(tuition * sibF);
+      detail += ' − '+pxMoney(tuition - sibTui)+' sibling discount ('+sibPct+'%)';
       tuition = sibTui;
     }
     let sub = tuition;
@@ -5156,16 +5188,26 @@ function renderPxCalcTotal() {
       const td = c.tdays || c.days;
       const wkr = Number((pricing.transport[c.transport]||{})[td]||0);
       let tr = wkr*wksNum;
-      if (isSibling) tr = Math.round(tr * 0.90);   // siblings get 10% off transport too
+      if (isSibling) tr = sibRound(tr * sibF);   // siblings get the same discount off transport
       sub += tr;
-      detail += ' + '+pxMoney(tr)+' transport ('+(c.transport==='1way'?'1-way':'2-way')+', '+td+'-day'+(isSibling?', sibling 10% off':'')+')';
+      detail += ' + '+pxMoney(tr)+' transport ('+(c.transport==='1way'?'1-way':'2-way')+', '+td+'-day'+(isSibling?', sibling '+sibPct+'% off':'')+')';
     }
-    // Optional add-ons (AM/PM Extended, CIT, ...) — recorded now, no price impact yet
-    const addons = c.addons || [];
-    if (addons.length) {
-      const labels = addons.map(k => (ADDON_OPTS.find(o => o[0] === k) || [])[1] || k);
-      detail += ' + '+labels.join(', ')+' <span style="color:#999">(no charge yet)</span>';
-    }
+    // Optional add-ons (AM/PM Extended, CIT, ...) — priced from the Assumptions table
+    (c.addons || []).forEach(k => {
+      const lbl = (ADDON_OPTS.find(o => o[0] === k) || [])[1] || k;
+      const ad = (A.addons && A.addons[k]) || {amount:0, basis:'week'};
+      const amt = Number(ad.amount)||0;
+      if (amt <= 0) { detail += ' + '+lbl+' <span style="color:#999">(no charge yet)</span>'; return; }
+      if (ad.basis === 'pct_off') {
+        const d = Math.round(tuition * amt/100); sub -= d;
+        detail += ' − '+pxMoney(d)+' '+lbl+' ('+amt+'% off)';
+      } else if (ad.basis === 'season') {
+        sub += amt; detail += ' + '+pxMoney(amt)+' '+lbl;
+      } else {   // per week
+        const add = amt*wksNum; sub += add;
+        detail += ' + '+pxMoney(add)+' '+lbl+' ('+pxMoney(amt)+'/wk × '+wksNum+')';
+      }
+    });
     campGrand += sub;
     lines.push('<div class="px-line"><span>Camper '+(i+1)+': '+detail+'</span><span>'+pxMoney(sub)+'</span></div>');
   });
@@ -5375,6 +5417,77 @@ async function savePxRates() {
   } catch(e) { msg.textContent = 'Save failed — try again'; msg.style.color = '#c0392b'; }
 }
 
+// ---------- Assumptions (single source of truth for the pricing rules) ----------
+function renderPxAssumptions() {
+  if (!pricing) return;
+  const box = document.getElementById('px-assumptions');
+  const a = pricing.assumptions || (pricing.assumptions = {});
+  const locked = !!a.locked;
+  const dis = locked ? ' disabled' : '';
+  const inp = (id,v) => '<input class="px-rate-inp" id="'+id+'" style="text-align:left" value="'+(v==null?'':v)+'"'+dis+'>';
+  const arow = (label, cell) => '<tr><td class="px-l">'+label+'</td><td style="text-align:left">'+cell+'</td></tr>';
+  const dm = pricing.camp.day_mult || {};
+  const pctVal = v => parseFloat((Number(v||0)*100).toFixed(2));
+  const basisSel = (id,val) => '<select class="px-rate-inp" id="'+id+'" style="width:auto;text-align:left"'+dis+'>'+
+    [['week','per week'],['season','per season (flat)'],['pct_off','% off tuition']].map(([v,l])=>'<option value="'+v+'"'+(val===v?' selected':'')+'>'+l+'</option>').join('')+'</select>';
+
+  let h = '<div class="px-controls" style="align-items:center">' +
+    '<button class="px-btn'+(locked?'':' ghost')+'" id="px-asm-lock">'+(locked?'🔒 Locked':'🔓 Unlocked')+'</button>' +
+    '<button class="px-btn" id="px-asm-save"'+dis+' style="'+(locked?'opacity:.5;cursor:default':'')+'">💾 Save</button>' +
+    '<span class="px-msg" id="px-asm-msg" style="color:#888">'+(locked?'Unlock to edit these assumptions.':'')+'</span></div>';
+  h += '<div class="px-sec"><div class="px-sec-title">Camp pricing assumptions</div><table class="px-tbl"><thead><tr><th class="px-l">Assumption</th><th>Value</th></tr></thead><tbody>';
+  h += arow('Junior Camp tuition', inp('px-asm-junior', a.junior_pct)+' % of 2nd Grade+');
+  h += arow('Sibling discount', inp('px-asm-sibdisc', a.sibling_disc_pct)+' % off tuition &amp; transport (2nd+ camper)');
+  h += arow('Round tuition (4/3-day &amp; Junior) to', '$ '+inp('px-asm-rt', a.round_tuition));
+  h += arow('Round sibling tuition to', '$ '+inp('px-asm-rs', a.round_sibling));
+  h += arow('Round Original sheet to', '$ '+inp('px-asm-ro', a.round_original));
+  h += '</tbody></table></div>';
+  h += '<div class="px-sec"><div class="px-sec-title">Add-on pricing</div><div style="font-size:.8rem;color:#888;margin-bottom:.3rem">Amount 0 = recorded only (no charge). Set an amount to have it affect the Calculator.</div>' +
+    '<table class="px-tbl"><thead><tr><th class="px-l">Add-on</th><th>Amount ($)</th><th>Basis</th></tr></thead><tbody>';
+  ADDON_OPTS.forEach(([k,l]) => {
+    const ad = (a.addons && a.addons[k]) || {amount:0, basis:'week'};
+    h += '<tr><td class="px-l">'+l+'</td><td>'+inp('px-asm-ao-'+k+'-amt', ad.amount)+'</td><td>'+basisSel('px-asm-ao-'+k+'-basis', ad.basis)+'</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<div class="px-sec"><div class="px-sec-title">For reference (edit in Rate Settings)</div><table class="px-tbl"><thead><tr><th class="px-l">Item</th><th>Value</th></tr></thead><tbody>' +
+    arow('Day rate factor', '5-day 100%, 4-day '+pctVal(dm['4'])+'%, 3-day '+pctVal(dm['3'])+'%') +
+    arow('Transportation', '2-way by day count (weekly × weeks); 1-way $120/wk; sibling 10% off') +
+    '</tbody></table></div>';
+  box.innerHTML = h;
+  document.getElementById('px-asm-lock').addEventListener('click', async () => {
+    pricing.assumptions.locked = !pricing.assumptions.locked;
+    try { await fetch('/api/pricing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pricing)}); } catch(e){}
+    renderPxAssumptions();
+  });
+  const sv = document.getElementById('px-asm-save');
+  if (sv && !locked) sv.addEventListener('click', savePxAssumptions);
+}
+
+async function savePxAssumptions() {
+  const num = id => { const el=document.getElementById(id); const v=parseFloat((el&&el.value||'').replace(/[^0-9.]/g,'')); return isNaN(v)?0:v; };
+  const a = pricing.assumptions = pricing.assumptions || {};
+  a.junior_pct = num('px-asm-junior');
+  a.sibling_disc_pct = num('px-asm-sibdisc');
+  a.round_tuition = num('px-asm-rt');
+  a.round_sibling = num('px-asm-rs');
+  a.round_original = num('px-asm-ro');
+  a.addons = a.addons || {};
+  ADDON_OPTS.forEach(([k]) => {
+    a.addons[k] = a.addons[k] || {};
+    a.addons[k].amount = num('px-asm-ao-'+k+'-amt');
+    const b = document.getElementById('px-asm-ao-'+k+'-basis');
+    a.addons[k].basis = (b && b.value) || 'week';
+  });
+  const msg = document.getElementById('px-asm-msg');
+  if (msg) { msg.textContent = 'Saving…'; msg.style.color = '#777'; }
+  try {
+    const r = await fetch('/api/pricing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pricing)});
+    if (!r.ok) throw 0;
+    if (msg) { msg.textContent = '✓ Saved'; msg.style.color = '#2e7d32'; }
+    renderPxCalc(); renderPxSheet();
+  } catch(e) { if (msg) { msg.textContent = 'Save failed — try again'; msg.style.color = '#c0392b'; } }
+}
+
 // ---------- Rate Sheet (printable) ----------
 // Derivation rules:
 //   2nd Grade+ tuition   = entered base (5-day) x day factor
@@ -5390,8 +5503,11 @@ function renderPxSheet() {
   const dm = pricing.camp.day_mult || {};
   const dayF = d => d === '5' ? 1 : Number(dm[d] != null ? dm[d] : 1);
   const trWk = d => Number((pricing.transport['2way'] || {})[d] || 0);
-  const SIB = 0.90, JR = 0.90;
-  const r1 = x => Math.round(x), r25 = x => Math.round(x/25)*25, wnum = w => parseInt(w,10)||0;
+  const A = pricing.assumptions || {};
+  const SIB = 1 - (Number(A.sibling_disc_pct)||10)/100;   // sibling multiplier
+  const JR = (Number(A.junior_pct)||90)/100;              // Junior Camp factor
+  const rS = Number(A.round_sibling)||1, rT = Number(A.round_tuition)||25, rO = Number(A.round_original)||5;
+  const sib = x => Math.round(x/rS)*rS, wnum = w => parseInt(w,10)||0;
 
   const baseFor = k => k === 'original' ? (pricing.camp.original || {}) : k === 'current' ? (pricing.camp.current || {}) : pricing.camp.tiers;
   const labelFor = k => k === 'original' ? 'Original' : k === 'current' ? ('Current ('+(pricing.season_label||'')+')') : ('Proposed ('+(pricing.proposed_label||'')+')');
@@ -5400,18 +5516,18 @@ function renderPxSheet() {
   const pBase = baseFor(primary), cBase = baseFor(compareKey);
 
   // Rounding step for 4/3-day + Junior tuition. Original mirrors the as-published
-  // sheet (nearest $5); Current/Proposed use the new nearest-$25 rule.
-  const stepFor = k => k === 'original' ? 5 : 25;
+  // sheet (round_original); Current/Proposed use round_tuition.
+  const stepFor = k => k === 'original' ? rO : rT;
   // 8 column values for a row: [5d T+Tr, 5d Sib+Tr, 5d T, 5d Sib, 4d T+Tr, 4d T, 3d T+Tr, 3d T]
   function rowVals(base, prog, tier, w, step) {
     const wn = wnum(w);
     const rs = x => Math.round(x/step)*step;
-    const t2 = d => { const raw = Number((base[tier]||{})[w]||0) * dayF(d); return d === '5' ? r1(raw) : rs(raw); };
+    const t2 = d => { const raw = Number((base[tier]||{})[w]||0) * dayF(d); return d === '5' ? Math.round(raw) : rs(raw); };
     const tuiP = d => prog === 'junior' ? rs(JR * t2(d)) : t2(d);
     const tr = d => trWk(d) * wn;
-    const t5 = tuiP('5'), sib5 = r1(SIB*t5), t4 = tuiP('4'), t3 = tuiP('3');
+    const t5 = tuiP('5'), sib5 = sib(SIB*t5), t4 = tuiP('4'), t3 = tuiP('3');
     if (wn === 0) return [null, null, t5, null, null, t4, null, t3];   // Mini: tuition only
-    return [t5+tr('5'), sib5+r1(SIB*tr('5')), t5, sib5, t4+tr('4'), t4, t3+tr('3'), t3];
+    return [t5+tr('5'), sib5+sib(SIB*tr('5')), t5, sib5, t4+tr('4'), t4, t3+tr('3'), t3];
   }
   // Per-column background hue (5d=blue, 4d=green, 3d=gold; plain Tuition = darker "m" shade)
   const COLHUE = ['c5l','c5l','c5m','c5l','c4l','c4m','c3l','c3m'];
