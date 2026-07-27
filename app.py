@@ -2144,7 +2144,12 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-field{display:inline-flex;flex-direction:column;gap:.2rem;margin:0 .9rem .8rem 0;font-size:.8rem;color:#555}
 .px-field select,.px-field input{padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.9rem;min-width:120px}
 .px-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.4rem;margin-bottom:1rem}
-.px-camper-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.6rem;padding:.6rem .7rem;border:1px solid #eee;border-radius:8px;margin-bottom:.6rem;background:#fafafa}
+.px-camper-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem;padding:.6rem .7rem;border:1px solid #eee;border-radius:8px;margin-bottom:.6rem;background:#fafafa}
+/* Compact camper-row fields so the row fits on one line on a normal screen */
+.px-camper-row .px-field select,.px-camper-row .px-field input{min-width:74px;font-size:.85rem;padding:.35rem .4rem}
+.px-camper-row select[data-f="ptype"]{min-width:150px}
+.px-camper-row select[data-f="am"],.px-camper-row select[data-f="pm"]{min-width:96px}
+.px-camper-row .px-field{margin:0}
 .px-ao{position:relative;display:inline-block}
 .px-ao>summary{list-style:none;cursor:pointer;padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.9rem;background:#fff;min-width:110px}
 .px-ao>summary::-webkit-details-marker{display:none}
