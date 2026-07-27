@@ -428,8 +428,8 @@ _DEFAULT_PRICING = {
             "Final": {"8": 6000, "7": 5820, "6": 5460, "5": 4920, "4": 4200, "Mini": 550},
         },
         # Multiplier applied to the (weeks) tuition for 5/4/3 days per week
-        # (4-day = 88% of 5-day, 3-day = 70%, per the rate sheet).
-        "day_mult": {"5": 1.0, "4": 0.88, "3": 0.70},
+        # (4-day = 88% of 5-day, 3-day = 80%, per the rate sheet).
+        "day_mult": {"5": 1.0, "4": 0.88, "3": 0.80},
     },
     # Weekly transportation add-on, by days per week
     "transport": {
@@ -3325,7 +3325,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <summary>How do the rate tables and the day rate factor work?</summary>
       <div class="faq-body">
         <p><strong>Rate Settings</strong> holds the camp tuition, transportation, childcare, and extended-care rates (plus the derivation rules, below). Camp tuition has a <strong>Current</strong> column set (the season now in effect, e.g. 2026) and a <strong>Proposed</strong> column set (the upcoming season, e.g. 2027), each with Early Signup and Regular by number of weeks. Enter both and the <strong>Change</strong> column shows the effective percent increase. The Proposed rates are what the Calculator and Explorer use. Set the season labels at the top, edit any value, and click <strong>Save rates</strong>.</p>
-        <p>The <strong>day rate factor</strong> is the percentage of the full 5-day tuition a 4-day or 3-day camper pays (100% = full price). It defaults to 88% for 4-day and 70% for 3-day; the 5-day column is the base and is always 100%.</p>
+        <p>The <strong>day rate factor</strong> is the percentage of the full 5-day tuition a 4-day or 3-day camper pays (100% = full price). It defaults to 88% for 4-day and 80% for 3-day; the 5-day column is the base and is always 100%.</p>
         <p>At the bottom of Rate Settings, the <strong>Derivation rules &amp; rounding</strong> section holds the rules that turn tuition into the other prices, shared by the Calculator and Rate Sheet so they never drift apart: the <strong>Junior Camp %</strong> (of 2nd Grade+), the <strong>sibling discount %</strong> (off tuition &amp; transport), the <strong>Full-Time CIT %</strong> (off the full 2nd Grade+ tuition), the <strong>sibling extended-care discount</strong> ($ off per week, each of AM &amp; PM), and the <strong>rounding</strong> rules. These rarely change, so a <strong>Lock / Unlock</strong> button protects them: unlock, edit, click <strong>Save rates</strong>, then lock again. The rest of the tab (tuition, transportation, childcare, extended care) stays editable regardless of the lock.</p>
       </div>
     </details>
@@ -5362,7 +5362,7 @@ function renderPxRates() {
     '<td>'+inp('px-camp-Final-'+w, pricing.camp.tiers.Final[w])+'</td>'+
     '<td id="px-chg-ES-'+w+'" class="px-diff-flat"></td><td id="px-chg-Final-'+w+'" class="px-diff-flat"></td></tr>');
   h += '</tbody></table>';
-  h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the percentage of the full 5-day tuition charged to a 4-day or 3-day camper (100% is the full rate). Defaults to 88% for 4-day and 70% for 3-day. The 5-day column is the base and is always 100%.</div>';
+  h += '<div style="font-size:.8rem;color:#888;margin:.6rem 0 .3rem"><strong>Day rate factor:</strong> the percentage of the full 5-day tuition charged to a 4-day or 3-day camper (100% is the full rate). Defaults to 88% for 4-day and 80% for 3-day. The 5-day column is the base and is always 100%.</div>';
   const pct = v => parseFloat((Number(v||0) * 100).toFixed(2));
   const pctInp = (id,v) => '<input class="px-rate-inp px-pct" id="'+id+'" value="'+pct(v)+'"> %';
   h += '<table class="px-tbl"><thead><tr><th>5-day</th><th>4-day</th><th>3-day</th></tr></thead><tbody><tr>'+
