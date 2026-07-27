@@ -5254,10 +5254,13 @@ function renderPxExplore() {
     '<label class="px-field">Early Signup discount<select id="px-exp-esmode"><option value="pct"'+(pxExp.esMode==='pct'?' selected':'')+'>% off regular</option><option value="amt"'+(pxExp.esMode==='amt'?' selected':'')+'>$ off regular</option></select></label>' +
     '<label class="px-field">Discount value<input type="number" id="px-exp-esdisc" step="0.1" value="'+pxExp.esDisc+'"></label>' +
     '<label class="px-field">Round Early Signup to<select id="px-exp-esround">'+roundOptsFor(pxExp.esRound)+'</select></label>' +
-    '<button class="px-btn" id="px-apply" style="align-self:center">Apply to Rate Settings</button>' +
     '</div>' +
-    '<div style="font-size:.8rem;color:#888;margin-bottom:1rem">Preview only. The <strong>Regular</strong> price is the current price increased by the percentage above; <strong>Early Signup</strong> is the regular price minus the discount. Use <strong>Apply to Rate Settings</strong> to load these into the editable rates, then Save. Transportation is not changed here.</div>' +
-    '<div id="px-exp-results"></div>';
+    '<div style="font-size:.8rem;color:#888;margin-bottom:1rem">Preview only. The <strong>Regular</strong> price is the current price increased by the percentage above; <strong>Early Signup</strong> is the regular price minus the discount. Transportation is not changed here.</div>' +
+    '<div id="px-exp-results"></div>' +
+    '<div style="margin-top:1.2rem;padding-top:.9rem;border-top:1px solid #e5e5e5">' +
+      '<button class="px-btn" id="px-apply">Apply to Rate Settings</button>' +
+      '<div style="font-size:.8rem;color:#888;margin-top:.4rem">Loads the proposed figures above into <strong>Rate Settings</strong> for review. This changes the shared rates for everyone once you go there and click <strong>Save rates</strong>. Nothing is saved until you do.</div>' +
+    '</div>';
   const g = id => document.getElementById(id);
   g('px-exp-pct').addEventListener('input', e => { pxExp.pct = parseFloat(e.target.value)||0; renderPxExploreResults(); });
   g('px-exp-esmode').addEventListener('change', e => { pxExp.esMode = e.target.value; renderPxExploreResults(); });
