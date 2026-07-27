@@ -3262,9 +3262,9 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do I calculate what a family owes?</summary>
       <div class="faq-body">
-        <p>On the <strong>Calculator</strong> sub-tab, choose <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). When transportation is selected, a <strong>Transport days</strong> field appears (defaults to the camper's camp days) so you can charge transport for fewer days than they attend. Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
+        <p>On the <strong>Calculator</strong> sub-tab, choose the <strong>Season</strong> (Current or Proposed) and <strong>Early Signup (fall)</strong> or <strong>Regular</strong> for the family, then add a row per camper with their <strong>weeks</strong>, <strong>days per week</strong>, and <strong>transportation</strong> (none, 1-way, or 2-way). When transportation is selected, a <strong>Transport days</strong> field appears (defaults to the camper's camp days) so you can charge transport for fewer days than they attend. Use <strong>Add camper</strong> for siblings. The itemized <strong>Camp total</strong> updates as you go.</p>
         <p>For families with more than one camper, each standard camper after the first has a <strong>sibling discount</strong> field (% or $ off that camper's tuition). These are handled case by case, so you enter the amount per family; it is shown as a line on that camper's subtotal.</p>
-        <p>Each camper has a <strong>Camp rate</strong> setting. Leave it on <strong>Standard</strong> for regular camp tuition. For a family in the year-round preschool, set the preschooler to <strong>Preschool student</strong> and any 2nd-grade+ camper to <strong>Older sibling</strong>; those campers are then priced at the weekly preschool / older-sibling rate (× the number of weeks) instead of standard tuition.</p>
+        <p>Each camper has a <strong>Camp rate</strong> setting with four options: <strong>Standard (2nd Grade+)</strong>, <strong>Junior Camp (PS-1st)</strong> = 90% of 2nd Grade+, <strong>Preschool student</strong> (year-round preschool weekly rate), and <strong>Older sibling of preschool student</strong> (that family's older-sibling weekly rate). These come from the same Rate Settings the Rate Sheet uses, so the numbers stay consistent.</p>
       </div>
     </details>
 
@@ -5017,6 +5017,7 @@ function famCardHTML(f) {
 // ---- Pricing module (admin) ----
 let pricing = null, pxLoaded = false;
 let pxTier = 'ES';
+let pxSeason = 'proposed';   // which rate set the calculator prices from (current | proposed)
 let pxCampers = [{weeks:'8', days:'5', transport:'none', ptype:'standard', disc:0, discMode:'pct'}];
 let pxExp = {pct:3, round:50, esRound:25, esMode:'pct', esDisc:7};
 const pxMoney = n => '$' + (Math.round(Number(n)||0)).toLocaleString('en-US');
@@ -5047,10 +5048,15 @@ function renderPxCalc() {
   const weekOpts = pricing.camp.week_order || ['8','7','6','5','4','Mini'];
   const trLabel = {none:'None', '1way':'1-way', '2way':'2-way'};
   let h = '<div class="px-sec"><div class="px-sec-title">Summer Camp</div>';
-  h += '<div class="px-controls"><label class="px-field">Rate<select id="px-tier">' +
-    `<option value="ES"${pxTier==='ES'?' selected':''}>Early Signup (fall)</option>` +
-    `<option value="Final"${pxTier==='Final'?' selected':''}>Regular</option></select></label></div>`;
-  const rateTypes = [['standard','Standard'],['pre','Preschool student'],['sib','Older sibling']];
+  h += '<div class="px-controls">' +
+    '<label class="px-field">Season<select id="px-cal-season">' +
+      `<option value="proposed"${pxSeason==='proposed'?' selected':''}>Proposed (${famEsc(pricing.proposed_label||'')})</option>` +
+      `<option value="current"${pxSeason==='current'?' selected':''}>Current (${famEsc(pricing.season_label||'')})</option></select></label>` +
+    '<label class="px-field">Rate<select id="px-tier">' +
+      `<option value="ES"${pxTier==='ES'?' selected':''}>Early Signup (fall)</option>` +
+      `<option value="Final"${pxTier==='Final'?' selected':''}>Regular</option></select></label>` +
+    '</div>';
+  const rateTypes = [['standard','Standard (2nd Grade+)'],['junior','Junior Camp (PS-1st)'],['pre','Preschool student'],['sib','Older sibling of preschool student']];
   pxCampers.forEach((c,i) => {
     const opt = (v,cur) => `<option value="${v}"${cur===v?' selected':''}>${v}</option>`;
     const ptype = c.ptype || 'standard';
@@ -5061,7 +5067,7 @@ function renderPxCalc() {
       '<label class="px-field">Days/wk<select data-f="days">'+['5','4','3'].map(d=>opt(d,c.days)).join('')+'</select></label>' +
       '<label class="px-field">Transport<select data-f="transport">'+['none','1way','2way'].map(t=>`<option value="${t}"${c.transport===t?' selected':''}>${trLabel[t]}</option>`).join('')+'</select></label>' +
       (c.transport!=='none' ? '<label class="px-field">Transport days<select data-f="tdays">'+['5','4','3'].map(d=>opt(d,(c.tdays||c.days))).join('')+'</select></label>' : '') +
-      (i>0 && ptype==='standard' ? '<label class="px-field">Sibling disc.<select data-f="discMode"><option value="pct"'+(c.discMode!=='amt'?' selected':'')+'>% off</option><option value="amt"'+(c.discMode==='amt'?' selected':'')+'>$ off</option></select></label>' +
+      (i>0 && (ptype==='standard'||ptype==='junior') ? '<label class="px-field">Sibling disc.<select data-f="discMode"><option value="pct"'+(c.discMode!=='amt'?' selected':'')+'>% off</option><option value="amt"'+(c.discMode==='amt'?' selected':'')+'>$ off</option></select></label>' +
              '<label class="px-field">Amount<input type="number" data-f="disc" min="0" step="1" value="'+(c.disc||'')+'" placeholder="0" style="width:80px;padding:.4rem .5rem;border:1px solid var(--border);border-radius:6px"></label>' : '') +
       (pxCampers.length>1?'<button class="px-btn ghost px-rm" data-i="'+i+'" style="padding:.35rem .6rem">✕</button>':'') +
       '</div>';
@@ -5071,6 +5077,7 @@ function renderPxCalc() {
   h += '<div id="px-calc-total"></div>';
   box.innerHTML = h;
   document.getElementById('px-tier').addEventListener('change', e => { pxTier = e.target.value; renderPxCalc(); });
+  document.getElementById('px-cal-season').addEventListener('change', e => { pxSeason = e.target.value; renderPxCalc(); });
   box.querySelectorAll('.px-camper-row').forEach(row => {
     const i = +row.dataset.i;
     row.querySelectorAll('[data-f]').forEach(el => {
@@ -5090,7 +5097,15 @@ function renderPxCalc() {
 }
 
 function renderPxCalcTotal() {
-  const tiers = pricing.camp.tiers[pxTier] || {}, dm = pricing.camp.day_mult || {};
+  const baseSet = pxSeason === 'current' ? (pricing.camp.current || {}) : pricing.camp.tiers;
+  const tiers = baseSet[pxTier] || {}, dm = pricing.camp.day_mult || {};
+  // Standard 2nd Grade+ tuition for a weeks/days combo (4/3-day rounded to $25)
+  const stdTuition = (weeks, days) => {
+    const base = Number(tiers[weeks]||0), mult = Number(dm[days]!=null ? dm[days] : 1);
+    let t = base*mult;
+    if (days !== '5') t = Math.round(t/25)*25;
+    return t;
+  };
   let lines = [], campGrand = 0;
   pxCampers.forEach((c,i) => {
     const ptype = c.ptype || 'standard';
@@ -5101,14 +5116,18 @@ function renderPxCalcTotal() {
       const ccrow = pricing.childcare[c.days] || {};
       const weekly = ptype === 'sib' ? Number(ccrow.sibling2||0) : Number(ccrow.base||0);
       tuition = weekly * wksNum;
-      detail = pxMoney(tuition)+' '+(ptype==='sib'?'older-sibling':'preschool')+' rate ('+pxMoney(weekly)+'/wk × '+wksNum+' wks, '+c.days+'-day)';
+      detail = pxMoney(tuition)+' '+(ptype==='sib'?'older-sibling (of preschooler)':'preschool')+' rate ('+pxMoney(weekly)+'/wk × '+wksNum+' wks, '+c.days+'-day)';
     } else {
-      const base = Number(tiers[c.weeks]||0);
+      const std = stdTuition(c.weeks, c.days);
       const mult = Number(dm[c.days]!=null ? dm[c.days] : 1);
-      tuition = base*mult;
-      if (c.days !== '5') tuition = Math.round(tuition/25)*25;   // 4/3-day rounded to nearest $25
-      detail = pxMoney(tuition)+' tuition ('+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+(mult!==1?' ×'+mult:'')+')';
-      // Per-camper sibling discount entered case-by-case (2nd+ standard camper only)
+      if (ptype === 'junior') {
+        tuition = Math.round((0.90 * std)/25)*25;   // Junior Camp = 90% of 2nd Grade+, rounded to $25
+        detail = pxMoney(tuition)+' Junior Camp tuition (90% of 2nd Grade+, '+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+')';
+      } else {
+        tuition = std;
+        detail = pxMoney(tuition)+' tuition ('+(c.weeks==='Mini'?'Mini':c.weeks+' wks')+(mult!==1?' ×'+mult:'')+')';
+      }
+      // Per-camper sibling discount entered case-by-case (2nd+ standard/junior camper only)
       const dv = Number(c.disc||0);
       if (i > 0 && dv > 0) {
         const disc = c.discMode === 'amt' ? Math.min(dv, tuition) : tuition * dv/100;
@@ -5127,7 +5146,8 @@ function renderPxCalcTotal() {
     lines.push('<div class="px-line"><span>Camper '+(i+1)+': '+detail+'</span><span>'+pxMoney(sub)+'</span></div>');
   });
   const tierLbl = pxTier==='ES' ? 'Early Signup' : 'Regular';
-  const html = '<div class="px-total-box">'+lines.join('')+'<div class="px-line px-sub"><span>Family total ('+tierLbl+' tier)</span><span class="px-grand">'+pxMoney(campGrand)+'</span></div></div>';
+  const seasonLbl = pxSeason==='current' ? (pricing.season_label||'Current') : (pricing.proposed_label||'Proposed');
+  const html = '<div class="px-total-box">'+lines.join('')+'<div class="px-line px-sub"><span>Family total ('+famEsc(seasonLbl)+', '+tierLbl+')</span><span class="px-grand">'+pxMoney(campGrand)+'</span></div></div>';
   document.getElementById('px-calc-total').innerHTML = html;
 }
 
