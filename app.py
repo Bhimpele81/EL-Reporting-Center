@@ -5065,7 +5065,7 @@ function renderPxCalc() {
       '</div>';
   });
   h += '<button class="px-btn ghost" id="px-add-camper">＋ Add camper</button></div>';
-  h += '<div class="px-sec"><div class="px-sec-title">Childcare / School <span style="font-weight:400;color:#999;font-size:.8rem">(separate from camp)</span></div><div class="px-controls">' +
+  h += '<div class="px-sec"><div class="px-sec-title">Childcare / School <span style="font-weight:400;color:#999;font-size:.8rem">(for families with students in the year-round preschool)</span></div><div class="px-controls">' +
     '<label class="px-field">Include<select id="px-cc-on"><option value="no"'+(pxCC.on?'':' selected')+'>No</option><option value="yes"'+(pxCC.on?' selected':'')+'>Yes</option></select></label>' +
     '<label class="px-field">Days/wk<select id="px-cc-days">'+['5','4','3'].map(d=>`<option value="${d}"${pxCC.days===d?' selected':''}>${d}</option>`).join('')+'</select></label>' +
     '<label class="px-field">Preschool students<input type="number" id="px-cc-pre" min="0" value="'+(pxCC.nPre)+'" style="width:70px"></label>' +
