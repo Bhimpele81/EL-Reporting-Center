@@ -3338,7 +3338,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <div class="faq-body">
         <p>Open the <strong>Rate Sheet</strong> sub-tab and click <strong>Print / Save PDF</strong> (prints to a single color page). It shows the full rate grid for both programs (<strong>2nd Grade+</strong> and <strong>Junior Camp, PS through 1st Grade</strong>), Early Season and Regular, with tuition, sibling, and with-transportation columns grouped by days per week (color-coded: 5-day blue, 4-day green, 3-day gold).</p>
         <p>Use the <strong>Show</strong> selector to choose which rates to display: <strong>2026 Actual</strong> (the as-published 2026 sheet), <strong>Current</strong>, or <strong>Proposed</strong>. Use <strong>Compare to</strong> to overlay the <strong>% change</strong> (to two decimals) in every cell versus another sheet, so you can see new-vs-older side by side.</p>
-        <p>Everything is derived from your Regular Rate Settings: Junior Camp is 90% of 2nd Grade+ (rounded to $25), Early Season is 93% of the matching Regular rate (rounded to $25), sibling tuition is 10% off (rounded to $1, assumes 5 days), transportation is 2-way for that column's day count with a 10% sibling discount, 4/3-day tuition rounds to $25 (the 2026 Actual view rounds to $5 to match the published numbers), and Minicamp is a flat rate.</p>
+        <p>Everything is derived from your Regular Rate Settings: Junior Camp is 90% of 2nd Grade+ (rounded to $25), Early Season is 93% of the matching Regular rate (rounded to $25), sibling tuition is 10% off (rounded to $1, assumes 5 days), transportation is 2-way for that column's day count with a 10% sibling discount, 3/4-day tuition rounds to $25 (the 2026 Actual view rounds to $5 to match the published numbers), and Minicamp is a flat rate.</p>
       </div>
     </details>
 
@@ -5354,7 +5354,7 @@ function renderPxRates() {
   const mini = pricing.camp.mini || {};
   const esPct = (pricing.assumptions && pricing.assumptions.early_season_pct != null) ? pricing.assumptions.early_season_pct : 93;
   h += '<div class="px-sec"><div class="px-sec-title">Summer Camp tuition (Regular)</div>' +
-    '<div style="font-size:.8rem;color:#888;margin-bottom:.3rem">Enter the 5-day <strong>Regular</strong> tuition for the <strong>Current ('+famEsc(curL)+')</strong> and <strong>Proposed ('+famEsc(propL)+')</strong> seasons. Everything else is derived from these: 4/3-day by the day factor, Junior Camp by the Junior %, and <strong>Early Season</strong> as '+esPct+'% of each Regular rate (set in Derivation rules below). The <strong>Change</strong> column shows the effective increase; the Proposed column is what the Calculator and Rate Sheet use.</div>' +
+    '<div style="font-size:.8rem;color:#888;margin-bottom:.3rem">Enter the 5-day <strong>Regular</strong> tuition for the <strong>Current ('+famEsc(curL)+')</strong> and <strong>Proposed ('+famEsc(propL)+')</strong> seasons. Everything else is derived from these: 3/4-day by the day factor, Junior Camp by the Junior %, and <strong>Early Season</strong> as '+esPct+'% of each Regular rate (set in Derivation rules below). The <strong>Change</strong> column shows the effective increase; the Proposed column is what the Calculator and Rate Sheet use.</div>' +
     '<table class="px-tbl"><thead>' +
     '<tr><th class="px-l">Weeks</th><th>Current ('+famEsc(curL)+')</th><th>Proposed ('+famEsc(propL)+')</th><th>Change</th></tr></thead><tbody>';
   wk.filter(w => w !== 'Mini').forEach(w => h += '<tr><td class="px-l">'+w+'</td>'+
@@ -5407,7 +5407,7 @@ function renderPxRates() {
       rrow('Full-Time CIT tuition (% off the full 2nd Grade+ tuition)', rinp('px-asm-cit', a.cit_disc_pct)) +
       rrow('Sibling extended-care discount ($ off per week, each of AM &amp; PM)', rinp('px-asm-sibext', a.sibling_ext_disc)) +
       rrow('Early Season tuition (% of the Regular rate, rounded to nearest $25)', rinp('px-asm-es', a.early_season_pct)) +
-      rrow('Round tuition (4/3-day &amp; Junior), nearest $', rinp('px-asm-rt', a.round_tuition)) +
+      rrow('Round tuition (3/4-day &amp; Junior), nearest $', rinp('px-asm-rt', a.round_tuition)) +
       rrow('Round sibling tuition, nearest $', rinp('px-asm-rs', a.round_sibling)) +
       rrow('Round 2026 Actual sheet, nearest $', rinp('px-asm-ro', a.round_original)) +
     '</tbody></table></div>';
