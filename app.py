@@ -3337,8 +3337,8 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <summary>How do I share the rates as a PDF?</summary>
       <div class="faq-body">
         <p>Open the <strong>Rate Sheet</strong> sub-tab and click <strong>Print / Save PDF</strong> (prints to a single color page). It shows the full rate grid for both programs (<strong>2nd Grade+</strong> and <strong>Junior Camp, PS through 1st Grade</strong>), Early Season and Regular, with tuition, sibling, and with-transportation columns grouped by days per week (color-coded: 5-day blue, 4-day green, 3-day gold).</p>
-        <p>Use the <strong>Show</strong> selector to choose which rates to display: <strong>Original</strong> (the as-published 2026 sheet), <strong>Current</strong>, or <strong>Proposed</strong>. Use <strong>Compare to</strong> to overlay the <strong>% change</strong> in every cell versus another sheet, so you can see new-vs-older side by side.</p>
-        <p>Everything is derived from your Regular Rate Settings: Junior Camp is 90% of 2nd Grade+ (rounded to $25), Early Season is 93% of the matching Regular rate (rounded to $25), sibling tuition is 10% off (rounded to $1, assumes 5 days), transportation is 2-way for that column's day count with a 10% sibling discount, 4/3-day tuition rounds to $25 (the Original view rounds to $5 to match the published numbers), and Minicamp is a flat rate.</p>
+        <p>Use the <strong>Show</strong> selector to choose which rates to display: <strong>2026 Actual</strong> (the as-published 2026 sheet), <strong>Current</strong>, or <strong>Proposed</strong>. Use <strong>Compare to</strong> to overlay the <strong>% change</strong> (to two decimals) in every cell versus another sheet, so you can see new-vs-older side by side.</p>
+        <p>Everything is derived from your Regular Rate Settings: Junior Camp is 90% of 2nd Grade+ (rounded to $25), Early Season is 93% of the matching Regular rate (rounded to $25), sibling tuition is 10% off (rounded to $1, assumes 5 days), transportation is 2-way for that column's day count with a 10% sibling discount, 4/3-day tuition rounds to $25 (the 2026 Actual view rounds to $5 to match the published numbers), and Minicamp is a flat rate.</p>
       </div>
     </details>
 
@@ -5409,7 +5409,7 @@ function renderPxRates() {
       rrow('Early Season tuition (% of the Regular rate, rounded to nearest $25)', rinp('px-asm-es', a.early_season_pct)) +
       rrow('Round tuition (4/3-day &amp; Junior), nearest $', rinp('px-asm-rt', a.round_tuition)) +
       rrow('Round sibling tuition, nearest $', rinp('px-asm-rs', a.round_sibling)) +
-      rrow('Round Original sheet, nearest $', rinp('px-asm-ro', a.round_original)) +
+      rrow('Round 2026 Actual sheet, nearest $', rinp('px-asm-ro', a.round_original)) +
     '</tbody></table></div>';
   h += '<div style="margin-top:.5rem"><button class="px-btn" id="px-save">💾 Save rates</button><span class="px-msg" id="px-save-msg"></span></div>';
   box.innerHTML = h;
@@ -5513,7 +5513,7 @@ function renderPxSheet() {
   const sib = x => Math.round(x/rS)*rS, wnum = w => parseInt(w,10)||0;
 
   const baseFor = k => k === 'original' ? (pricing.camp.original || {}) : k === 'current' ? (pricing.camp.current || {}) : pricing.camp.tiers;
-  const labelFor = k => k === 'original' ? 'Original' : k === 'current' ? ('Current ('+(pricing.season_label||'')+')') : ('Proposed ('+(pricing.proposed_label||'')+')');
+  const labelFor = k => k === 'original' ? '2026 Actual' : k === 'current' ? ('Current ('+(pricing.season_label||'')+')') : ('Proposed ('+(pricing.proposed_label||'')+')');
   const primary = pxSheetSeason, compareKey = pxSheetCompare;
   const comparing = compareKey !== 'none' && compareKey !== primary;
   const pBase = baseFor(primary), cBase = baseFor(compareKey);
@@ -5551,7 +5551,7 @@ function renderPxSheet() {
     let inner = pxMoney(prim);
     if (comparing && comp != null && comp > 0) {
       const pct = (prim - comp) / comp * 100;
-      inner += '<br><span class="px-chgs '+(Math.abs(pct) < 0.05 ? 'px-diff-flat' : 'px-diff-up')+'">'+(pct>0?'+':'')+pct.toFixed(1)+'%</span>';
+      inner += '<br><span class="px-chgs '+(Math.abs(pct) < 0.005 ? 'px-diff-flat' : 'px-diff-up')+'">'+(pct>0?'+':'')+pct.toFixed(2)+'%</span>';
     }
     return '<td'+cls+'>'+inner+'</td>';
   }
@@ -5578,8 +5578,8 @@ function renderPxSheet() {
   }
 
   const opt = (v,l,cur) => '<option value="'+v+'"'+(cur===v?' selected':'')+'>'+famEsc(l)+'</option>';
-  const showOpts = opt('proposed', labelFor('proposed'), primary) + opt('current', labelFor('current'), primary) + opt('original', 'Original', primary);
-  const cmpOpts = opt('none','None',compareKey) + opt('proposed', labelFor('proposed'), compareKey) + opt('current', labelFor('current'), compareKey) + opt('original','Original',compareKey);
+  const showOpts = opt('proposed', labelFor('proposed'), primary) + opt('current', labelFor('current'), primary) + opt('original', '2026 Actual', primary);
+  const cmpOpts = opt('none','None',compareKey) + opt('proposed', labelFor('proposed'), compareKey) + opt('current', labelFor('current'), compareKey) + opt('original','2026 Actual',compareKey);
   let h = '<div class="px-noprint" style="margin-bottom:.8rem;display:flex;gap:.7rem;align-items:flex-end;flex-wrap:wrap">' +
     '<button class="px-btn" id="px-print" style="height:38px">🖨 Print / Save PDF</button>' +
     '<label class="px-field" style="margin:0">Show<select id="px-sheet-season">'+showOpts+'</select></label>' +
