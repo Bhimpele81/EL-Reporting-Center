@@ -5403,7 +5403,7 @@ function renderPxRates() {
       '<span class="px-msg" id="px-asm-msg" style="color:#888">'+(locked?'Unlock to edit these rules.':'')+'</span></div>' +
     '<table class="px-tbl"><thead><tr><th class="px-l">Rule</th><th>Value</th></tr></thead><tbody>' +
       rrow('Junior Camp tuition (% of 2nd Grade+)', rinp('px-asm-junior', a.junior_pct)) +
-      rrow('Sibling discount (% off tuition &amp; transport, 2nd+ camper)', rinp('px-asm-sibdisc', a.sibling_disc_pct)) +
+      rrow('Sibling discount (% off tuition &amp; transport, 2nd sibling and up)', rinp('px-asm-sibdisc', a.sibling_disc_pct)) +
       rrow('Full-Time CIT tuition (% off the full 2nd Grade+ tuition)', rinp('px-asm-cit', a.cit_disc_pct)) +
       rrow('Sibling extended-care discount ($ off per week, each of AM &amp; PM)', rinp('px-asm-sibext', a.sibling_ext_disc)) +
       rrow('Early Season tuition (% of the Regular rate, rounded to nearest $25)', rinp('px-asm-es', a.early_season_pct)) +
