@@ -5900,21 +5900,17 @@ function renderPizza() {
   // even though this column is narrower and its text wraps differently.
   let refBody = '';
   PZ_GROUPS.forEach(([g,label,rate]) => {
+    if (rate == null) return;   // count box lists only the camper groups (no Specialists / School)
     refBody += '<div class="pz-group pz-refgroup"><div class="pz-gname pz-refname"><span>'+label+'</span>' +
-      (rate != null ? '<span class="pz-refval" id="pz-ref-'+g+'">–</span>' : '<span class="pz-refval pz-refna">—</span>') +
-      '</div></div>';
+      '<span class="pz-refval" id="pz-ref-'+g+'">–</span></div></div>';
   });
-  refBody += '<div class="pz-group pz-refgroup"><div class="pz-gname pz-refname"><span>School</span><span class="pz-refval pz-refna">—</span></div></div>';
-  const ref = '<div class="pz-card pz-refcard"><div class="pz-title pz-reftitle" id="pz-ref-week">This Week</div>' + refBody + '<div class="pz-grandrow pz-refgrand">&nbsp;</div></div>';
-  const refLine = '<div class="pz-refweekline px-noprint">Enrollment reference for <strong id="pz-ref-wklbl">this week</strong> <span id="pz-ref-range" style="color:#999"></span> &middot; Minors = Munchkins &amp; Rugrats, Majors = rest of Junior Camp. For reference only.</div>';
-  box.innerHTML = head + refLine + '<div class="pz-grid">'+ref+cols+'</div>';
+  const ref = '<div class="pz-card pz-refcard"><div class="pz-title pz-reftitle" id="pz-ref-week">This Week</div>' + refBody + '</div>';
+  box.innerHTML = head + '<div class="pz-grid">'+ref+cols+'</div>';
   const dt = document.getElementById('pz-print-date'); if (dt) { try { dt.textContent = new Date().toLocaleDateString(); } catch(e){} }
   fetch('/api/pizza-week-counts').then(r => r.ok ? r.json() : null).then(d => {
     if (!d) return;
     const wkLabel = d.week ? ('Week '+d.week) : 'Off-season';
-    const wk = document.getElementById('pz-ref-week'); if (wk) wk.textContent = wkLabel;      // title bar
-    const wl = document.getElementById('pz-ref-wklbl'); if (wl) wl.textContent = wkLabel;      // reference line
-    const rg = document.getElementById('pz-ref-range'); if (rg) rg.textContent = d.week_range ? ('('+d.week_range+')') : '';
+    const wk = document.getElementById('pz-ref-week'); if (wk) wk.textContent = wkLabel;      // count-box title bar
     const c = d.counts || {};
     ['minors','majors','inter','senior','upper'].forEach(k => { const el = document.getElementById('pz-ref-'+k); if (el) el.textContent = d.has_master ? (c[k] != null ? c[k] : '–') : '—'; });
   }).catch(() => {});
