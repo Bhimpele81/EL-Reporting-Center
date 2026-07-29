@@ -191,6 +191,9 @@ SCHEDULES_KEY     = "schedules.json"
 LOCAL_SCHEDULES   = os.path.join(UPLOAD_DIR, "schedules.json")
 PRICING_KEY       = "pricing.json"
 LOCAL_PRICING     = os.path.join(UPLOAD_DIR, "pricing.json")
+LOGINLOG_KEY      = "login_log.json"
+LOCAL_LOGINLOG    = os.path.join(UPLOAD_DIR, "login_log.json")
+_LOGINLOG_MAX     = 100   # rolling history kept; the UI shows the most recent 20
 # Default season: Monday of each of the 8 camp weeks (2026)
 _DEFAULT_SEASON_MONDAYS = ["2026-06-22", "2026-06-29", "2026-07-06", "2026-07-13",
                            "2026-07-20", "2026-07-27", "2026-08-03", "2026-08-10"]
@@ -202,7 +205,8 @@ FAMILY_FIELDS     = ["last", "first", "family", "bunk",
                      "pu1_name", "pu1_auth", "pu2_name", "pu2_auth",
                      "pu3_name", "pu3_auth", "pu4_name", "pu4_auth"]
 _PROTECTED_KEYS   = {"bunk_config.json", CONFIG_META_KEY, MASTER_KEY, MASTER_META_KEY,
-                     PAYROLL_KEY, FAMILIES_KEY, USERS_KEY, SEASON_KEY, SCHEDULES_KEY, PRICING_KEY}
+                     PAYROLL_KEY, FAMILIES_KEY, USERS_KEY, SEASON_KEY, SCHEDULES_KEY, PRICING_KEY,
+                     LOGINLOG_KEY}
 
 
 def _camper_key(name, bunk):
@@ -521,6 +525,55 @@ def _pricing_load() -> dict:
     if not isinstance(data, dict):
         data = {}
     return _deep_fill(data, _DEFAULT_PRICING)
+
+
+def _loginlog_load() -> list:
+    """The rolling list of successful sign-in events (oldest first)."""
+    data = None
+    if _s3:
+        buf = _s3_get_file(LOGINLOG_KEY)
+        if buf:
+            try:
+                data = json.load(buf)
+            except Exception:
+                data = None
+    if data is None and os.path.exists(LOCAL_LOGINLOG):
+        try:
+            with open(LOCAL_LOGINLOG, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = None
+    return data if isinstance(data, list) else []
+
+
+def _loginlog_save(events: list) -> None:
+    try:
+        with open(LOCAL_LOGINLOG, "w", encoding="utf-8") as f:
+            json.dump(events, f)
+    except Exception:
+        pass
+    if _s3:
+        try:
+            _s3.put_object(Bucket=S3_BUCKET, Key=LOGINLOG_KEY,
+                           Body=json.dumps(events).encode("utf-8"),
+                           ContentType="application/json")
+        except ClientError:
+            pass
+
+
+def _loginlog_record(username: str, name: str, how: str = "sign-in") -> None:
+    """Append a successful sign-in event, keeping the last _LOGINLOG_MAX."""
+    try:
+        fwd = request.headers.get("X-Forwarded-For", "") or ""
+        ip = (fwd.split(",")[0].strip() if fwd else (request.remote_addr or "")) or ""
+    except Exception:
+        ip = ""
+    events = _loginlog_load()
+    events.append({"username": username, "name": name or username,
+                   "ts": _now_eastern_stamp(), "ip": ip, "how": how})
+    if len(events) > _LOGINLOG_MAX:
+        events = events[-_LOGINLOG_MAX:]
+    _loginlog_save(events)
 
 
 def _payroll_days() -> list:
@@ -1613,6 +1666,7 @@ def api_login():
         return jsonify({"error": "Invalid username or password."}), 401
     session.permanent = True
     session["user"] = u["username"]
+    _loginlog_record(u["username"], u.get("name") or u["username"], "sign-in")
     return jsonify({"username": u["username"], "name": u.get("name") or u["username"],
                     "is_admin": bool(u.get("is_admin"))})
 
@@ -1638,6 +1692,7 @@ def api_register():
     _users_save(data)
     session.permanent = True
     session["user"] = username
+    _loginlog_record(username, entry["name"], "new account")
     return jsonify({"username": username, "name": entry["name"], "is_admin": entry["is_admin"]})
 
 
@@ -1645,6 +1700,14 @@ def api_register():
 def api_logout():
     session.clear()
     return jsonify({"ok": True})
+
+
+@app.route("/api/login-log")
+@admin_required
+def api_login_log():
+    """Admin-only: the most recent sign-in events (newest first)."""
+    events = _loginlog_load()
+    return jsonify({"events": list(reversed(events))[:20]})
 
 
 @app.route("/api/account/password", methods=["POST"])
@@ -2996,6 +3059,18 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       </div>
     </div>
   </div>
+
+  <div class="card" id="loginlog-card" style="display:none">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Sign-In Activity</div>
+        <div class="card-hint">The most recent 20 successful sign-ins to the site (newest first). Admin-only.</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="fam-table" id="loginlog-table"></table>
+    </div>
+  </div>
   </div><!-- /util-col -->
   <div class="card">
     <div class="card-hd">
@@ -3394,6 +3469,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li>Everyone signs in with their own <strong>username + password</strong>; new users register with the shared <strong>access code</strong>.</li>
           <li>Change your own password by clicking <strong>your name</strong> in the top-right.</li>
           <li>Admins manage accounts (add / rename / reset password / remove) in <strong>Utilities → User Accounts</strong>.</li>
+          <li>Admins can review the <strong>most recent 20 sign-ins</strong> (who, when, and IP) in <strong>Utilities → Sign-In Activity</strong>.</li>
         </ul>
       </div>
     </details>
@@ -4615,8 +4691,37 @@ function loadAllData() {
   loadPayroll();
   loadFamilies();
   loadUsers();
+  loadLoginLog();
   loadSeason();
   loadSchedules();
+}
+
+async function loadLoginLog() {
+  // Admin-only; the endpoint 403s for non-admins, in which case we hide the card.
+  const card = document.getElementById('loginlog-card');
+  if (!card) return;
+  if (!currentUser || !currentUser.is_admin) { card.style.display = 'none'; return; }
+  try {
+    const res = await fetch('/api/login-log');
+    if (!res.ok) { card.style.display = 'none'; return; }
+    const d = await res.json();
+    const tbl = document.getElementById('loginlog-table');
+    const events = d.events || [];
+    let h = '<thead><tr><th>When</th><th>User</th><th>How</th><th>IP</th></tr></thead><tbody>';
+    if (!events.length) {
+      h += '<tr><td colspan="4" style="color:#999">No sign-ins recorded yet.</td></tr>';
+    } else {
+      events.forEach(e => {
+        h += '<tr><td style="white-space:nowrap">' + famEsc(e.ts || '') + '</td>' +
+             '<td>' + famEsc(e.name || e.username || '') + (e.name && e.username && e.name !== e.username ? ' <span style="color:#999">(' + famEsc(e.username) + ')</span>' : '') + '</td>' +
+             '<td style="color:#666">' + famEsc(e.how || 'sign-in') + '</td>' +
+             '<td style="color:#999;font-size:.8rem">' + famEsc(e.ip || '') + '</td></tr>';
+      });
+    }
+    h += '</tbody>';
+    tbl.innerHTML = h;
+    card.style.display = '';
+  } catch(e) { card.style.display = 'none'; }
 }
 
 // ---- Camper Schedules (admin) ----
