@@ -2196,18 +2196,21 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 /* Pizza calculator */
 .pz-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;align-items:start}
 @media(max-width:1000px){.pz-grid{grid-template-columns:1fr}}
-.pz-card{border:1px solid #eee;border-radius:10px;padding:.7rem .85rem;background:#fafafa;min-width:0}
-.pz-title{font-weight:700;color:#6d1f2f;margin-bottom:.5rem;font-size:1rem}
+.pz-card{border:1px solid #e6dade;border-radius:10px;background:#fff;overflow:hidden;min-width:0;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.pz-title{background:#6d1f2f;color:#fff;font-weight:700;font-size:.98rem;padding:.5rem .8rem}
+.pz-tblwrap{padding:.45rem .7rem .55rem}
 .pz-tbl{width:100%;border-collapse:collapse;font-size:.85rem}
-.pz-tbl th{font-size:.68rem;color:#999;text-transform:uppercase;letter-spacing:.03em;padding:.2rem .3rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700}
+.pz-tbl th{font-size:.64rem;color:#8a8a8a;text-transform:uppercase;letter-spacing:.03em;padding:.25rem .3rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700}
 .pz-tbl th.pz-g,.pz-tbl td.pz-g{text-align:left}
-.pz-tbl td{padding:.28rem .3rem;border-bottom:1px solid #eee;vertical-align:middle}
-.pz-tbl td.pz-num{text-align:right;font-variant-numeric:tabular-nums}
+.pz-tbl td{padding:.28rem .3rem;border-bottom:1px solid #f1ebec;vertical-align:middle}
+.pz-tbl tbody tr:nth-child(even) td{background:#faf6f7}
+.pz-tbl td.pz-num{text-align:right;font-variant-numeric:tabular-nums;color:#555}
+.pz-tbl td.pz-pz{font-weight:700;color:#6d1f2f}
 .pz-rate{color:#b3b3b3;font-size:.66rem;font-weight:400;display:block}
 .pz-in{width:100%;max-width:60px;padding:.25rem .3rem;border:1px solid #ccc;border-radius:6px;font-size:.85rem;text-align:right;box-sizing:border-box}
 .pz-grand{font-weight:800;font-size:1.05rem;color:#6d1f2f}
-.pz-tot-l{text-align:right;font-weight:700}
-.pz-tbl tfoot td{border-top:2px solid #ccc;border-bottom:none;padding-top:.45rem}
+.pz-tot-l{text-align:right;font-weight:700;color:#6d1f2f}
+.pz-tbl tfoot td{border-top:none;padding-top:.5rem;background:#f4e9ec}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
 .payroll-table td{height:42px}
@@ -5710,16 +5713,16 @@ function renderPizza() {
         '<td>'+camperCell+'</td>' +
         '<td>'+inp('pz-'+p+'-'+g+'-s', gs.s)+'</td>' +
         '<td class="pz-num"><span id="pz-'+p+'-'+g+'-sl">0</span></td>' +
-        '<td class="pz-num"><strong><span id="pz-'+p+'-'+g+'-pz">0.0</span></strong></td></tr>';
+        '<td class="pz-num pz-pz"><span id="pz-'+p+'-'+g+'-pz">0.0</span></td></tr>';
     });
     rows += '<tr><td class="pz-g">School<span class="pz-rate">enter pizzas directly</span></td>' +
       '<td colspan="3" style="text-align:right;color:#aaa;font-size:.72rem">pizzas &rarr;</td>' +
-      '<td class="pz-num"><strong>'+inp('pz-'+p+'-school', ps.school)+'</strong></td></tr>';
-    cols += '<div class="pz-card"><div class="pz-title">'+title+'</div>' +
+      '<td class="pz-num pz-pz">'+inp('pz-'+p+'-school', ps.school)+'</td></tr>';
+    cols += '<div class="pz-card"><div class="pz-title">'+title+'</div><div class="pz-tblwrap">' +
       '<table class="pz-tbl"><thead><tr><th class="pz-g">Group</th><th>Campers</th><th>Staff</th><th>Slices</th><th>Pizzas</th></tr></thead>' +
       '<tbody>'+rows+'</tbody>' +
       '<tfoot><tr><td colspan="4" class="pz-tot-l">Grand Total Pizzas to Order</td><td class="pz-num pz-grand"><span id="pz-'+p+'-total">0.0</span></td></tr></tfoot>' +
-      '</table></div>';
+      '</table></div></div>';
   });
   const head = '<div class="pz-toolbar px-noprint" style="display:flex;gap:.5rem;margin-bottom:.8rem">' +
       '<button class="px-btn" id="pz-print" style="height:36px">🖨 Print / Save PDF</button>' +
@@ -5738,10 +5741,16 @@ function renderPizza() {
     st.textContent = '@media print{ body *{visibility:hidden!important}' +
       ' #tab-pizza,#tab-pizza *{visibility:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}' +
       ' #tab-pizza{position:absolute;left:0;top:0;width:100%}' +
-      ' .px-noprint{display:none!important} #tab-pizza .card-hint,#tab-pizza .card-title{display:none!important}' +
+      ' .px-noprint{display:none!important}' +
+      ' #tab-pizza .card{border:none!important;box-shadow:none!important;padding:0!important;margin:0!important;background:transparent!important}' +
+      ' #tab-pizza .card-hint,#tab-pizza .card-title{display:none!important}' +
       ' .pz-print-head{display:block!important}' +
-      ' .pz-card{break-inside:avoid}' +
-      ' @page{size:landscape;margin:.4in} }';
+      ' .pz-grid{gap:.45rem!important} .pz-card{break-inside:avoid;box-shadow:none!important;border:1px solid #6d1f2f!important}' +
+      ' .pz-title{font-size:11px!important;padding:4px 8px!important} .pz-tblwrap{padding:3px 6px 5px!important}' +
+      ' .pz-tbl{font-size:10px!important} .pz-tbl th{font-size:8px!important} .pz-tbl td,.pz-tbl th{padding:2px 4px!important}' +
+      ' .pz-in{border:1px solid #bbb!important;max-width:42px!important;font-size:10px!important;padding:1px 2px!important}' +
+      ' .pz-grand{font-size:12px!important}' +
+      ' @page{size:landscape;margin:.35in} }';
     window.print();
   });
   const cb = document.getElementById('pz-csv');
