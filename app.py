@@ -2193,6 +2193,21 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-sheet-tbl .px-grp{border-left:2.5px solid #000!important}
 .px-sheet-sectitle{display:table-caption}
 .px-chgs{font-size:.9em;font-weight:600}
+/* Pizza calculator */
+.pz-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;align-items:start}
+@media(max-width:1100px){.pz-grid{grid-template-columns:1fr}}
+.pz-card{border:1px solid #eee;border-radius:10px;padding:.7rem .85rem;background:#fafafa}
+.pz-title{font-weight:700;color:#6d1f2f;margin-bottom:.5rem;font-size:1rem}
+.pz-tbl{width:100%;border-collapse:collapse;font-size:.85rem}
+.pz-tbl th{font-size:.68rem;color:#999;text-transform:uppercase;letter-spacing:.03em;padding:.2rem .3rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700}
+.pz-tbl th.pz-g,.pz-tbl td.pz-g{text-align:left}
+.pz-tbl td{padding:.28rem .3rem;border-bottom:1px solid #eee;vertical-align:middle}
+.pz-tbl td.pz-num{text-align:right;font-variant-numeric:tabular-nums}
+.pz-rate{color:#b3b3b3;font-size:.66rem;font-weight:400;white-space:nowrap;display:block}
+.pz-in{width:52px;padding:.25rem .3rem;border:1px solid #ccc;border-radius:6px;font-size:.85rem;text-align:right;box-sizing:border-box}
+.pz-grand{font-weight:800;font-size:1.05rem;color:#6d1f2f}
+.pz-tot-l{text-align:right;font-weight:700}
+.pz-tbl tfoot td{border-top:2px solid #ccc;border-bottom:none;padding-top:.45rem}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
 .payroll-table td{height:42px}
@@ -2628,7 +2643,8 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="tab" data-tab="payroll">🗓️ <span>Payroll</span></div>
   <div class="tab" data-tab="snap" id="tab-snap-nav">📸 <span>Camp Snapshot</span></div>
   <div class="tab" data-tab="families">👪 <span>Families</span></div>
-  <div class="tab" data-tab="pricing" id="tab-pricing-nav">💲 <span>Pricing</span><span class="nav-new">NEW</span></div>
+  <div class="tab" data-tab="pricing" id="tab-pricing-nav">💲 <span>Pricing</span></div>
+  <div class="tab" data-tab="pizza" id="tab-pizza-nav">🍕 <span>Pizza</span><span class="nav-new">NEW</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
   <div class="tab" data-tab="help">❓ <span>FAQs</span></div>
 </nav>
@@ -2817,6 +2833,19 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <div class="px-view" id="px-explore"></div>
     <div class="px-view" id="px-rates"></div>
     <div class="px-view" id="px-sheet"></div>
+  </div>
+</div>
+
+<!-- ===== PIZZA TAB ===== -->
+<div class="tab-panel" id="tab-pizza">
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Pizza Order Calculator</div>
+        <div class="card-hint">For each lunch period, enter the current number of campers and staff in each group. Slices and pizzas calculate automatically (16 slices per double-cut pizza; each group rounds up to the nearest half pizza). Enter fresh headcounts each time: this does not use the master sheet, since lunch assignments change week to week. Your entries are kept in this browser.</div>
+      </div>
+    </div>
+    <div id="pizza-app"></div>
   </div>
 </div>
 
@@ -3342,6 +3371,17 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       </div>
     </details>
 
+    <div class="help-sub">Pizza</div>
+
+    <details class="faq">
+      <summary>How does the Pizza Order Calculator work?</summary>
+      <div class="faq-body">
+        <p>The <strong>Pizza</strong> tab figures out how many pizzas to order for each lunch period. It has <strong>three identical columns</strong>, one per lunch period. For each group, type in the number of <strong>campers</strong> and <strong>staff</strong> for that period, and it fills in the slices and pizzas automatically.</p>
+        <p>Each pizza is <strong>16 slices</strong> (double-cut). Staff count as <strong>4 slices</strong> each. Campers count by group: <strong>Minors</strong> 2, <strong>Majors</strong> 2.25, <strong>Inter</strong> 2.5, <strong>Senior</strong> 3.25, <strong>Upper</strong> 3.5. <strong>Specialists</strong> are staff only (no campers). Each group's pizza count is <strong>rounded up to the nearest half pizza</strong>. <strong>School</strong> is a manual entry, just type the number of pizzas. Each column then shows a <strong>Grand Total Pizzas to Order</strong>.</p>
+        <p>Enter fresh headcounts each time you order: the calculator does <strong>not</strong> pull from the master sheet, because lunch assignments change from week to week. Your entries stay in your browser, so they're still there if you come back to the tab.</p>
+      </div>
+    </details>
+
     <div class="help-sub">Accounts</div>
 
     <details class="faq">
@@ -3403,6 +3443,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (tab.dataset.tab === 'snap') loadBunkSnapshot();
     if (tab.dataset.tab === 'families') loadFamiliesDir();
     if (tab.dataset.tab === 'pricing') loadPricing();
+    if (tab.dataset.tab === 'pizza') renderPizza();
   });
 });
 
@@ -5617,6 +5658,71 @@ function renderPxSheet() {
   if (seasonSel) seasonSel.addEventListener('change', e => { pxSheetSeason = e.target.value; renderPxSheet(); });
   const cmpSel = document.getElementById('px-sheet-compare');
   if (cmpSel) cmpSel.addEventListener('change', e => { pxSheetCompare = e.target.value; renderPxSheet(); });
+}
+
+// ---------- Pizza Order Calculator ----------
+// Slices per (double-cut) pizza, staff slices, and per-camper slices by group.
+const PZ_SLICES = 16, PZ_STAFF = 4;
+const PZ_GROUPS = [
+  ['minors','Minors',2], ['majors','Majors',2.25], ['inter','Inter',2.5],
+  ['senior','Senior',3.25], ['upper','Upper',3.5], ['specialists','Specialists',null],
+];
+const PZ_PERIODS = ['Lunch Period 1','Lunch Period 2','Lunch Period 3'];
+const pzRoundHalf = x => Math.ceil(x*2)/2;                                   // up to nearest 0.5 pizza
+const pzNum = id => { const el=document.getElementById(id); const v=parseFloat((el&&el.value||'').replace(/[^0-9.]/g,'')); return isNaN(v)?0:v; };
+const pzFmt = x => (Math.round(x*100)/100).toString();
+function pzLoad() { try { return JSON.parse(localStorage.getItem('el_pizza_v1')) || {}; } catch(e) { return {}; } }
+function pzSave() {
+  try {
+    const st = {};
+    PZ_PERIODS.forEach((_,p) => { st[p] = {}; PZ_GROUPS.forEach(([g]) => { st[p][g] = {c:pzNum('pz-'+p+'-'+g+'-c'), s:pzNum('pz-'+p+'-'+g+'-s')}; }); st[p].school = pzNum('pz-'+p+'-school'); });
+    localStorage.setItem('el_pizza_v1', JSON.stringify(st));
+  } catch(e) {}
+}
+function pzRecalc(p) {
+  let total = 0;
+  PZ_GROUPS.forEach(([g,,rate]) => {
+    const c = pzNum('pz-'+p+'-'+g+'-c'), s = pzNum('pz-'+p+'-'+g+'-s');
+    const slices = (rate != null ? c*rate : 0) + s*PZ_STAFF;
+    const pizzas = pzRoundHalf(slices/PZ_SLICES);
+    total += pizzas;
+    const slEl = document.getElementById('pz-'+p+'-'+g+'-sl'); if (slEl) slEl.textContent = slices ? pzFmt(slices) : '0';
+    const pzEl = document.getElementById('pz-'+p+'-'+g+'-pz'); if (pzEl) pzEl.textContent = pizzas.toFixed(1);
+  });
+  total += pzNum('pz-'+p+'-school');
+  const tEl = document.getElementById('pz-'+p+'-total'); if (tEl) tEl.textContent = total.toFixed(1);
+  pzSave();
+}
+function renderPizza() {
+  const box = document.getElementById('pizza-app'); if (!box) return;
+  const st = pzLoad();
+  const inp = (id,v) => '<input class="pz-in" id="'+id+'" inputmode="decimal" value="'+(v?v:'')+'">';
+  let cols = '';
+  PZ_PERIODS.forEach((title,p) => {
+    const ps = st[p] || {};
+    let rows = '';
+    PZ_GROUPS.forEach(([g,label,rate]) => {
+      const gs = ps[g] || {};
+      const camperCell = rate != null ? inp('pz-'+p+'-'+g+'-c', gs.c) : '<span style="color:#c8c8c8">—</span>';
+      const note = rate != null ? (rate+' slices/camper') : 'staff only';
+      rows += '<tr><td class="pz-g">'+label+'<span class="pz-rate">'+note+'</span></td>' +
+        '<td>'+camperCell+'</td>' +
+        '<td>'+inp('pz-'+p+'-'+g+'-s', gs.s)+'</td>' +
+        '<td class="pz-num"><span id="pz-'+p+'-'+g+'-sl">0</span></td>' +
+        '<td class="pz-num"><strong><span id="pz-'+p+'-'+g+'-pz">0.0</span></strong></td></tr>';
+    });
+    rows += '<tr><td class="pz-g">School<span class="pz-rate">enter pizzas directly</span></td>' +
+      '<td colspan="3" style="text-align:right;color:#aaa;font-size:.72rem">pizzas &rarr;</td>' +
+      '<td class="pz-num"><strong>'+inp('pz-'+p+'-school', ps.school)+'</strong></td></tr>';
+    cols += '<div class="pz-card"><div class="pz-title">'+title+'</div>' +
+      '<table class="pz-tbl"><thead><tr><th class="pz-g">Group</th><th>Campers</th><th>Staff</th><th>Slices</th><th>Pizzas</th></tr></thead>' +
+      '<tbody>'+rows+'</tbody>' +
+      '<tfoot><tr><td colspan="4" class="pz-tot-l">Grand Total Pizzas to Order</td><td class="pz-num pz-grand"><span id="pz-'+p+'-total">0.0</span></td></tr></tfoot>' +
+      '</table></div>';
+  });
+  box.innerHTML = '<div class="pz-grid">'+cols+'</div>';
+  box.querySelectorAll('.pz-in').forEach(el => el.addEventListener('input', () => pzRecalc(+el.id.split('-')[1])));
+  PZ_PERIODS.forEach((_,p) => pzRecalc(p));
 }
 
 // ---- First-time "Utilities" notice (shows once per browser, after sign-in) ----
