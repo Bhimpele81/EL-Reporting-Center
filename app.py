@@ -2294,7 +2294,8 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 #px-sheet .px-sheet-head{text-align:center;margin-bottom:1rem}
 #px-sheet .px-sheet-head h2{font-family:'Roboto Slab',serif;color:var(--brand-dark);margin:.2rem 0}
 .px-sheet-grid{display:flex;flex-wrap:wrap;gap:1.6rem;align-items:flex-start}
-.px-sheet-tbl th{font-size:.72rem;line-height:1.12;white-space:normal;overflow-wrap:break-word;word-break:break-word;hyphens:auto;overflow:hidden}
+.px-sheet-tbl th{font-size:.72rem;line-height:1.12;white-space:normal;overflow-wrap:break-word;word-break:break-word;hyphens:auto;overflow:hidden;font-weight:700}
+.px-sheet-tbl td.px-tui{font-weight:700}
 .px-sheet-tbl td{font-size:.82rem}
 .px-sheet-tbl td:not(.px-l),.px-sheet-tbl th:not(.px-l){width:78px;min-width:78px}
 .px-sheet-sectitle{background:var(--brand);color:#fff;font-weight:700;text-align:center;padding:.35rem .5rem;border-radius:5px;font-size:1rem;margin:.2rem 0 .4rem;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -5759,7 +5760,7 @@ function renderPxSheet() {
   }
   // Per-column background hue (5d=blue, 4d=green, 3d=gold; plain Tuition = darker "m" shade)
   const COLHUE = ['c5l','c5l','c5m','c5l','c4l','c4m','c3l','c3m'];
-  const ccls = i => COLHUE[i] + ((i === 0 || i === 4 || i === 6) ? ' px-grp' : '');
+  const ccls = i => COLHUE[i] + ((i === 0 || i === 4 || i === 6) ? ' px-grp' : '') + ((i === 2 || i === 5 || i === 7) ? ' px-tui' : '');
   function cell(prim, comp, i) {
     const cls = ' class="'+ccls(i)+'"';
     if (prim == null) return '<td'+cls+'></td>';
@@ -5770,8 +5771,8 @@ function renderPxSheet() {
     }
     return '<td'+cls+'>'+inner+'</td>';
   }
-  const LABELS = ['Tuition with Transportation','Sibling Tuition w/ Transportation','Tuition','Sibling Tuition',
-                  'Tuition w/ Transportation','Tuition','Tuition w/ Transportation','Tuition'];
+  const LABELS = ['Tuition with Transport','Sibling Tuition w/ Transport','Tuition','Sibling Tuition',
+                  'Tuition w/ Transport','Tuition','Tuition w/ Transport','Tuition'];
   function section(prog, tier, title) {
     let s = '<div class="px-sec"><div style="overflow-x:auto"><table class="px-tbl px-sheet-tbl"><caption class="px-sheet-sectitle">'+title+'</caption><thead>' +
       '<tr><th class="px-l" rowspan="2">Weeks</th><th colspan="4" class="c5m px-grp">5</th><th colspan="2" class="c4m px-grp">4</th><th colspan="2" class="c3m px-grp">3</th></tr>' +
@@ -5780,7 +5781,7 @@ function renderPxSheet() {
     wk.forEach(w => {
       // Junior Camp has no Mini row; show the "3/4 Day" note instead (as on the source sheet)
       if (w === 'Mini' && prog === 'junior') {
-        s += '<tr><td class="px-l">3/4 Day</td><td colspan="8" style="text-align:center;font-style:italic;background:#efecec">Tuition 20% off, One-way transportation Add&rsquo;l $120 per week</td></tr>';
+        s += '<tr><td class="px-l">3/4 Day</td><td colspan="8" style="text-align:center;font-style:italic;background:#efecec">Tuition 20% off, One-way transport Add&rsquo;l $120 per week</td></tr>';
         return;
       }
       const pv = rowVals(pBase, prog, tier, w, stepFor(primary));
