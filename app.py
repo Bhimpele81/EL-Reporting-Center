@@ -2198,19 +2198,18 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 @media(max-width:1000px){.pz-grid{grid-template-columns:1fr}}
 .pz-card{border:1px solid #e6dade;border-radius:10px;background:#fff;overflow:hidden;min-width:0;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .pz-title{background:#6d1f2f;color:#fff;font-weight:700;font-size:.98rem;padding:.5rem .8rem}
-.pz-tblwrap{padding:.45rem .7rem .55rem}
-.pz-tbl{width:100%;border-collapse:collapse;font-size:.85rem}
-.pz-tbl th{font-size:.64rem;color:#8a8a8a;text-transform:uppercase;letter-spacing:.03em;padding:.25rem .3rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700}
-.pz-tbl th.pz-g,.pz-tbl td.pz-g{text-align:left}
-.pz-tbl td{padding:.28rem .3rem;border-bottom:1px solid #f1ebec;vertical-align:middle}
-.pz-tbl tbody tr:nth-child(even) td{background:#faf6f7}
-.pz-tbl td.pz-num{text-align:right;font-variant-numeric:tabular-nums;color:#555}
-.pz-tbl td.pz-pz{font-weight:700;color:#6d1f2f}
-.pz-rate{color:#b3b3b3;font-size:.66rem;font-weight:400;display:block}
-.pz-in{width:100%;max-width:60px;padding:.25rem .3rem;border:1px solid #ccc;border-radius:6px;font-size:.85rem;text-align:right;box-sizing:border-box}
-.pz-grand{font-weight:800;font-size:1.05rem;color:#6d1f2f}
-.pz-tot-l{text-align:right;font-weight:700;color:#6d1f2f}
-.pz-tbl tfoot td{border-top:none;padding-top:.5rem;background:#f4e9ec}
+.pz-group{padding:.5rem .8rem;border-bottom:1px solid #efe7e9}
+.pz-gname{font-weight:700;color:#333;font-size:.9rem;margin-bottom:.25rem}
+.pz-gname .pz-rate{margin-left:.4rem}
+.pz-rate{color:#b3b3b3;font-size:.66rem;font-weight:400}
+.pz-row{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.14rem 0;font-size:.85rem}
+.pz-lbl{color:#666}
+.pz-in{width:72px;padding:.25rem .35rem;border:1px solid #ccc;border-radius:6px;font-size:.85rem;text-align:right;box-sizing:border-box}
+.pz-gtot{display:flex;justify-content:space-between;align-items:baseline;margin-top:.35rem;padding-top:.3rem;border-top:1px dashed #dcccd0;font-size:.83rem;font-weight:700;color:#6d1f2f}
+.pz-gtot-v{font-variant-numeric:tabular-nums;white-space:nowrap}
+.pz-sl{font-weight:400;color:#b3b3b3;font-size:.68rem;margin-left:.25rem}
+.pz-grandrow{display:flex;justify-content:space-between;align-items:baseline;padding:.6rem .8rem;background:#f4e9ec;font-weight:800;color:#6d1f2f;font-size:.95rem}
+.pz-grand{font-size:1.15rem;font-variant-numeric:tabular-nums}
 .payroll-table{border-collapse:collapse;width:100%;font-size:.85rem}
 .payroll-table th,.payroll-table td{border:1px solid #cfcfcf;padding:.35rem .4rem;text-align:center;vertical-align:middle}
 .payroll-table td{height:42px}
@@ -5704,25 +5703,20 @@ function renderPizza() {
   let cols = '';
   PZ_PERIODS.forEach((title,p) => {
     const ps = st[p] || {};
-    let rows = '';
+    let body = '';
     PZ_GROUPS.forEach(([g,label,rate]) => {
       const gs = ps[g] || {};
-      const camperCell = rate != null ? inp('pz-'+p+'-'+g+'-c', gs.c) : '<span style="color:#c8c8c8">—</span>';
       const note = rate != null ? (rate+' slices/camper') : 'staff only';
-      rows += '<tr><td class="pz-g">'+label+'<span class="pz-rate">'+note+'</span></td>' +
-        '<td>'+camperCell+'</td>' +
-        '<td>'+inp('pz-'+p+'-'+g+'-s', gs.s)+'</td>' +
-        '<td class="pz-num"><span id="pz-'+p+'-'+g+'-sl">0</span></td>' +
-        '<td class="pz-num pz-pz"><span id="pz-'+p+'-'+g+'-pz">0.0</span></td></tr>';
+      let block = '<div class="pz-group"><div class="pz-gname">'+label+'<span class="pz-rate">'+note+'</span></div>';
+      if (rate != null) block += '<div class="pz-row"><span class="pz-lbl">'+label+' campers</span>'+inp('pz-'+p+'-'+g+'-c', gs.c)+'</div>';
+      block += '<div class="pz-row"><span class="pz-lbl">'+label+' staff</span>'+inp('pz-'+p+'-'+g+'-s', gs.s)+'</div>';
+      block += '<div class="pz-gtot"><span>Total Pizzas for '+label+'</span><span class="pz-gtot-v"><span id="pz-'+p+'-'+g+'-pz">0.0</span><span class="pz-sl">(<span id="pz-'+p+'-'+g+'-sl">0</span> slices)</span></span></div></div>';
+      body += block;
     });
-    rows += '<tr><td class="pz-g">School<span class="pz-rate">enter pizzas directly</span></td>' +
-      '<td colspan="3" style="text-align:right;color:#aaa;font-size:.72rem">pizzas &rarr;</td>' +
-      '<td class="pz-num pz-pz">'+inp('pz-'+p+'-school', ps.school)+'</td></tr>';
-    cols += '<div class="pz-card"><div class="pz-title">'+title+'</div><div class="pz-tblwrap">' +
-      '<table class="pz-tbl"><thead><tr><th class="pz-g">Group</th><th>Campers</th><th>Staff</th><th>Slices</th><th>Pizzas</th></tr></thead>' +
-      '<tbody>'+rows+'</tbody>' +
-      '<tfoot><tr><td colspan="4" class="pz-tot-l">Grand Total Pizzas to Order</td><td class="pz-num pz-grand"><span id="pz-'+p+'-total">0.0</span></td></tr></tfoot>' +
-      '</table></div></div>';
+    body += '<div class="pz-group"><div class="pz-gname">School<span class="pz-rate">enter pizzas directly</span></div>' +
+      '<div class="pz-row"><span class="pz-lbl">School pizzas</span>'+inp('pz-'+p+'-school', ps.school)+'</div></div>';
+    cols += '<div class="pz-card"><div class="pz-title">'+title+'</div>'+body +
+      '<div class="pz-grandrow"><span>Grand Total Pizzas to Order</span><span class="pz-grand" id="pz-'+p+'-total">0.0</span></div></div>';
   });
   const head = '<div class="pz-toolbar px-noprint" style="display:flex;gap:.5rem;margin-bottom:.8rem">' +
       '<button class="px-btn" id="pz-print" style="height:36px">🖨 Print / Save PDF</button>' +
@@ -5745,11 +5739,13 @@ function renderPizza() {
       ' #tab-pizza .card{border:none!important;box-shadow:none!important;padding:0!important;margin:0!important;background:transparent!important}' +
       ' #tab-pizza .card-hint,#tab-pizza .card-title{display:none!important}' +
       ' .pz-print-head{display:block!important}' +
-      ' .pz-grid{gap:.45rem!important} .pz-card{break-inside:avoid;box-shadow:none!important;border:1px solid #6d1f2f!important}' +
-      ' .pz-title{font-size:11px!important;padding:4px 8px!important} .pz-tblwrap{padding:3px 6px 5px!important}' +
-      ' .pz-tbl{font-size:10px!important} .pz-tbl th{font-size:8px!important} .pz-tbl td,.pz-tbl th{padding:2px 4px!important}' +
-      ' .pz-in{border:1px solid #bbb!important;max-width:42px!important;font-size:10px!important;padding:1px 2px!important}' +
-      ' .pz-grand{font-size:12px!important}' +
+      ' .pz-grid{gap:.5rem!important} .pz-card{break-inside:avoid;box-shadow:none!important;border:1px solid #6d1f2f!important}' +
+      ' .pz-title{font-size:12px!important;padding:4px 8px!important}' +
+      ' .pz-group{padding:3px 8px!important} .pz-gname{font-size:11px!important;margin-bottom:1px!important}' +
+      ' .pz-row{font-size:10px!important;padding:1px 0!important}' +
+      ' .pz-gtot{font-size:10px!important;margin-top:2px!important;padding-top:2px!important}' +
+      ' .pz-in{border:1px solid #bbb!important;width:52px!important;font-size:10px!important;padding:1px 3px!important}' +
+      ' .pz-grandrow{font-size:11px!important;padding:4px 8px!important} .pz-grand{font-size:13px!important}' +
       ' @page{size:landscape;margin:.35in} }';
     window.print();
   });
