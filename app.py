@@ -2314,7 +2314,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-sheet-sectitle{display:table-caption}
 .px-chgs{font-size:.9em;font-weight:600}
 /* Pizza calculator */
-.pz-grid{display:grid;grid-template-columns:190px repeat(3,minmax(0,1fr));gap:1rem;align-items:start}
+.pz-grid{display:grid;grid-template-columns:125px repeat(3,minmax(0,1fr));gap:1rem;align-items:start}
 @media(max-width:1000px){.pz-grid{grid-template-columns:1fr}}
 /* Reference column mirrors a period card's structure so each count lines up with its group */
 .pz-refcard{border-color:#d8d8d8}
