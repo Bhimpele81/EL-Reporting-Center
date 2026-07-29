@@ -1654,6 +1654,11 @@ def api_me():
     any_users = bool(_users_load()["users"])
     if u is None:
         return jsonify({"authenticated": False, "has_users": any_users})
+    # A session restored from the cookie (refresh / return visit) never hits /api/login,
+    # so record it once per session. The "logged" flag keeps refreshes from spamming the log.
+    if not session.get("logged"):
+        _loginlog_record(u["username"], u.get("name") or u["username"], "active session")
+        session["logged"] = True
     return jsonify({"authenticated": True, "username": u["username"],
                     "name": u.get("name") or u["username"], "is_admin": bool(u.get("is_admin"))})
 
@@ -1666,6 +1671,7 @@ def api_login():
         return jsonify({"error": "Invalid username or password."}), 401
     session.permanent = True
     session["user"] = u["username"]
+    session["logged"] = True
     _loginlog_record(u["username"], u.get("name") or u["username"], "sign-in")
     return jsonify({"username": u["username"], "name": u.get("name") or u["username"],
                     "is_admin": bool(u.get("is_admin"))})
@@ -1692,6 +1698,7 @@ def api_register():
     _users_save(data)
     session.permanent = True
     session["user"] = username
+    session["logged"] = True
     _loginlog_record(username, entry["name"], "new account")
     return jsonify({"username": username, "name": entry["name"], "is_admin": entry["is_admin"]})
 
@@ -3064,7 +3071,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <div class="card-hd">
       <div>
         <div class="card-title">Sign-In Activity</div>
-        <div class="card-hint">The most recent 20 successful sign-ins to the site (newest first). Admin-only.</div>
+        <div class="card-hint">The 20 most recent sign-ins to the site (newest first). The <strong>How</strong> column shows a fresh <em>sign-in</em>, a <em>new account</em>, or an <em>active session</em> (someone returning on an existing login). Admin-only.</div>
       </div>
     </div>
     <div style="overflow-x:auto">
@@ -3469,7 +3476,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li>Everyone signs in with their own <strong>username + password</strong>; new users register with the shared <strong>access code</strong>.</li>
           <li>Change your own password by clicking <strong>your name</strong> in the top-right.</li>
           <li>Admins manage accounts (add / rename / reset password / remove) in <strong>Utilities → User Accounts</strong>.</li>
-          <li>Admins can review the <strong>most recent 20 sign-ins</strong> (who, when, and IP) in <strong>Utilities → Sign-In Activity</strong>.</li>
+          <li>Admins can review the <strong>most recent 20 sign-ins</strong> (who, when, how, and IP) in <strong>Utilities → Sign-In Activity</strong>. "How" distinguishes a fresh sign-in, a new account, and an active session resumed on a return visit (a refresh with a still-valid login logs once, not every time).</li>
         </ul>
       </div>
     </details>
