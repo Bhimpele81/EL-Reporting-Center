@@ -1139,6 +1139,56 @@ def api_bunk_snapshot():
     })
 
 
+@app.route("/api/pizza-week-counts", methods=["GET"])
+def api_pizza_week_counts():
+    """Current-week camper counts per pizza group (reference for the Pizza tab).
+    Minors = Munchkins/Rugrats bunks; Majors = the rest of Junior Camp;
+    Inter/Senior/Upper = those camps. Not used to auto-fill the calculator."""
+    cur_week, _ = _current_week_day()
+    ranges = _season_week_strings()
+    idx = (cur_week - 1) if cur_week else 0       # off-season: fall back to week 1 counts
+    out = {"has_master": False, "in_season": bool(cur_week), "week": cur_week,
+           "week_range": ranges[idx] if 0 <= idx < len(ranges) else "",
+           "counts": {"minors": 0, "majors": 0, "inter": 0, "senior": 0, "upper": 0}}
+    fb = _load_master()
+    if not fb:
+        return jsonify(out)
+    out["has_master"] = True
+    try:
+        campers = parse_master(fb) or []
+        config = _s3_load_config() or load_bunk_config(CONFIG_PATH)
+    except Exception as e:
+        out["error"] = str(e)
+        return jsonify(out)
+    camp_of, minors_bunks = {}, set()
+    for camp in config.get("camps", []):
+        for b in camp.get("bunks", []):
+            camp_of[b["name"]] = camp["name"]
+            nm = (b.get("name") or "").lower()
+            if "munchkin" in nm or "rugrat" in nm:
+                minors_bunks.add(b["name"])
+    counts = {"minors": 0, "majors": 0, "inter": 0, "senior": 0, "upper": 0}
+    for c in campers:
+        weeks = c.get("weeks") or []
+        if not (idx < len(weeks) and int(weeks[idx] or 0)):
+            continue
+        bk = c.get("bunk", "")
+        camp = (camp_of.get(bk, "") or "").lower()
+        if bk in minors_bunks:
+            counts["minors"] += 1
+        elif camp.startswith("junior"):
+            counts["majors"] += 1
+        elif camp.startswith("inter"):
+            counts["inter"] += 1
+        elif camp.startswith("senior"):
+            counts["senior"] += 1
+        elif camp.startswith("upper"):
+            counts["upper"] += 1
+        # FT CITs and any unmapped bunks are not counted here
+    out["counts"] = counts
+    return jsonify(out)
+
+
 @app.route("/api/families/full", methods=["GET"])
 def api_families_full():
     """Grouped family records joined with master (age/grade/enrollment) and
@@ -2264,8 +2314,18 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-sheet-sectitle{display:table-caption}
 .px-chgs{font-size:.9em;font-weight:600}
 /* Pizza calculator */
-.pz-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;align-items:start}
+.pz-grid{display:grid;grid-template-columns:190px repeat(3,minmax(0,1fr));gap:1rem;align-items:start}
 @media(max-width:1000px){.pz-grid{grid-template-columns:1fr}}
+.pz-refcard{border:1px solid #dcdcdc;border-radius:10px;background:#fff;overflow:hidden;min-width:0;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.pz-reftitle{background:#4a4a4a;color:#fff;font-weight:700;font-size:.85rem;padding:.5rem .7rem}
+.pz-refbody{padding:.55rem .7rem}
+.pz-refweek{font-size:1rem;font-weight:800;color:#6d1f2f}
+.pz-refrange{font-size:.72rem;color:#999;margin-bottom:.55rem}
+.pz-refrow{display:flex;justify-content:space-between;align-items:baseline;font-size:.82rem;padding:.2rem 0;border-bottom:1px solid #f1ebec}
+.pz-refrow:last-of-type{border-bottom:none}
+.pz-reflbl{color:#555}
+.pz-refval{font-weight:700;font-variant-numeric:tabular-nums;color:#333}
+.pz-refnote{font-size:.66rem;color:#b3b3b3;margin-top:.55rem;line-height:1.35}
 .pz-card{border:1px solid #e6dade;border-radius:10px;background:#fff;overflow:hidden;min-width:0;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .pz-title{background:#6d1f2f;color:#fff;font-weight:700;font-size:.98rem;padding:.5rem .8rem}
 .pz-group{padding:.5rem .8rem;border-bottom:1px solid #efe7e9}
@@ -3463,6 +3523,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
         <p>The <strong>Pizza</strong> tab figures out how many pizzas to order for each lunch period. It has <strong>three identical columns</strong>, one per lunch period. For each group, type in the number of <strong>campers</strong> and <strong>staff</strong> for that period, and it fills in the slices and pizzas automatically.</p>
         <p>Each pizza is <strong>16 slices</strong> (double-cut). Staff count as <strong>4 slices</strong> each. Campers count by group: <strong>Minors</strong> 2, <strong>Majors</strong> 2.25, <strong>Inter</strong> 2.5, <strong>Senior</strong> 3.25, <strong>Upper</strong> 3.5. <strong>Specialists</strong> are staff only (no campers). Each group's pizza count is <strong>rounded up to the nearest half pizza</strong>. <strong>School</strong> is a manual entry, just type the number of pizzas. Each column then shows a <strong>Grand Total Pizzas to Order</strong>.</p>
         <p>Enter fresh headcounts each time you order: the calculator does <strong>not</strong> pull from the master sheet, because lunch assignments change from week to week. Your entries stay in your browser, so they're still there if you come back to the tab.</p>
+        <p>The narrow <strong>This Week</strong> column on the left shows the current camp week and, for reference, how many campers are enrolled in each group this week from the master sheet (<strong>Minors</strong> = Munchkins &amp; Rugrats bunks; <strong>Majors</strong> = the rest of Junior Camp; Inter/Senior/Upper by camp). It's a helper only, it never fills in the calculator.</p>
         <p>Use <strong>Print / Save PDF</strong> to print the three periods on one page (or save as a PDF) to hand off with your order, or <strong>Export CSV</strong> to download the numbers as a spreadsheet.</p>
       </div>
     </details>
@@ -5836,8 +5897,23 @@ function renderPizza() {
     '<div class="pz-print-head" style="display:none;text-align:center;margin-bottom:.7rem">' +
       '<div style="font-size:1.3rem;font-weight:800;color:#6d1f2f">Elbow Lane Day Camp</div>' +
       '<div style="font-weight:600;color:#444">Pizza Order &mdash; <span id="pz-print-date"></span></div></div>';
-  box.innerHTML = head + '<div class="pz-grid">'+cols+'</div>';
+  const REF = [['minors','Minors'],['majors','Majors'],['inter','Inter'],['senior','Senior'],['upper','Upper']];
+  const ref = '<div class="pz-refcard"><div class="pz-reftitle">This Week</div><div class="pz-refbody">' +
+    '<div class="pz-refweek" id="pz-ref-week">Week —</div><div class="pz-refrange" id="pz-ref-range"></div>' +
+    REF.map(([k,l]) => '<div class="pz-refrow"><span class="pz-reflbl">'+l+'</span><span class="pz-refval" id="pz-ref-'+k+'">–</span></div>').join('') +
+    '<div class="pz-refnote">Current-week enrollment from the master sheet, for reference. Minors = Munchkins &amp; Rugrats; Majors = the rest of Junior Camp. Enter your lunch headcounts by hand.</div>' +
+    '</div></div>';
+  box.innerHTML = head + '<div class="pz-grid">'+ref+cols+'</div>';
   const dt = document.getElementById('pz-print-date'); if (dt) { try { dt.textContent = new Date().toLocaleDateString(); } catch(e){} }
+  fetch('/api/pizza-week-counts').then(r => r.ok ? r.json() : null).then(d => {
+    if (!d) return;
+    const wk = document.getElementById('pz-ref-week'), rg = document.getElementById('pz-ref-range');
+    if (wk) wk.textContent = d.week ? ('Week '+d.week) : 'Off-season';
+    if (rg) rg.textContent = d.week_range || '';
+    const c = d.counts || {};
+    REF.forEach(([k]) => { const el = document.getElementById('pz-ref-'+k); if (el) el.textContent = d.has_master ? (c[k] != null ? c[k] : '–') : '—'; });
+    if (!d.has_master) { const n = document.querySelector('.pz-refnote'); if (n) n.textContent = 'Upload a master sheet (Utilities) to see current-week enrollment here.'; }
+  }).catch(() => {});
   box.querySelectorAll('.pz-in').forEach(el => el.addEventListener('input', () => pzRecalc(+el.id.split('-')[1])));
   PZ_PERIODS.forEach((_,p) => pzRecalc(p));
   const pb = document.getElementById('pz-print');
@@ -5851,6 +5927,7 @@ function renderPizza() {
       ' #tab-pizza .card{border:none!important;box-shadow:none!important;padding:0!important;margin:0!important;background:transparent!important}' +
       ' #tab-pizza .card-hint,#tab-pizza .card-title{display:none!important}' +
       ' .pz-print-head{display:block!important}' +
+      ' .pz-refcard{display:none!important}' +
       ' .pz-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:.5rem!important} .pz-card{break-inside:avoid;box-shadow:none!important;border:1px solid #6d1f2f!important}' +
       ' .pz-title{font-size:12px!important;padding:4px 8px!important}' +
       ' .pz-group{padding:3px 8px!important} .pz-gname{font-size:11px!important;margin-bottom:1px!important}' +
