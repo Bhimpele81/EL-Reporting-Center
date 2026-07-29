@@ -3379,6 +3379,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
         <p>The <strong>Pizza</strong> tab figures out how many pizzas to order for each lunch period. It has <strong>three identical columns</strong>, one per lunch period. For each group, type in the number of <strong>campers</strong> and <strong>staff</strong> for that period, and it fills in the slices and pizzas automatically.</p>
         <p>Each pizza is <strong>16 slices</strong> (double-cut). Staff count as <strong>4 slices</strong> each. Campers count by group: <strong>Minors</strong> 2, <strong>Majors</strong> 2.25, <strong>Inter</strong> 2.5, <strong>Senior</strong> 3.25, <strong>Upper</strong> 3.5. <strong>Specialists</strong> are staff only (no campers). Each group's pizza count is <strong>rounded up to the nearest half pizza</strong>. <strong>School</strong> is a manual entry, just type the number of pizzas. Each column then shows a <strong>Grand Total Pizzas to Order</strong>.</p>
         <p>Enter fresh headcounts each time you order: the calculator does <strong>not</strong> pull from the master sheet, because lunch assignments change from week to week. Your entries stay in your browser, so they're still there if you come back to the tab.</p>
+        <p>Use <strong>Print / Save PDF</strong> to print the three periods on one page (or save as a PDF) to hand off with your order, or <strong>Export CSV</strong> to download the numbers as a spreadsheet.</p>
       </div>
     </details>
 
@@ -5720,9 +5721,57 @@ function renderPizza() {
       '<tfoot><tr><td colspan="4" class="pz-tot-l">Grand Total Pizzas to Order</td><td class="pz-num pz-grand"><span id="pz-'+p+'-total">0.0</span></td></tr></tfoot>' +
       '</table></div>';
   });
-  box.innerHTML = '<div class="pz-grid">'+cols+'</div>';
+  const head = '<div class="pz-toolbar px-noprint" style="display:flex;gap:.5rem;margin-bottom:.8rem">' +
+      '<button class="px-btn" id="pz-print" style="height:36px">🖨 Print / Save PDF</button>' +
+      '<button class="px-btn ghost" id="pz-csv" style="height:36px">⬇ Export CSV</button></div>' +
+    '<div class="pz-print-head" style="display:none;text-align:center;margin-bottom:.7rem">' +
+      '<div style="font-size:1.3rem;font-weight:800;color:#6d1f2f">Elbow Lane Day Camp</div>' +
+      '<div style="font-weight:600;color:#444">Pizza Order &mdash; <span id="pz-print-date"></span></div></div>';
+  box.innerHTML = head + '<div class="pz-grid">'+cols+'</div>';
+  const dt = document.getElementById('pz-print-date'); if (dt) { try { dt.textContent = new Date().toLocaleDateString(); } catch(e){} }
   box.querySelectorAll('.pz-in').forEach(el => el.addEventListener('input', () => pzRecalc(+el.id.split('-')[1])));
   PZ_PERIODS.forEach((_,p) => pzRecalc(p));
+  const pb = document.getElementById('pz-print');
+  if (pb) pb.addEventListener('click', () => {
+    let st = document.getElementById('pz-print-style');
+    if (!st) { st = document.createElement('style'); st.id = 'pz-print-style'; document.head.appendChild(st); }
+    st.textContent = '@media print{ body *{visibility:hidden!important}' +
+      ' #tab-pizza,#tab-pizza *{visibility:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}' +
+      ' #tab-pizza{position:absolute;left:0;top:0;width:100%}' +
+      ' .px-noprint{display:none!important} #tab-pizza .card-hint,#tab-pizza .card-title{display:none!important}' +
+      ' .pz-print-head{display:block!important}' +
+      ' .pz-card{break-inside:avoid}' +
+      ' @page{size:landscape;margin:.4in} }';
+    window.print();
+  });
+  const cb = document.getElementById('pz-csv');
+  if (cb) cb.addEventListener('click', pzExportCSV);
+}
+
+// Export the current pizza calculations as a CSV download
+function pzExportCSV() {
+  const q = x => { x = (x == null ? '' : String(x)); return /[",\n]/.test(x) ? '"'+x.replace(/"/g,'""')+'"' : x; };
+  const rows = [['Elbow Lane Day Camp - Pizza Order'], []];
+  PZ_PERIODS.forEach((title,p) => {
+    rows.push([title]);
+    rows.push(['Group','Campers','Staff','Slices','Pizzas']);
+    let total = 0;
+    PZ_GROUPS.forEach(([g,label,rate]) => {
+      const c = pzNum('pz-'+p+'-'+g+'-c'), s = pzNum('pz-'+p+'-'+g+'-s');
+      const slices = (rate != null ? c*rate : 0) + s*PZ_STAFF, pizzas = pzRoundHalf(slices/PZ_SLICES);
+      total += pizzas;
+      rows.push([label, rate != null ? c : '', s, slices, pizzas.toFixed(1)]);
+    });
+    const school = pzNum('pz-'+p+'-school'); total += school;
+    rows.push(['School (manual)', '', '', '', school.toFixed(1)]);
+    rows.push(['Grand Total Pizzas to Order', '', '', '', total.toFixed(1)]);
+    rows.push([]);
+  });
+  const csv = rows.map(r => r.map(q).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'pizza-order.csv';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
 // ---- First-time "Utilities" notice (shows once per browser, after sign-in) ----
