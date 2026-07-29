@@ -5739,7 +5739,7 @@ function renderPizza() {
       ' #tab-pizza .card{border:none!important;box-shadow:none!important;padding:0!important;margin:0!important;background:transparent!important}' +
       ' #tab-pizza .card-hint,#tab-pizza .card-title{display:none!important}' +
       ' .pz-print-head{display:block!important}' +
-      ' .pz-grid{gap:.5rem!important} .pz-card{break-inside:avoid;box-shadow:none!important;border:1px solid #6d1f2f!important}' +
+      ' .pz-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:.5rem!important} .pz-card{break-inside:avoid;box-shadow:none!important;border:1px solid #6d1f2f!important}' +
       ' .pz-title{font-size:12px!important;padding:4px 8px!important}' +
       ' .pz-group{padding:3px 8px!important} .pz-gname{font-size:11px!important;margin-bottom:1px!important}' +
       ' .pz-row{font-size:10px!important;padding:1px 0!important}' +
