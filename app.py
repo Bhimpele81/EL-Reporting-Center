@@ -2194,17 +2194,17 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-sheet-sectitle{display:table-caption}
 .px-chgs{font-size:.9em;font-weight:600}
 /* Pizza calculator */
-.pz-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;align-items:start}
-@media(max-width:1100px){.pz-grid{grid-template-columns:1fr}}
-.pz-card{border:1px solid #eee;border-radius:10px;padding:.7rem .85rem;background:#fafafa}
+.pz-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;align-items:start}
+@media(max-width:1000px){.pz-grid{grid-template-columns:1fr}}
+.pz-card{border:1px solid #eee;border-radius:10px;padding:.7rem .85rem;background:#fafafa;min-width:0}
 .pz-title{font-weight:700;color:#6d1f2f;margin-bottom:.5rem;font-size:1rem}
 .pz-tbl{width:100%;border-collapse:collapse;font-size:.85rem}
 .pz-tbl th{font-size:.68rem;color:#999;text-transform:uppercase;letter-spacing:.03em;padding:.2rem .3rem;border-bottom:1px solid #ddd;text-align:right;font-weight:700}
 .pz-tbl th.pz-g,.pz-tbl td.pz-g{text-align:left}
 .pz-tbl td{padding:.28rem .3rem;border-bottom:1px solid #eee;vertical-align:middle}
 .pz-tbl td.pz-num{text-align:right;font-variant-numeric:tabular-nums}
-.pz-rate{color:#b3b3b3;font-size:.66rem;font-weight:400;white-space:nowrap;display:block}
-.pz-in{width:52px;padding:.25rem .3rem;border:1px solid #ccc;border-radius:6px;font-size:.85rem;text-align:right;box-sizing:border-box}
+.pz-rate{color:#b3b3b3;font-size:.66rem;font-weight:400;display:block}
+.pz-in{width:100%;max-width:60px;padding:.25rem .3rem;border:1px solid #ccc;border-radius:6px;font-size:.85rem;text-align:right;box-sizing:border-box}
 .pz-grand{font-weight:800;font-size:1.05rem;color:#6d1f2f}
 .pz-tot-l{text-align:right;font-weight:700}
 .pz-tbl tfoot td{border-top:2px solid #ccc;border-bottom:none;padding-top:.45rem}
