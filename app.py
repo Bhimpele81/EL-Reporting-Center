@@ -2316,20 +2316,18 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 /* Pizza calculator */
 .pz-grid{display:grid;grid-template-columns:190px repeat(3,minmax(0,1fr));gap:1rem;align-items:start}
 @media(max-width:1000px){.pz-grid{grid-template-columns:1fr}}
-.pz-refcard{border:1px solid #dcdcdc;border-radius:10px;background:#fff;overflow:hidden;min-width:0;box-shadow:0 1px 3px rgba(0,0,0,.06)}
-.pz-reftitle{background:#4a4a4a;color:#fff;font-weight:700;font-size:.85rem;padding:.5rem .7rem}
-.pz-refbody{padding:.55rem .7rem}
-.pz-refweek{font-size:1rem;font-weight:800;color:#6d1f2f}
-.pz-refrange{font-size:.72rem;color:#999;margin-bottom:.55rem}
-.pz-refrow{display:flex;justify-content:space-between;align-items:baseline;font-size:.82rem;padding:.2rem 0;border-bottom:1px solid #f1ebec}
-.pz-refrow:last-of-type{border-bottom:none}
-.pz-reflbl{color:#555}
-.pz-refval{font-weight:700;font-variant-numeric:tabular-nums;color:#333}
-.pz-refnote{font-size:.66rem;color:#b3b3b3;margin-top:.55rem;line-height:1.35}
+/* Reference column mirrors a period card's structure so each count lines up with its group */
+.pz-refcard{border-color:#d8d8d8}
+.pz-reftitle{background:#4a4a4a!important}
+.pz-refgroup{box-sizing:border-box;overflow:hidden}
+.pz-refname{display:flex;justify-content:space-between;align-items:baseline;gap:.4rem;line-height:1.35}
+.pz-refval{font-weight:800;font-variant-numeric:tabular-nums;color:#6d1f2f;font-size:.9rem;line-height:1.35}
+.pz-refna{color:#ccc;font-weight:400}
+.pz-refweekline{font-size:.85rem;color:#555;margin-bottom:.7rem}
 .pz-card{border:1px solid #e6dade;border-radius:10px;background:#fff;overflow:hidden;min-width:0;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .pz-title{background:#6d1f2f;color:#fff;font-weight:700;font-size:.98rem;padding:.5rem .8rem}
 .pz-group{padding:.5rem .8rem;border-bottom:1px solid #efe7e9}
-.pz-gname{font-weight:700;color:#333;font-size:.9rem;margin-bottom:.25rem}
+.pz-gname{font-weight:700;color:#333;font-size:.9rem;margin-bottom:.25rem;line-height:1.35}
 .pz-gname .pz-rate{margin-left:.4rem}
 .pz-rate{color:#b3b3b3;font-size:.66rem;font-weight:400}
 .pz-row{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.14rem 0;font-size:.85rem}
@@ -5897,25 +5895,32 @@ function renderPizza() {
     '<div class="pz-print-head" style="display:none;text-align:center;margin-bottom:.7rem">' +
       '<div style="font-size:1.3rem;font-weight:800;color:#6d1f2f">Elbow Lane Day Camp</div>' +
       '<div style="font-weight:600;color:#444">Pizza Order &mdash; <span id="pz-print-date"></span></div></div>';
-  const REF = [['minors','Minors'],['majors','Majors'],['inter','Inter'],['senior','Senior'],['upper','Upper']];
-  const ref = '<div class="pz-refcard"><div class="pz-reftitle">This Week</div><div class="pz-refbody">' +
-    '<div class="pz-refweek" id="pz-ref-week">Week —</div><div class="pz-refrange" id="pz-ref-range"></div>' +
-    REF.map(([k,l]) => '<div class="pz-refrow"><span class="pz-reflbl">'+l+'</span><span class="pz-refval" id="pz-ref-'+k+'">–</span></div>').join('') +
-    '<div class="pz-refnote">Current-week enrollment from the master sheet, for reference. Minors = Munchkins &amp; Rugrats; Majors = the rest of Junior Camp. Enter your lunch headcounts by hand.</div>' +
-    '</div></div>';
-  box.innerHTML = head + '<div class="pz-grid">'+ref+cols+'</div>';
+  // Reference column: one row per group (the count sits on the group-name line). Each row's height
+  // is matched to the period tiles' group blocks by pzAlignRef() after render, so counts line up
+  // even though this column is narrower and its text wraps differently.
+  let refBody = '';
+  PZ_GROUPS.forEach(([g,label,rate]) => {
+    refBody += '<div class="pz-group pz-refgroup"><div class="pz-gname pz-refname"><span>'+label+'</span>' +
+      (rate != null ? '<span class="pz-refval" id="pz-ref-'+g+'">–</span>' : '<span class="pz-refval pz-refna">—</span>') +
+      '</div></div>';
+  });
+  refBody += '<div class="pz-group pz-refgroup"><div class="pz-gname pz-refname"><span>School</span><span class="pz-refval pz-refna">—</span></div></div>';
+  const ref = '<div class="pz-card pz-refcard"><div class="pz-title pz-reftitle" id="pz-ref-week">This Week</div>' + refBody + '<div class="pz-grandrow pz-refgrand">&nbsp;</div></div>';
+  const refLine = '<div class="pz-refweekline px-noprint">Enrollment reference for <strong id="pz-ref-wklbl">this week</strong> <span id="pz-ref-range" style="color:#999"></span> &middot; Minors = Munchkins &amp; Rugrats, Majors = rest of Junior Camp. For reference only.</div>';
+  box.innerHTML = head + refLine + '<div class="pz-grid">'+ref+cols+'</div>';
   const dt = document.getElementById('pz-print-date'); if (dt) { try { dt.textContent = new Date().toLocaleDateString(); } catch(e){} }
   fetch('/api/pizza-week-counts').then(r => r.ok ? r.json() : null).then(d => {
     if (!d) return;
-    const wk = document.getElementById('pz-ref-week'), rg = document.getElementById('pz-ref-range');
-    if (wk) wk.textContent = d.week ? ('Week '+d.week) : 'Off-season';
-    if (rg) rg.textContent = d.week_range || '';
+    const wkLabel = d.week ? ('Week '+d.week) : 'Off-season';
+    const wk = document.getElementById('pz-ref-week'); if (wk) wk.textContent = wkLabel;      // title bar
+    const wl = document.getElementById('pz-ref-wklbl'); if (wl) wl.textContent = wkLabel;      // reference line
+    const rg = document.getElementById('pz-ref-range'); if (rg) rg.textContent = d.week_range ? ('('+d.week_range+')') : '';
     const c = d.counts || {};
-    REF.forEach(([k]) => { const el = document.getElementById('pz-ref-'+k); if (el) el.textContent = d.has_master ? (c[k] != null ? c[k] : '–') : '—'; });
-    if (!d.has_master) { const n = document.querySelector('.pz-refnote'); if (n) n.textContent = 'Upload a master sheet (Utilities) to see current-week enrollment here.'; }
+    ['minors','majors','inter','senior','upper'].forEach(k => { const el = document.getElementById('pz-ref-'+k); if (el) el.textContent = d.has_master ? (c[k] != null ? c[k] : '–') : '—'; });
   }).catch(() => {});
-  box.querySelectorAll('.pz-in').forEach(el => el.addEventListener('input', () => pzRecalc(+el.id.split('-')[1])));
+  box.querySelectorAll('.pz-in').forEach(el => el.addEventListener('input', () => { pzRecalc(+el.id.split('-')[1]); pzAlignRef(); }));
   PZ_PERIODS.forEach((_,p) => pzRecalc(p));
+  pzAlignRef();
   const pb = document.getElementById('pz-print');
   if (pb) pb.addEventListener('click', () => {
     let st = document.getElementById('pz-print-style');
@@ -5941,6 +5946,24 @@ function renderPizza() {
   const cb = document.getElementById('pz-csv');
   if (cb) cb.addEventListener('click', pzExportCSV);
 }
+
+// Match each reference-column row's height to the matching period-tile group block so the counts
+// line up horizontally with their groups (the columns are different widths and wrap differently).
+function pzAlignRef() {
+  const app = document.getElementById('pizza-app'); if (!app) return;
+  const per = app.querySelector('.pz-card:not(.pz-refcard)');
+  const refc = app.querySelector('.pz-refcard');
+  if (!per || !refc) return;
+  const perGroups = per.querySelectorAll('.pz-group');
+  const refGroups = refc.querySelectorAll('.pz-refgroup');
+  const stacked = getComputedStyle(app.querySelector('.pz-grid')).gridTemplateColumns.split(' ').length < 2;
+  refGroups.forEach((rg, i) => {
+    rg.style.height = (!stacked && perGroups[i]) ? (perGroups[i].getBoundingClientRect().height + 'px') : '';
+  });
+  const pg = per.querySelector('.pz-grandrow'), rgd = refc.querySelector('.pz-refgrand');
+  if (pg && rgd) rgd.style.height = stacked ? '' : (pg.getBoundingClientRect().height + 'px');
+}
+window.addEventListener('resize', () => { const p = document.getElementById('tab-pizza'); if (p && p.classList.contains('active')) pzAlignRef(); });
 
 // Export the current pizza calculations as a CSV download
 function pzExportCSV() {
