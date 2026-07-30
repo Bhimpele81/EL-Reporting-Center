@@ -1213,7 +1213,7 @@ def api_pizza_week_counts():
 
 @app.route("/api/pizza-bunk-counts", methods=["GET"])
 def api_pizza_bunk_counts():
-    """Current-week camper counts per BUNK, grouped by pizza group, for the Pizza Beta bunk pickers.
+    """Current-week camper counts per BUNK, grouped by pizza group, for the Pizza bunk pickers.
     Minors = Munchkins/Rugrats bunks; Majors = the rest of Junior Camp; Inter/Senior/Upper by camp."""
     cur_week, _ = _current_week_day()
     ranges = _season_week_strings()
@@ -2429,7 +2429,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .pz-refval{font-weight:800;font-variant-numeric:tabular-nums;color:#6d1f2f;font-size:.9rem;line-height:1.35}
 .pz-refna{color:#ccc;font-weight:400}
 .pz-refweekline{font-size:.85rem;color:#555;margin-bottom:.7rem}
-/* Pizza Beta bunk picker */
+/* Pizza bunk picker */
 .pzb-bunks{margin:.1rem 0 .35rem;font-size:.8rem}
 .pzb-bunks>summary{cursor:pointer;color:#6d1f2f;font-weight:600;list-style:none;padding:.1rem 0}
 .pzb-bunks>summary::-webkit-details-marker{display:none}
@@ -2878,8 +2878,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="tab" data-tab="snap" id="tab-snap-nav">📸 <span>Camp Snapshot</span></div>
   <div class="tab" data-tab="families">👪 <span>Families</span></div>
   <div class="tab" data-tab="pricing" id="tab-pricing-nav">💲 <span>Pricing</span></div>
-  <div class="tab" data-tab="pizza" id="tab-pizza-nav">🍕 <span>Pizza</span></div>
-  <div class="tab" data-tab="pizzabeta" id="tab-pizzabeta-nav">🍕 <span>Pizza Beta</span><span class="nav-new">BETA</span></div>
+  <div class="tab" data-tab="pizzabeta" id="tab-pizzabeta-nav">🍕 <span>Pizza</span><span class="nav-new">NEW</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
   <div class="tab" data-tab="help">❓ <span>FAQs</span></div>
 </nav>
@@ -3072,24 +3071,12 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
 </div>
 
 <!-- ===== PIZZA TAB ===== -->
-<div class="tab-panel" id="tab-pizza">
-  <div class="card">
-    <div class="card-hd">
-      <div>
-        <div class="card-title">Pizza Order Calculator</div>
-        <div class="card-hint">For each lunch period, enter the current number of campers and staff in each group. Slices and pizzas calculate automatically (16 slices per double-cut pizza; each group rounds up to the nearest half pizza). Enter fresh headcounts each time: this does not use the master sheet, since lunch assignments change week to week. Your entries are kept in this browser.</div>
-      </div>
-    </div>
-    <div id="pizza-app"></div>
-  </div>
-</div>
-
 <div class="tab-panel" id="tab-pizzabeta">
   <div class="card">
     <div class="card-hd">
       <div>
-        <div class="card-title">Pizza Order Calculator <span style="font-size:.7rem;color:#b26a00;font-weight:700">BETA</span></div>
-        <div class="card-hint">Same as the Pizza tab, but for each group you can pick the <strong>bunks</strong> in that lunch period from a dropdown, and the camper count fills in automatically from the current week's master-sheet enrollment. You can still type over any number. Your entries are kept in this browser.</div>
+        <div class="card-title">Pizza Order Calculator</div>
+        <div class="card-hint">For each group you can pick the <strong>bunks</strong> in that lunch period from a dropdown, and the camper count fills in automatically from the current week's master-sheet enrollment. You can still type over any number. Your entries are kept in this browser.</div>
       </div>
     </div>
     <div id="pizzabeta-app"></div>
@@ -3638,12 +3625,11 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How does the Pizza Order Calculator work?</summary>
       <div class="faq-body">
-        <p>The <strong>Pizza</strong> tab figures out how many pizzas to order for each lunch period. It has <strong>three identical columns</strong>, one per lunch period. For each group, type in the number of <strong>campers</strong> and <strong>staff</strong> for that period, and it fills in the slices and pizzas automatically.</p>
+        <p>The <strong>Pizza</strong> tab figures out how many pizzas to order for each lunch period. It has <strong>three identical columns</strong>, one per lunch period. For each group, pick the <strong>bunks</strong> in that period from the dropdown: the number of <strong>campers</strong> fills in from the current week's master-sheet enrollment and the number of <strong>staff</strong> fills in from the Payroll assignments for those bunks. You can type over either number if you need to, and the slices and pizzas calculate automatically.</p>
         <p>Each pizza is <strong>16 slices</strong> (double-cut). Staff count as <strong>4 slices</strong> each. Campers count by group: <strong>Minors</strong> 2, <strong>Majors</strong> 2.25, <strong>Inter</strong> 2.5, <strong>Senior</strong> 3.25, <strong>Upper</strong> 3.5. <strong>Specialists</strong> are staff only (no campers). Each group's pizza count is <strong>rounded up to the nearest half pizza</strong>. <strong>School</strong> is a manual entry, just type the number of pizzas. Each column then shows a <strong>Grand Total Pizzas to Order</strong>.</p>
-        <p>Enter fresh headcounts each time you order: the calculator does <strong>not</strong> pull from the master sheet, because lunch assignments change from week to week. Your entries stay in your browser, so they're still there if you come back to the tab.</p>
-        <p>The narrow <strong>This Week</strong> column on the left shows the current camp week and, for reference, how many campers are enrolled in each group this week from the master sheet (<strong>Minors</strong> and <strong>Majors</strong> are set per Junior-Camp bunk in <strong>Utilities → Bunks &amp; Camps</strong>, via the Min/Maj dropdown; Inter/Senior/Upper by camp). It's a helper only, it never fills in the calculator.</p>
+        <p>Your entries stay in your browser, so they're still there if you come back to the tab. <strong>Minors</strong> and <strong>Majors</strong> are set per Junior-Camp bunk in <strong>Utilities → Bunks &amp; Camps</strong>, via the Min/Maj dropdown; Inter/Senior/Upper are by camp.</p>
+        <p>The narrow <strong>This Week</strong> column on the left shows the current camp week and, for reference, how many campers are enrolled in each group this week from the master sheet. It's a helper only.</p>
         <p>Use <strong>Print / Save PDF</strong> to print the three periods on one page (or save as a PDF) to hand off with your order, or <strong>Export CSV</strong> to download the numbers as a spreadsheet.</p>
-        <p>There's also a <strong>Pizza Beta</strong> tab that works the same way, but for each group you can pick the <strong>bunks</strong> in that lunch period from a dropdown, and the camper count fills in automatically from the current week's enrollment (you can still type over it).</p>
       </div>
     </details>
 
@@ -3710,7 +3696,6 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (tab.dataset.tab === 'snap') loadBunkSnapshot();
     if (tab.dataset.tab === 'families') loadFamiliesDir();
     if (tab.dataset.tab === 'pricing') loadPricing();
-    if (tab.dataset.tab === 'pizza') renderPizza();
     if (tab.dataset.tab === 'pizzabeta') renderPizzaBeta();
   });
 });
@@ -6075,151 +6060,9 @@ const PZ_PERIODS = ['Lunch Period 1','Lunch Period 2','Lunch Period 3'];
 const pzRoundHalf = x => Math.ceil(x*2)/2;                                   // up to nearest 0.5 pizza
 const pzNum = id => { const el=document.getElementById(id); const v=parseFloat((el&&el.value||'').replace(/[^0-9.]/g,'')); return isNaN(v)?0:v; };
 const pzFmt = x => (Math.round(x*100)/100).toString();
-function pzLoad() { try { return JSON.parse(localStorage.getItem('el_pizza_v1')) || {}; } catch(e) { return {}; } }
-function pzSave() {
-  try {
-    const st = {};
-    PZ_PERIODS.forEach((_,p) => { st[p] = {}; PZ_GROUPS.forEach(([g]) => { st[p][g] = {c:pzNum('pz-'+p+'-'+g+'-c'), s:pzNum('pz-'+p+'-'+g+'-s')}; }); st[p].school = pzNum('pz-'+p+'-school'); });
-    localStorage.setItem('el_pizza_v1', JSON.stringify(st));
-  } catch(e) {}
-}
-function pzRecalc(p) {
-  let total = 0;
-  PZ_GROUPS.forEach(([g,,rate]) => {
-    const c = pzNum('pz-'+p+'-'+g+'-c'), s = pzNum('pz-'+p+'-'+g+'-s');
-    const slices = (rate != null ? c*rate : 0) + s*PZ_STAFF;
-    const pizzas = pzRoundHalf(slices/PZ_SLICES);
-    total += pizzas;
-    const slEl = document.getElementById('pz-'+p+'-'+g+'-sl'); if (slEl) slEl.textContent = slices ? pzFmt(slices) : '0';
-    const pzEl = document.getElementById('pz-'+p+'-'+g+'-pz'); if (pzEl) pzEl.textContent = pizzas.toFixed(1);
-  });
-  total += pzNum('pz-'+p+'-school');
-  const tEl = document.getElementById('pz-'+p+'-total'); if (tEl) tEl.textContent = total.toFixed(1);
-  pzSave();
-}
-function renderPizza() {
-  const box = document.getElementById('pizza-app'); if (!box) return;
-  const st = pzLoad();
-  const inp = (id,v) => '<input class="pz-in" id="'+id+'" inputmode="decimal" value="'+(v?v:'')+'">';
-  let cols = '';
-  PZ_PERIODS.forEach((title,p) => {
-    const ps = st[p] || {};
-    let body = '';
-    PZ_GROUPS.forEach(([g,label,rate]) => {
-      const gs = ps[g] || {};
-      const note = rate != null ? (rate+' slices/camper') : 'staff only';
-      let block = '<div class="pz-group"><div class="pz-gname">'+label+'<span class="pz-rate">'+note+'</span></div>';
-      if (rate != null) block += '<div class="pz-row"><span class="pz-lbl">'+label+' campers</span>'+inp('pz-'+p+'-'+g+'-c', gs.c)+'</div>';
-      block += '<div class="pz-row"><span class="pz-lbl">'+label+' staff</span>'+inp('pz-'+p+'-'+g+'-s', gs.s)+'</div>';
-      block += '<div class="pz-gtot"><span>Total Pizzas for '+label+'</span><span class="pz-gtot-v"><span id="pz-'+p+'-'+g+'-pz">0.0</span><span class="pz-sl">(<span id="pz-'+p+'-'+g+'-sl">0</span> slices)</span></span></div></div>';
-      body += block;
-    });
-    body += '<div class="pz-group"><div class="pz-gname">School<span class="pz-rate">enter pizzas directly</span></div>' +
-      '<div class="pz-row"><span class="pz-lbl">School pizzas</span>'+inp('pz-'+p+'-school', ps.school)+'</div></div>';
-    cols += '<div class="pz-card"><div class="pz-title">'+title+'</div>'+body +
-      '<div class="pz-grandrow"><span>Grand Total Pizzas to Order</span><span class="pz-grand" id="pz-'+p+'-total">0.0</span></div></div>';
-  });
-  const head = '<div class="pz-toolbar px-noprint" style="display:flex;gap:.5rem;margin-bottom:.8rem">' +
-      '<button class="px-btn" id="pz-print" style="height:36px">🖨 Print / Save PDF</button>' +
-      '<button class="px-btn ghost" id="pz-csv" style="height:36px">⬇ Export CSV</button></div>' +
-    '<div class="pz-print-head" style="display:none;text-align:center;margin-bottom:.7rem">' +
-      '<div style="font-size:1.3rem;font-weight:800;color:#6d1f2f">Elbow Lane Day Camp</div>' +
-      '<div style="font-weight:600;color:#444">Pizza Order &mdash; <span id="pz-print-date"></span></div></div>';
-  // Reference column: one row per group (the count sits on the group-name line). Each row's height
-  // is matched to the period tiles' group blocks by pzAlignRef() after render, so counts line up
-  // even though this column is narrower and its text wraps differently.
-  let refBody = '';
-  PZ_GROUPS.forEach(([g,label,rate]) => {
-    if (rate == null) return;   // count box lists only the camper groups (no Specialists / School)
-    refBody += '<div class="pz-group pz-refgroup"><div class="pz-gname pz-refname"><span>'+label+'</span>' +
-      '<span class="pz-refval" id="pz-ref-'+g+'">–</span></div></div>';
-  });
-  const ref = '<div class="pz-card pz-refcard"><div class="pz-title pz-reftitle" id="pz-ref-week">This Week</div>' + refBody + '</div>';
-  box.innerHTML = head + '<div class="pz-grid">'+ref+cols+'</div>';
-  const dt = document.getElementById('pz-print-date'); if (dt) { try { dt.textContent = new Date().toLocaleDateString(); } catch(e){} }
-  fetch('/api/pizza-week-counts').then(r => r.ok ? r.json() : null).then(d => {
-    if (!d) return;
-    const wkLabel = d.week ? ('Week '+d.week) : 'Off-season';
-    const wk = document.getElementById('pz-ref-week'); if (wk) wk.textContent = wkLabel;      // count-box title bar
-    const c = d.counts || {};
-    ['minors','majors','inter','senior','upper'].forEach(k => { const el = document.getElementById('pz-ref-'+k); if (el) el.textContent = d.has_master ? (c[k] != null ? c[k] : '–') : '—'; });
-  }).catch(() => {});
-  box.querySelectorAll('.pz-in').forEach(el => el.addEventListener('input', () => { pzRecalc(+el.id.split('-')[1]); pzAlignRef(); }));
-  PZ_PERIODS.forEach((_,p) => pzRecalc(p));
-  pzAlignRef();
-  const pb = document.getElementById('pz-print');
-  if (pb) pb.addEventListener('click', () => {
-    let st = document.getElementById('pz-print-style');
-    if (!st) { st = document.createElement('style'); st.id = 'pz-print-style'; document.head.appendChild(st); }
-    st.textContent = '@media print{ body *{visibility:hidden!important}' +
-      ' #tab-pizza,#tab-pizza *{visibility:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}' +
-      ' #tab-pizza{position:absolute;left:0;top:0;width:100%}' +
-      ' .px-noprint{display:none!important}' +
-      ' #tab-pizza .card{border:none!important;box-shadow:none!important;padding:0!important;margin:0!important;background:transparent!important}' +
-      ' #tab-pizza .card-hint,#tab-pizza .card-title{display:none!important}' +
-      ' .pz-print-head{display:block!important}' +
-      ' .pz-refcard{display:none!important}' +
-      ' .pz-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:.5rem!important} .pz-card{break-inside:avoid;box-shadow:none!important;border:1px solid #6d1f2f!important}' +
-      ' .pz-title{font-size:12px!important;padding:4px 8px!important}' +
-      ' .pz-group{padding:3px 8px!important} .pz-gname{font-size:11px!important;margin-bottom:1px!important}' +
-      ' .pz-row{font-size:10px!important;padding:1px 0!important}' +
-      ' .pz-gtot{font-size:10px!important;margin-top:2px!important;padding-top:2px!important}' +
-      ' .pz-in{border:1px solid #bbb!important;width:52px!important;font-size:10px!important;padding:1px 3px!important}' +
-      ' .pz-grandrow{font-size:11px!important;padding:4px 8px!important} .pz-grand{font-size:13px!important}' +
-      ' @page{size:landscape;margin:.35in} }';
-    window.print();
-  });
-  const cb = document.getElementById('pz-csv');
-  if (cb) cb.addEventListener('click', pzExportCSV);
-}
-
-// Match each reference-column row's height to the matching period-tile group block so the counts
-// line up horizontally with their groups (the columns are different widths and wrap differently).
-function pzAlignRef() {
-  const app = document.getElementById('pizza-app'); if (!app) return;
-  const per = app.querySelector('.pz-card:not(.pz-refcard)');
-  const refc = app.querySelector('.pz-refcard');
-  if (!per || !refc) return;
-  const perGroups = per.querySelectorAll('.pz-group');
-  const refGroups = refc.querySelectorAll('.pz-refgroup');
-  const stacked = getComputedStyle(app.querySelector('.pz-grid')).gridTemplateColumns.split(' ').length < 2;
-  refGroups.forEach((rg, i) => {
-    rg.style.height = (!stacked && perGroups[i]) ? (perGroups[i].getBoundingClientRect().height + 'px') : '';
-  });
-  const pg = per.querySelector('.pz-grandrow'), rgd = refc.querySelector('.pz-refgrand');
-  if (pg && rgd) rgd.style.height = stacked ? '' : (pg.getBoundingClientRect().height + 'px');
-}
-window.addEventListener('resize', () => { const p = document.getElementById('tab-pizza'); if (p && p.classList.contains('active')) pzAlignRef(); });
-
-// Export the current pizza calculations as a CSV download
-function pzExportCSV() {
-  const q = x => { x = (x == null ? '' : String(x)); return /[",\n]/.test(x) ? '"'+x.replace(/"/g,'""')+'"' : x; };
-  const rows = [['Elbow Lane Day Camp - Pizza Order'], []];
-  PZ_PERIODS.forEach((title,p) => {
-    rows.push([title]);
-    rows.push(['Group','Campers','Staff','Slices','Pizzas']);
-    let total = 0;
-    PZ_GROUPS.forEach(([g,label,rate]) => {
-      const c = pzNum('pz-'+p+'-'+g+'-c'), s = pzNum('pz-'+p+'-'+g+'-s');
-      const slices = (rate != null ? c*rate : 0) + s*PZ_STAFF, pizzas = pzRoundHalf(slices/PZ_SLICES);
-      total += pizzas;
-      rows.push([label, rate != null ? c : '', s, slices, pizzas.toFixed(1)]);
-    });
-    const school = pzNum('pz-'+p+'-school'); total += school;
-    rows.push(['School (manual)', '', '', '', school.toFixed(1)]);
-    rows.push(['Grand Total Pizzas to Order', '', '', '', total.toFixed(1)]);
-    rows.push([]);
-  });
-  const csv = rows.map(r => r.map(q).join(',')).join('\n');
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'pizza-order.csv';
-  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-}
-
-// ========== Pizza Order Calculator — BETA ==========
-// Same as the Pizza tab, but each camper group has a bunk multi-select. Picking bunks auto-fills the
-// campers field with the current week's enrollment from the master (still editable). ids use 'pzb-'.
+// ---------- Pizza Order Calculator (rendering) ----------
+// Each camper group has a bunk multi-select. Picking bunks auto-fills the campers field with the
+// current week's enrollment from the master (still editable). ids use 'pzb-'.
 let pzbData = {groups:{}, has_master:false, week:null};   // cached /api/pizza-bunk-counts
 function pzbLoad() { try { return JSON.parse(localStorage.getItem('el_pizza_beta_v1')) || {}; } catch(e) { return {}; } }
 function pzbSave() {
