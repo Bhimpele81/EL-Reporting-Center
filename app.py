@@ -2342,6 +2342,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-ar-tbl thead th:first-child{width:50px}   /* Weeks */
 .px-ar-tbl thead th:nth-child(2){width:60px}  /* Days/wk; the rate columns then split the rest equally */
 .px-ar-tbl td.px-ar-wk{background:#f4e9ec;font-weight:700;vertical-align:middle;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.px-ar-tbl tbody tr.px-ar-shade td:not(.px-ar-wk){background:#f2edef;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .px-ar-tbd{color:#c9c9c9}
 .px-sheet-sectitle{display:table-caption}
 .px-chgs{font-size:.9em;font-weight:600}
@@ -5939,10 +5940,10 @@ function pxAllRatesHTML() {
   const TBD = '<span class="px-ar-tbd">&mdash;</span>';
   function section(title, cols) {
     let s = '<table class="px-ar-tbl"><caption class="px-ar-cap">'+title+'</caption><thead><tr><th>Weeks</th><th>Days/wk</th>'+cols.map(c=>'<th>'+c.head+'</th>').join('')+'</tr></thead><tbody>';
-    wks.forEach(w => days.forEach((d,di) => {
-      s += '<tr>' + (di===0 ? '<td class="px-ar-wk" rowspan="3">'+w+' wk</td>' : '') + '<td>'+d+'-day</td>' +
+    wks.forEach((w,wi) => { const sh = (wi % 2 === 0) ? ' class="px-ar-shade"' : ''; days.forEach((d,di) => {
+      s += '<tr'+sh+'>' + (di===0 ? '<td class="px-ar-wk" rowspan="3">'+w+' wk</td>' : '') + '<td>'+d+'-day</td>' +
         cols.map(c => '<td>'+(c.fn ? money(c.fn(w,d)) : TBD)+'</td>').join('') + '</tr>';
-    }));
+    }); });
     return s + '</tbody></table>';
   }
   let out = '<div class="px-ar-wrap"><div class="px-ar-head">' +
