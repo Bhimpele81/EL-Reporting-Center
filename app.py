@@ -6251,7 +6251,7 @@ function pzbBuild() {
         const sel = {}; (gs.bunks || []).forEach(b => sel[b] = true);
         const bl = bunksOf(g);
         if (bl.length) {
-          const checks = bl.map(b => '<label class="pzb-bunk"><input type="checkbox" data-p="'+p+'" data-g="'+g+'" data-cnt="'+b.count+'" value="'+famEsc(b.bunk)+'"'+(sel[b.bunk]?' checked':'')+'> '+famEsc(b.bunk)+' <span class="pzb-cnt">('+b.count+')</span></label>').join('');
+          const checks = bl.map(b => '<label class="pzb-bunk"><input type="checkbox" data-p="'+p+'" data-g="'+g+'" data-cnt="'+b.count+'" value="'+famEsc(b.bunk)+'"'+(sel[b.bunk]?' checked':'')+'> '+famEsc(b.bunk.replace(/^\s*\d+\s*/,''))+' <span class="pzb-cnt">('+b.count+')</span></label>').join('');
           block += '<details class="pzb-bunks"><summary>Bunks<span class="pzb-selc" id="pzb-'+p+'-'+g+'-selc"></span></summary><div class="pzb-bunklist">'+checks+'</div></details>';
         }
         block += '<div class="pz-row"><span class="pz-lbl">'+label+' campers</span>'+inp('pzb-'+p+'-'+g+'-c', gs.c)+'</div>';
@@ -6326,6 +6326,11 @@ function pzbAlignRef() {
   refGroups.forEach((rg, i) => { rg.style.height = (!stacked && perGroups[i]) ? (perGroups[i].getBoundingClientRect().height + 'px') : ''; });
 }
 window.addEventListener('resize', () => { const p = document.getElementById('tab-pizzabeta'); if (p && p.classList.contains('active')) pzbAlignRef(); });
+// Collapse an open bunk dropdown once the user clicks away (so it minimizes after selecting).
+document.addEventListener('click', e => {
+  const app = document.getElementById('pizzabeta-app'); if (!app) return;
+  app.querySelectorAll('.pzb-bunks[open]').forEach(d => { if (!d.contains(e.target)) d.removeAttribute('open'); });
+});
 function pzbExportCSV() {
   const q = x => { x = (x == null ? '' : String(x)); return /[",\n]/.test(x) ? '"'+x.replace(/"/g,'""')+'"' : x; };
   const rows = [['Elbow Lane Day Camp - Pizza Order (Beta)'], []];
