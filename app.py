@@ -1224,7 +1224,7 @@ def api_pizza_bunk_counts():
            "spec_areas": []}
     # Specialist areas come straight from Payroll (any area that isn't a camp / support / director),
     # with a head count per area. Independent of the master sheet.
-    _nonspec = {"junior", "inter", "senior", "upper", "minors", "majors", "support", "director", ""}
+    _nonspec = {"junior", "inter", "senior", "upper", "minors", "majors", "support", "director", "floater", ""}
     _spec = {}
     for s in (_payroll_load().get("staff") or []):
         a = (s.get("area") or "").strip()
@@ -1258,9 +1258,11 @@ def api_pizza_bunk_counts():
         bk = _denum(s.get("bunk", ""))
         if bk:
             staff_by_bunk[bk] = staff_by_bunk.get(bk, 0) + 1
-    # The CIT counselors are logged on Payroll under bunk "CITs"; they cover both PT CIT
-    # groups (which eat together), so fold them onto the first PT CIT bunk we render.
-    cit_staff = staff_by_bunk.get("cits", 0)
+    # The CIT counselors are logged on Payroll under bunk "CITs" (5 total, not per group); they
+    # cover every CIT group (which all eat together), so fold ALL of them onto the first PT CIT
+    # bunk we render, once. Match PT CIT bunks loosely so "PT CITs" / "PT CIT Maroon" / "PT CIT
+    # Silver" all count.
+    cit_staff = staff_by_bunk.get("cits", 0) + staff_by_bunk.get("cit", 0)
     pt_cit_done = False
     # Map each bunk (in config order) to its pizza group with its current-week camper + staff counts.
     # FT CITs are their own camp; treat them as an Upper bunk so they flow through the camper math.
@@ -1270,7 +1272,7 @@ def api_pizza_bunk_counts():
             nm = b.get("name") or ""
             entry = {"bunk": nm, "count": bunk_count.get(nm, 0), "staff": staff_by_bunk.get(_denum(nm), 0)}
             low = nm.lower()
-            if _denum(nm) == "pt cits" and not pt_cit_done:
+            if _denum(nm).startswith("pt cit") and not pt_cit_done:
                 entry["staff"] += cit_staff
                 pt_cit_done = True
             if cl.startswith("junior"):
