@@ -1221,7 +1221,7 @@ def api_pizza_bunk_counts():
     out = {"has_master": False, "in_season": bool(cur_week), "week": cur_week,
            "week_range": ranges[idx] if 0 <= idx < len(ranges) else "",
            "groups": {"minors": [], "majors": [], "inter": [], "senior": [], "upper": []},
-           "spec_areas": []}
+           "spec_areas": [], "ftcit": 0}
     # Specialist areas come straight from Payroll (any area that isn't a camp / support / director),
     # with a head count per area. Independent of the master sheet.
     _nonspec = {"junior", "inter", "senior", "upper", "minors", "majors", "support", "director", ""}
@@ -1250,6 +1250,10 @@ def api_pizza_bunk_counts():
             continue
         bk = c.get("bunk", "")
         bunk_count[bk] = bunk_count.get(bk, 0) + 1
+    # Full-Time CITs this week: campers in the "FT CITs" camp (not the Upper "PT CITs" bunks).
+    for camp in config.get("camps", []):
+        if (camp.get("name") or "").strip().lower().startswith("ft cit"):
+            out["ftcit"] += sum(bunk_count.get(b.get("name") or "", 0) for b in camp.get("bunks", []))
     # Staff assigned per bunk, keyed by the de-numbered bunk name ("15 Spirit" -> "spirit").
     # Payroll staff carry a de-numbered bunk (e.g. "Spirit"); specialists have no bunk.
     def _denum(s): return (s or "").lstrip("0123456789 ").strip().lower()
@@ -3637,7 +3641,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <summary>How does the Pizza Order Calculator work?</summary>
       <div class="faq-body">
         <p>The <strong>Pizza</strong> tab figures out how many pizzas to order for each lunch period. It has <strong>three identical columns</strong>, one per lunch period. For each group, pick the <strong>bunks</strong> in that period from the dropdown: the number of <strong>campers</strong> fills in from the current week's master-sheet enrollment and the number of <strong>staff</strong> fills in from the Payroll assignments for those bunks. You can type over either number if you need to, and the slices and pizzas calculate automatically.</p>
-        <p>Each pizza is <strong>16 slices</strong> (double-cut). Staff count as <strong>4 slices</strong> each. Campers count by group: <strong>Minors</strong> 2, <strong>Majors</strong> 2.25, <strong>Inter</strong> 2.5, <strong>Senior</strong> 3.25, <strong>Upper</strong> 3.5. In the <strong>Upper</strong> group's <strong>Bunks</strong> dropdown there's also an <strong>FT CIT</strong> checkbox; check it and enter how many full-time CITs are eating, each counting as 4 slices (staff rate). <strong>Specialists</strong> are staff only: instead of a headcount, open <strong>Areas</strong> and check the specialty areas present that period. The areas and their specialist counts come straight from the <strong>Payroll</strong> tab (the area each staffer is assigned to), and each selected specialist counts as 4 slices. You can still type over the resulting staff number. Each group's pizza count is <strong>rounded up to the nearest half pizza</strong>. The <strong>Additional Pies</strong> section is for direct entry, just type the number of pizzas for <strong>School</strong>, <strong>Office</strong>, <strong>Maintenance</strong>, and <strong>Vendor</strong>. Each column then shows a <strong>Grand Total Pizzas to Order</strong>.</p>
+        <p>Each pizza is <strong>16 slices</strong> (double-cut). Staff count as <strong>4 slices</strong> each. Campers count by group: <strong>Minors</strong> 2, <strong>Majors</strong> 2.25, <strong>Inter</strong> 2.5, <strong>Senior</strong> 3.25, <strong>Upper</strong> 3.5. In the <strong>Upper</strong> group's <strong>Bunks</strong> dropdown there's also an <strong>FT CIT</strong> checkbox; check it and the current week's full-time CIT count fills in from the master sheet (still editable), each counting as 4 slices (staff rate). <strong>Specialists</strong> are staff only: instead of a headcount, open <strong>Areas</strong> and check the specialty areas present that period. The areas and their specialist counts come straight from the <strong>Payroll</strong> tab (the area each staffer is assigned to), and each selected specialist counts as 4 slices. You can still type over the resulting staff number. Each group's pizza count is <strong>rounded up to the next whole pizza</strong>. The <strong>Additional Pies</strong> section is for direct entry, just type the number of pizzas for <strong>School</strong>, <strong>Office</strong>, <strong>Maintenance</strong>, and <strong>Vendor</strong>. Each column then shows a <strong>Grand Total Pizzas to Order</strong>.</p>
         <p>Your entries stay in your browser, so they're still there if you come back to the tab. <strong>Minors</strong> and <strong>Majors</strong> are set per Junior-Camp bunk in <strong>Utilities → Bunks &amp; Camps</strong>, via the Min/Maj dropdown; Inter/Senior/Upper are by camp.</p>
         <p>The narrow <strong>This Week</strong> column on the left shows the current camp week and, for reference, how many campers are enrolled in each group this week from the master sheet. It's a helper only.</p>
         <p>Use <strong>Print / Save PDF</strong> to print the three periods on one page (or save as a PDF) to hand off with your order, or <strong>Export CSV</strong> to download the numbers as a spreadsheet.</p>
@@ -6068,7 +6072,7 @@ const PZ_GROUPS = [
   ['senior','Senior',3.25], ['upper','Upper',3.5], ['specialists','Specialists',null],
 ];
 const PZ_PERIODS = ['Lunch Period 1','Lunch Period 2','Lunch Period 3'];
-const pzRoundHalf = x => Math.ceil(x*2)/2;                                   // up to nearest 0.5 pizza
+const pzRoundHalf = x => Math.ceil(x);                                       // up to the next whole pizza
 const pzNum = id => { const el=document.getElementById(id); const v=parseFloat((el&&el.value||'').replace(/[^0-9.]/g,'')); return isNaN(v)?0:v; };
 const pzFmt = x => (Math.round(x*100)/100).toString();
 // Direct-entry pizzas (no camper math), shown under "Additional Pies". [key, label].
@@ -6076,7 +6080,7 @@ const PZ_ADDL = [['school','School Pizzas'],['office','Office Pizza'],['maint','
 // ---------- Pizza Order Calculator (rendering) ----------
 // Each camper group has a bunk multi-select. Picking bunks auto-fills the campers field with the
 // current week's enrollment from the master (still editable). ids use 'pzb-'.
-let pzbData = {groups:{}, has_master:false, week:null, spec_areas:[]};   // cached /api/pizza-bunk-counts
+let pzbData = {groups:{}, has_master:false, week:null, spec_areas:[], ftcit:0};   // cached /api/pizza-bunk-counts
 function pzbLoad() { try { return JSON.parse(localStorage.getItem('el_pizza_beta_v1')) || {}; } catch(e) { return {}; } }
 function pzbSave() {
   try {
@@ -6103,10 +6107,10 @@ function pzbRecalc(p) {
     const pizzas = pzRoundHalf(slices/PZ_SLICES);
     total += pizzas;
     const slEl = document.getElementById('pzb-'+p+'-'+g+'-sl'); if (slEl) slEl.textContent = slices ? pzFmt(slices) : '0';
-    const pzEl = document.getElementById('pzb-'+p+'-'+g+'-pz'); if (pzEl) pzEl.textContent = pizzas.toFixed(1);
+    const pzEl = document.getElementById('pzb-'+p+'-'+g+'-pz'); if (pzEl) pzEl.textContent = pzFmt(pizzas);
   });
   PZ_ADDL.forEach(([k]) => { total += pzNum('pzb-'+p+'-'+k); });
-  const tEl = document.getElementById('pzb-'+p+'-total'); if (tEl) tEl.textContent = total.toFixed(1);
+  const tEl = document.getElementById('pzb-'+p+'-total'); if (tEl) tEl.textContent = pzFmt(total);
   pzbSave();
 }
 function pzbSelc(p,g) {
@@ -6124,9 +6128,9 @@ function renderPizzaBeta() {
   const box = document.getElementById('pizzabeta-app'); if (!box) return;
   box.innerHTML = '<div style="color:#888;padding:1rem">Loading current-week bunk counts…</div>';
   fetch('/api/pizza-bunk-counts').then(r => r.ok ? r.json() : null).then(d => {
-    pzbData = d || {groups:{}, has_master:false, week:null, spec_areas:[]};
+    pzbData = d || {groups:{}, has_master:false, week:null, spec_areas:[], ftcit:0};
     pzbBuild();
-  }).catch(() => { pzbData = {groups:{}, has_master:false, week:null, spec_areas:[]}; pzbBuild(); });
+  }).catch(() => { pzbData = {groups:{}, has_master:false, week:null, spec_areas:[], ftcit:0}; pzbBuild(); });
 }
 function pzbBuild() {
   const box = document.getElementById('pizzabeta-app'); if (!box) return;
@@ -6148,7 +6152,7 @@ function pzbBuild() {
         let checks = bl.map(b => '<label class="pzb-bunk"><input type="checkbox" data-p="'+p+'" data-g="'+g+'" data-cnt="'+b.count+'" data-staff="'+(b.staff||0)+'" value="'+famEsc(b.bunk)+'"'+(sel[b.bunk]?' checked':'')+'> '+famEsc(b.bunk.replace(/^\s*\d+\s*/,''))+' <span class="pzb-cnt">('+b.count+' camp · '+(b.staff||0)+' staff)</span></label>').join('');
         if (g === 'upper') {
           const on = !!gs.ftcit;
-          checks += '<label class="pzb-bunk pzb-ftcit-row"><input type="checkbox" class="pzb-ftcit" data-p="'+p+'" id="pzb-'+p+'-upper-ftcit"'+(on?' checked':'')+'> FT CIT'+
+          checks += '<label class="pzb-bunk pzb-ftcit-row"><input type="checkbox" class="pzb-ftcit" data-p="'+p+'" id="pzb-'+p+'-upper-ftcit"'+(on?' checked':'')+'> FT CIT <span class="pzb-cnt">('+(pzbData.ftcit||0)+' camp)</span>'+
             '<input class="pz-in pzb-ftcitn" id="pzb-'+p+'-upper-ftcitn" inputmode="decimal" placeholder="#" value="'+(gs.ftcitN?gs.ftcitN:'')+'"'+(on?'':' style="display:none"')+'></label>';
         }
         if (checks) block += '<details class="pzb-bunks"><summary>Bunks<span class="pzb-selc" id="pzb-'+p+'-'+g+'-selc"></span></summary><div class="pzb-bunklist">'+checks+'</div></details>';
@@ -6195,7 +6199,10 @@ function pzbBuild() {
   box.querySelectorAll('.pzb-bunks').forEach(dl => dl.addEventListener('toggle', pzbAlignRef));
   box.querySelectorAll('.pzb-ftcit').forEach(cb => cb.addEventListener('change', () => {
     const n = document.getElementById('pzb-'+cb.dataset.p+'-upper-ftcitn');
-    if (n) { n.style.display = cb.checked ? '' : 'none'; if (cb.checked) n.focus(); }
+    if (n) {
+      n.style.display = cb.checked ? '' : 'none';
+      if (cb.checked) { n.value = (pzbData.ftcit || 0) || ''; n.focus(); } else { n.value = ''; }
+    }
     pzbRecalc(+cb.dataset.p); pzbAlignRef();
   }));
   PZ_PERIODS.forEach((_,p) => PZ_GROUPS.forEach(([g,,rate]) => { if (rate != null || g === 'specialists') pzbSelc(p,g); }));
@@ -6255,11 +6262,11 @@ function pzbExportCSV() {
       if (g === 'upper') { const fc = document.getElementById('pzb-'+p+'-upper-ftcit'); if (fc && fc.checked) { ftN = pzNum('pzb-'+p+'-upper-ftcitn'); slices += ftN*PZ_STAFF; } }
       const pizzas = pzRoundHalf(slices/PZ_SLICES);
       total += pizzas;
-      rows.push([label, rate != null ? c : '', s, slices, pizzas.toFixed(1)]);
+      rows.push([label, rate != null ? c : '', s, slices, pzFmt(pizzas)]);
       if (ftN) rows.push(['  incl. FT CIT', '', ftN, '', '']);
     });
-    PZ_ADDL.forEach(([k,lbl]) => { const n = pzNum('pzb-'+p+'-'+k); total += n; rows.push([lbl, '', '', '', n.toFixed(1)]); });
-    rows.push(['Grand Total Pizzas to Order', '', '', '', total.toFixed(1)]);
+    PZ_ADDL.forEach(([k,lbl]) => { const n = pzNum('pzb-'+p+'-'+k); total += n; rows.push([lbl, '', '', '', pzFmt(n)]); });
+    rows.push(['Grand Total Pizzas to Order', '', '', '', pzFmt(total)]);
     rows.push([]);
   });
   const csv = rows.map(r => r.map(q).join(',')).join('\n');
