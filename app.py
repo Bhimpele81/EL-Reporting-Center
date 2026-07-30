@@ -880,12 +880,18 @@ _PUBLIC_PATHS = {"/", "/logo.png", "/health", "/healthz",
 
 @app.before_request
 def _require_login():
-    """Gate every /api/* route behind a valid session, except the auth ones."""
+    """Gate every /api/* route behind a valid session, except the auth ones.
+    Read-only users may view everything but cannot save Payroll or Rate Settings."""
     p = request.path
     if p in _PUBLIC_PATHS or not p.startswith("/api/"):
         return None
-    if _current_user() is None:
+    u = _current_user()
+    if u is None:
         return jsonify({"error": "auth", "message": "Please sign in."}), 401
+    if u.get("readonly") and request.method in ("POST", "PUT", "PATCH", "DELETE") \
+       and (p.startswith("/api/payroll") or p == "/api/pricing"):
+        return jsonify({"error": "readonly",
+                        "message": "Your account has read-only access to Payroll and Rate Settings."}), 403
     return None
 
 
@@ -1716,7 +1722,8 @@ def api_me():
         _loginlog_record(u["username"], u.get("name") or u["username"], "active session")
         session["logged"] = True
     return jsonify({"authenticated": True, "username": u["username"],
-                    "name": u.get("name") or u["username"], "is_admin": bool(u.get("is_admin"))})
+                    "name": u.get("name") or u["username"], "is_admin": bool(u.get("is_admin")),
+                    "readonly": bool(u.get("readonly"))})
 
 
 @app.route("/api/login", methods=["POST"])
@@ -1730,7 +1737,7 @@ def api_login():
     session["logged"] = True
     _loginlog_record(u["username"], u.get("name") or u["username"], "sign-in")
     return jsonify({"username": u["username"], "name": u.get("name") or u["username"],
-                    "is_admin": bool(u.get("is_admin"))})
+                    "is_admin": bool(u.get("is_admin")), "readonly": bool(u.get("readonly"))})
 
 
 @app.route("/api/register", methods=["POST"])
@@ -1756,7 +1763,7 @@ def api_register():
     session["user"] = username
     session["logged"] = True
     _loginlog_record(username, entry["name"], "new account")
-    return jsonify({"username": username, "name": entry["name"], "is_admin": entry["is_admin"]})
+    return jsonify({"username": username, "name": entry["name"], "is_admin": entry["is_admin"], "readonly": False})
 
 
 @app.route("/api/logout", methods=["POST"])
@@ -1799,7 +1806,8 @@ def api_account_password():
 @admin_required
 def api_users():
     users = [{"username": x["username"], "name": x.get("name") or x["username"],
-              "is_admin": bool(x.get("is_admin"))} for x in _users_load()["users"]]
+              "is_admin": bool(x.get("is_admin")), "readonly": bool(x.get("readonly"))}
+             for x in _users_load()["users"]]
     return jsonify({"users": users})
 
 
@@ -1818,10 +1826,12 @@ def api_users_add():
         return jsonify({"error": "That username is taken."}), 409
     entry = {"username": username, "name": username,
              "pw_hash": generate_password_hash(password),
-             "is_admin": bool(body.get("is_admin"))}
+             "is_admin": bool(body.get("is_admin")),
+             "readonly": bool(body.get("readonly"))}
     data["users"].append(entry)
     _users_save(data)
-    return jsonify({"username": username, "name": entry["name"], "is_admin": entry["is_admin"]})
+    return jsonify({"username": username, "name": entry["name"],
+                    "is_admin": entry["is_admin"], "readonly": entry["readonly"]})
 
 
 @app.route("/api/users/<username>", methods=["PATCH"])
@@ -1854,8 +1864,11 @@ def api_users_edit(username):
         # Don't let an admin strip their own admin rights (avoid lockout)
         if not (me and me["username"].lower() == username.lower() and not body["is_admin"]):
             u["is_admin"] = bool(body["is_admin"])
+    if "readonly" in body:
+        u["readonly"] = bool(body["readonly"])
     _users_save(data)
-    return jsonify({"username": u["username"], "name": u.get("name"), "is_admin": bool(u.get("is_admin"))})
+    return jsonify({"username": u["username"], "name": u.get("name"),
+                    "is_admin": bool(u.get("is_admin")), "readonly": bool(u.get("readonly"))})
 
 
 @app.route("/api/users/<username>", methods=["DELETE"])
@@ -2402,6 +2415,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table th.pr-extra{width:42px;min-width:42px;max-width:42px;background:#3f1119;color:#fff;white-space:nowrap;font-size:.6rem;letter-spacing:-.02em;padding-left:.12rem;padding-right:.12rem;line-height:1.1}
 .payroll-table td.pr-xcell{width:42px;min-width:42px;max-width:42px}
 .pr-xsep{border-left:2px solid #6d1f2f !important}
+.ro-banner{background:#fdf3e6;border:1px solid #e6c98a;color:#8a5a00;border-radius:8px;padding:.5rem .8rem;font-size:.85rem;margin:0 0 .7rem}
 .payroll-table.pr-locked td.pr-cell,.payroll-table.pr-locked td.pr-xcell{cursor:not-allowed}
 .payroll-table .pr-del{cursor:pointer;border:none;background:none;color:#c0392b;font-size:.95rem;padding:0}
 .pr-week-sep{border-left:3px solid #6d1f2f !important}
@@ -3130,6 +3144,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <input class="pr-input" id="usr-password" placeholder="Password" style="width:120px">
       <input class="pr-input" id="usr-email" placeholder="Their email (optional)" style="width:170px">
       <label style="font-size:.8rem;color:#666"><input type="checkbox" id="usr-admin"> Admin</label>
+      <label style="font-size:.8rem;color:#666"><input type="checkbox" id="usr-ro"> Read-only</label>
       <button class="pr-period-btn" id="usr-add">＋ Add User</button>
       <span id="usr-msg" style="font-size:.82rem;color:#777"></span>
     </div>
@@ -3230,6 +3245,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
         <button id="pr-lock" class="pr-period-btn pr-sm">🔓 Unlocked</button>
       </div>
     </div>
+    <div id="pr-ro-banner" class="ro-banner" style="display:none">👁 You have <strong>read-only</strong> access to Payroll, you can view and print it, but changes can't be saved.</div>
     <div id="pr-filter-note" style="font-size:.85rem;color:#9a5b00;margin:0 0 .5rem"></div>
 
     <div style="overflow-x:auto">
@@ -3556,6 +3572,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li>Change your own password by clicking <strong>your name</strong> in the top-right.</li>
           <li>Admins manage accounts (add / rename / reset password / remove) in <strong>Utilities → User Accounts</strong>.</li>
           <li>Admins can review the <strong>most recent 20 sign-ins</strong> (who, when, how, and IP) in <strong>Utilities → Sign-In Activity</strong>. "How" distinguishes a fresh sign-in, a new account, and an active session resumed on a return visit (a refresh with a still-valid login logs once, not every time).</li>
+          <li><strong>Read-only</strong> access: toggle <strong>Read-only</strong> for any account in <strong>Utilities → User Accounts</strong>. A read-only user can view and print <strong>Payroll</strong> and <strong>Rate Settings</strong> but can't save changes to them (enforced on the server). They use the rest of the app normally.</li>
         </ul>
       </div>
     </details>
@@ -4237,7 +4254,16 @@ async function prClickXCell(cell) {
         body: JSON.stringify({id, date: key, value: next})}); } catch(e) {}
 }
 
+// True when the signed-in user has read-only access (view Payroll & Rate Settings, no saving)
+function isReadOnly() { return !!(currentUser && currentUser.readonly); }
+
 function renderPayroll() {
+  // Read-only users see Payroll as view-only: force the locked view (reuses all the lock logic,
+  // shared server state untouched) and hide the controls that would try to save.
+  if (isReadOnly()) payroll.locked = true;
+  const roBanner = document.getElementById('pr-ro-banner');
+  if (roBanner) roBanner.style.display = isReadOnly() ? 'block' : 'none';
+  ['pr-lock','pr-timecard'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = isReadOnly() ? 'none' : ''; });
   // period buttons
   const pb = document.getElementById('payroll-periods');
   pb.innerHTML = '';
@@ -5527,6 +5553,7 @@ function renderPxExplore() {
   g('px-exp-pct').addEventListener('input', e => { pxExp.pct = parseFloat(e.target.value)||0; renderPxExploreResults(); });
   g('px-exp-round').addEventListener('change', e => { pxExp.round = parseInt(e.target.value,10); renderPxExploreResults(); });
   g('px-apply').addEventListener('click', pxApplyExplore);
+  if (isReadOnly()) { const ab = g('px-apply'); if (ab && ab.parentElement) ab.parentElement.style.display = 'none'; }
   renderPxExploreResults();
 }
 
@@ -5671,6 +5698,12 @@ function renderPxRates() {
   // Live effective-% change (Current -> Proposed), updated as you type, without re-render
   box.querySelectorAll('[id^="px-cur-"],[id^="px-camp-"]').forEach(el => el.addEventListener('input', pxUpdateRateChange));
   pxUpdateRateChange();
+  // Read-only users can view Rate Settings but not save: disable inputs, hide Save/Lock, add a banner.
+  if (isReadOnly()) {
+    box.querySelectorAll('input,select').forEach(el => el.disabled = true);
+    ['px-save','px-asm-lock'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    box.insertAdjacentHTML('afterbegin', '<div class="ro-banner">👁 You have <strong>read-only</strong> access to Rate Settings, changes can\'t be saved.</div>');
+  }
 }
 
 function pxRateNum(id) { const el = document.getElementById(id); const v = parseFloat((el && el.value || '').replace(/[^0-9.]/g,'')); return isNaN(v) ? 0 : v; }
@@ -6115,11 +6148,12 @@ async function loadUsers() {
     if (!res.ok) { card.style.display = 'none'; return; }
     const d = await res.json();
     const tbl = document.getElementById('users-table');
-    let h = '<thead><tr><th>Username</th><th>Role</th><th></th></tr></thead><tbody>';
+    let h = '<thead><tr><th>Username</th><th>Role</th><th>Read-only</th><th></th></tr></thead><tbody>';
     (d.users || []).forEach(u => {
       const isMe = currentUser && u.username.toLowerCase() === currentUser.username.toLowerCase();
       h += `<tr><td>${famEsc(u.username)}${isMe ? ' (you)' : ''}</td>` +
            `<td>${u.is_admin ? 'Admin' : 'User'}</td>` +
+           `<td><button class="pr-period-btn pr-sm usr-ro" data-u="${famEsc(u.username)}" data-ro="${u.readonly ? 1 : 0}">${u.readonly ? '✓ Yes' : 'No'}</button></td>` +
            `<td style="white-space:nowrap"><button class="usr-ic usr-rename" data-u="${famEsc(u.username)}" title="Rename">✎</button> ` +
            `<button class="pr-period-btn pr-sm usr-pw" data-u="${famEsc(u.username)}">Reset PW</button> ` +
            `${isMe ? '' : `<button class="pr-del usr-del" data-u="${famEsc(u.username)}" title="Remove">✕</button>`}</td></tr>`;
@@ -6163,6 +6197,16 @@ async function loadUsers() {
         loadUsers();
       });
     });
+    tbl.querySelectorAll('.usr-ro').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const un = btn.dataset.u, next = btn.dataset.ro !== '1';
+        const r = await fetch('/api/users/' + encodeURIComponent(un), {method:'PATCH',
+          headers:{'Content-Type':'application/json'}, body: JSON.stringify({readonly: next})});
+        if (!r.ok) { alert('Could not update read-only access.'); return; }
+        if (currentUser && currentUser.username.toLowerCase() === un.toLowerCase()) currentUser.readonly = next;
+        loadUsers();
+      });
+    });
   } catch(e) { card.style.display = 'none'; }
 }
 
@@ -6171,7 +6215,7 @@ document.getElementById('usr-add').addEventListener('click', async () => {
   const username = document.getElementById('usr-username').value.trim();
   const password = document.getElementById('usr-password').value;
   const email    = document.getElementById('usr-email').value.trim();
-  const body = { username, password, is_admin: document.getElementById('usr-admin').checked };
+  const body = { username, password, is_admin: document.getElementById('usr-admin').checked, readonly: document.getElementById('usr-ro').checked };
   if (!username || !password) { msg.style.color = '#c0392b'; msg.textContent = 'Username and password required.'; return; }
   try {
     const res = await fetch('/api/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
@@ -6196,6 +6240,7 @@ document.getElementById('usr-add').addEventListener('click', async () => {
 
     ['usr-username','usr-password','usr-email'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('usr-admin').checked = false;
+    document.getElementById('usr-ro').checked = false;
     loadUsers();
   } catch(e) { msg.style.color = '#c0392b'; msg.textContent = 'Network error: ' + e.message; }
 });
