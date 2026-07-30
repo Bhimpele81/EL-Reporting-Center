@@ -1227,7 +1227,7 @@ def api_pizza_bunk_counts():
     except Exception as e:
         out["error"] = str(e)
         return jsonify(out)
-    # Per-bunk current-week count
+    # Per-bunk current-week camper count
     bunk_count = {}
     for c in campers:
         weeks = c.get("weeks") or []
@@ -1235,12 +1235,20 @@ def api_pizza_bunk_counts():
             continue
         bk = c.get("bunk", "")
         bunk_count[bk] = bunk_count.get(bk, 0) + 1
-    # Map each bunk (in config order) to its pizza group with its current-week count
+    # Staff assigned per bunk, keyed by the de-numbered bunk name ("15 Spirit" -> "spirit").
+    # Payroll staff carry a de-numbered bunk (e.g. "Spirit"); specialists have no bunk.
+    def _denum(s): return (s or "").lstrip("0123456789 ").strip().lower()
+    staff_by_bunk = {}
+    for s in (_payroll_load().get("staff") or []):
+        bk = _denum(s.get("bunk", ""))
+        if bk:
+            staff_by_bunk[bk] = staff_by_bunk.get(bk, 0) + 1
+    # Map each bunk (in config order) to its pizza group with its current-week camper + staff counts
     for camp in config.get("camps", []):
         cl = (camp.get("name") or "").lower()
         for b in camp.get("bunks", []):
             nm = b.get("name") or ""
-            entry = {"bunk": nm, "count": bunk_count.get(nm, 0)}
+            entry = {"bunk": nm, "count": bunk_count.get(nm, 0), "staff": staff_by_bunk.get(_denum(nm), 0)}
             low = nm.lower()
             if cl.startswith("junior"):
                 out["groups"]["minors" if ("munchkin" in low or "rugrat" in low) else "majors"].append(entry)
@@ -6222,8 +6230,10 @@ function pzbSelc(p,g) {
   const el = document.getElementById('pzb-'+p+'-'+g+'-selc'); if (el) el.textContent = n ? ' ('+n+' selected)' : '';
 }
 function pzbBunkChange(p,g) {
-  let sum = 0; document.querySelectorAll('.pzb-bunks input[type=checkbox][data-p="'+p+'"][data-g="'+g+'"]').forEach(cb => { if (cb.checked) sum += Number(cb.dataset.cnt)||0; });
+  let sum = 0, staffSum = 0;
+  document.querySelectorAll('.pzb-bunks input[type=checkbox][data-p="'+p+'"][data-g="'+g+'"]').forEach(cb => { if (cb.checked) { sum += Number(cb.dataset.cnt)||0; staffSum += Number(cb.dataset.staff)||0; } });
   const camp = document.getElementById('pzb-'+p+'-'+g+'-c'); if (camp) camp.value = sum ? sum : '';
+  const staff = document.getElementById('pzb-'+p+'-'+g+'-s'); if (staff) staff.value = staffSum ? staffSum : '';
   pzbSelc(p,g); pzbRecalc(+p); pzbAlignRef();
 }
 function renderPizzaBeta() {
@@ -6251,7 +6261,7 @@ function pzbBuild() {
         const sel = {}; (gs.bunks || []).forEach(b => sel[b] = true);
         const bl = bunksOf(g);
         if (bl.length) {
-          const checks = bl.map(b => '<label class="pzb-bunk"><input type="checkbox" data-p="'+p+'" data-g="'+g+'" data-cnt="'+b.count+'" value="'+famEsc(b.bunk)+'"'+(sel[b.bunk]?' checked':'')+'> '+famEsc(b.bunk.replace(/^\s*\d+\s*/,''))+' <span class="pzb-cnt">('+b.count+')</span></label>').join('');
+          const checks = bl.map(b => '<label class="pzb-bunk"><input type="checkbox" data-p="'+p+'" data-g="'+g+'" data-cnt="'+b.count+'" data-staff="'+(b.staff||0)+'" value="'+famEsc(b.bunk)+'"'+(sel[b.bunk]?' checked':'')+'> '+famEsc(b.bunk.replace(/^\s*\d+\s*/,''))+' <span class="pzb-cnt">('+b.count+' camp · '+(b.staff||0)+' staff)</span></label>').join('');
           block += '<details class="pzb-bunks"><summary>Bunks<span class="pzb-selc" id="pzb-'+p+'-'+g+'-selc"></span></summary><div class="pzb-bunklist">'+checks+'</div></details>';
         }
         block += '<div class="pz-row"><span class="pz-lbl">'+label+' campers</span>'+inp('pzb-'+p+'-'+g+'-c', gs.c)+'</div>';
