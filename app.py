@@ -1178,13 +1178,17 @@ def api_pizza_week_counts():
     except Exception as e:
         out["error"] = str(e)
         return jsonify(out)
+    # A Junior-camp bunk is "Minors" if its division is set to Minor, else (unset) by the name rule.
     camp_of, minors_bunks = {}, set()
     for camp in config.get("camps", []):
+        cl = (camp.get("name") or "").lower()
         for b in camp.get("bunks", []):
             camp_of[b["name"]] = camp["name"]
-            nm = (b.get("name") or "").lower()
-            if "munchkin" in nm or "rugrat" in nm:
-                minors_bunks.add(b["name"])
+            if cl.startswith("junior"):
+                div = (b.get("division") or "").lower()
+                nm = (b.get("name") or "").lower()
+                if div == "minor" or (div not in ("minor", "major") and ("munchkin" in nm or "rugrat" in nm)):
+                    minors_bunks.add(b["name"])
     counts = {"minors": 0, "majors": 0, "inter": 0, "senior": 0, "upper": 0}
     for c in campers:
         weeks = c.get("weeks") or []
@@ -1251,7 +1255,14 @@ def api_pizza_bunk_counts():
             entry = {"bunk": nm, "count": bunk_count.get(nm, 0), "staff": staff_by_bunk.get(_denum(nm), 0)}
             low = nm.lower()
             if cl.startswith("junior"):
-                out["groups"]["minors" if ("munchkin" in low or "rugrat" in low) else "majors"].append(entry)
+                div = (b.get("division") or "").lower()
+                if div == "minor":
+                    grp = "minors"
+                elif div == "major":
+                    grp = "majors"
+                else:
+                    grp = "minors" if ("munchkin" in low or "rugrat" in low) else "majors"
+                out["groups"][grp].append(entry)
             elif cl.startswith("inter"):
                 out["groups"]["inter"].append(entry)
             elif cl.startswith("senior"):
@@ -3630,7 +3641,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
         <p>The <strong>Pizza</strong> tab figures out how many pizzas to order for each lunch period. It has <strong>three identical columns</strong>, one per lunch period. For each group, type in the number of <strong>campers</strong> and <strong>staff</strong> for that period, and it fills in the slices and pizzas automatically.</p>
         <p>Each pizza is <strong>16 slices</strong> (double-cut). Staff count as <strong>4 slices</strong> each. Campers count by group: <strong>Minors</strong> 2, <strong>Majors</strong> 2.25, <strong>Inter</strong> 2.5, <strong>Senior</strong> 3.25, <strong>Upper</strong> 3.5. <strong>Specialists</strong> are staff only (no campers). Each group's pizza count is <strong>rounded up to the nearest half pizza</strong>. <strong>School</strong> is a manual entry, just type the number of pizzas. Each column then shows a <strong>Grand Total Pizzas to Order</strong>.</p>
         <p>Enter fresh headcounts each time you order: the calculator does <strong>not</strong> pull from the master sheet, because lunch assignments change from week to week. Your entries stay in your browser, so they're still there if you come back to the tab.</p>
-        <p>The narrow <strong>This Week</strong> column on the left shows the current camp week and, for reference, how many campers are enrolled in each group this week from the master sheet (<strong>Minors</strong> = Munchkins &amp; Rugrats bunks; <strong>Majors</strong> = the rest of Junior Camp; Inter/Senior/Upper by camp). It's a helper only, it never fills in the calculator.</p>
+        <p>The narrow <strong>This Week</strong> column on the left shows the current camp week and, for reference, how many campers are enrolled in each group this week from the master sheet (<strong>Minors</strong> and <strong>Majors</strong> are set per Junior-Camp bunk in <strong>Utilities → Bunks &amp; Camps</strong>, via the Min/Maj dropdown; Inter/Senior/Upper by camp). It's a helper only, it never fills in the calculator.</p>
         <p>Use <strong>Print / Save PDF</strong> to print the three periods on one page (or save as a PDF) to hand off with your order, or <strong>Export CSV</strong> to download the numbers as a spreadsheet.</p>
         <p>There's also a <strong>Pizza Beta</strong> tab that works the same way, but for each group you can pick the <strong>bunks</strong> in that lunch period from a dropdown, and the camper count fills in automatically from the current week's enrollment (you can still type over it).</p>
       </div>
@@ -3975,6 +3986,7 @@ function renderCamps() {
     });
   sorted.forEach(({ camp, ci }) => {
     const collapsed = collapsedCamps.has(ci);
+    const isJr = /junior/i.test(camp.name || '');   // Minor/Major division only applies to Junior Camp
     const block = document.createElement('div');
     block.className = 'camp-block';
     block.innerHTML = `
@@ -3992,11 +4004,12 @@ function renderCamps() {
               <th>Bunk Name</th>
               <th style="width:70px">Number</th>
               <th style="width:100px">Grp</th>
+              ${isJr ? '<th style="width:96px" title="Minor / Major (used by the Pizza tab)">Min/Maj</th>' : ''}
               <th style="width:36px"></th>
             </tr>
           </thead>
           <tbody id="bunk-body-${ci}">
-            ${[...camp.bunks].sort((a,b) => a.number - b.number).map((b, bi) => bunkRow(ci, camp.bunks.indexOf(b), b)).join('')}
+            ${[...camp.bunks].sort((a,b) => a.number - b.number).map((b, bi) => bunkRow(ci, camp.bunks.indexOf(b), b, isJr)).join('')}
           </tbody>
         </table>
         <button class="add-bunk-btn" onclick="addBunk(${ci})">＋ Add Bunk</button>
@@ -4016,7 +4029,19 @@ function toggleCamp(ci) {
   }
 }
 
-function bunkRow(ci, bi, b) {
+function bunkRow(ci, bi, b, isJr) {
+  let divCell = '';
+  if (isJr) {
+    // Backfill the inferred default (Munchkins/Rugrats = Minor, else Major) so it's explicit once saved
+    if (b.division !== 'Minor' && b.division !== 'Major') {
+      const low = (b.name || '').toLowerCase();
+      b.division = (low.indexOf('munchkin') >= 0 || low.indexOf('rugrat') >= 0) ? 'Minor' : 'Major';
+    }
+    divCell = `<td><select class="bunk-input" onchange="campConfig.camps[${ci}].bunks[${bi}].division = this.value">
+      <option value="Minor"${b.division === 'Minor' ? ' selected' : ''}>Minor</option>
+      <option value="Major"${b.division === 'Major' ? ' selected' : ''}>Major</option>
+    </select></td>`;
+  }
   return `<tr id="bunk-${ci}-${bi}">
     <td><input class="bunk-input" value="${escHtml(b.name)}" placeholder="Bunk name"
       oninput="campConfig.camps[${ci}].bunks[${bi}].name = this.value"></td>
@@ -4024,6 +4049,7 @@ function bunkRow(ci, bi, b) {
       oninput="campConfig.camps[${ci}].bunks[${bi}].number = parseInt(this.value)||0"></td>
     <td><input class="bunk-input" value="${escHtml(b.grp||'')}" placeholder="Grp"
       oninput="campConfig.camps[${ci}].bunks[${bi}].grp = this.value"></td>
+    ${divCell}
     <td><button class="bunk-rm" title="Remove bunk" onclick="removeBunk(${ci},${bi})">✕</button></td>
   </tr>`;
 }
