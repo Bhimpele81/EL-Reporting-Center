@@ -3626,7 +3626,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <summary>How does the Pizza Order Calculator work?</summary>
       <div class="faq-body">
         <p>The <strong>Pizza</strong> tab figures out how many pizzas to order for each lunch period. It has <strong>three identical columns</strong>, one per lunch period. For each group, pick the <strong>bunks</strong> in that period from the dropdown: the number of <strong>campers</strong> fills in from the current week's master-sheet enrollment and the number of <strong>staff</strong> fills in from the Payroll assignments for those bunks. You can type over either number if you need to, and the slices and pizzas calculate automatically.</p>
-        <p>Each pizza is <strong>16 slices</strong> (double-cut). Staff count as <strong>4 slices</strong> each. Campers count by group: <strong>Minors</strong> 2, <strong>Majors</strong> 2.25, <strong>Inter</strong> 2.5, <strong>Senior</strong> 3.25, <strong>Upper</strong> 3.5. <strong>Specialists</strong> are staff only (no campers). Each group's pizza count is <strong>rounded up to the nearest half pizza</strong>. <strong>School</strong> is a manual entry, just type the number of pizzas. Each column then shows a <strong>Grand Total Pizzas to Order</strong>.</p>
+        <p>Each pizza is <strong>16 slices</strong> (double-cut). Staff count as <strong>4 slices</strong> each. Campers count by group: <strong>Minors</strong> 2, <strong>Majors</strong> 2.25, <strong>Inter</strong> 2.5, <strong>Senior</strong> 3.25, <strong>Upper</strong> 3.5. <strong>Specialists</strong> are staff only (no campers). Each group's pizza count is <strong>rounded up to the nearest half pizza</strong>. The <strong>Additional Pies</strong> section is for direct entry, just type the number of pizzas for <strong>School</strong>, <strong>Office</strong>, <strong>Maintenance</strong>, and <strong>Vendor</strong>. Each column then shows a <strong>Grand Total Pizzas to Order</strong>.</p>
         <p>Your entries stay in your browser, so they're still there if you come back to the tab. <strong>Minors</strong> and <strong>Majors</strong> are set per Junior-Camp bunk in <strong>Utilities → Bunks &amp; Camps</strong>, via the Min/Maj dropdown; Inter/Senior/Upper are by camp.</p>
         <p>The narrow <strong>This Week</strong> column on the left shows the current camp week and, for reference, how many campers are enrolled in each group this week from the master sheet. It's a helper only.</p>
         <p>Use <strong>Print / Save PDF</strong> to print the three periods on one page (or save as a PDF) to hand off with your order, or <strong>Export CSV</strong> to download the numbers as a spreadsheet.</p>
@@ -6060,6 +6060,8 @@ const PZ_PERIODS = ['Lunch Period 1','Lunch Period 2','Lunch Period 3'];
 const pzRoundHalf = x => Math.ceil(x*2)/2;                                   // up to nearest 0.5 pizza
 const pzNum = id => { const el=document.getElementById(id); const v=parseFloat((el&&el.value||'').replace(/[^0-9.]/g,'')); return isNaN(v)?0:v; };
 const pzFmt = x => (Math.round(x*100)/100).toString();
+// Direct-entry pizzas (no camper math), shown under "Additional Pies". [key, label].
+const PZ_ADDL = [['school','School Pizzas'],['office','Office Pizza'],['maint','Maintenance Pizza'],['vendor','Vendor Pizza']];
 // ---------- Pizza Order Calculator (rendering) ----------
 // Each camper group has a bunk multi-select. Picking bunks auto-fills the campers field with the
 // current week's enrollment from the master (still editable). ids use 'pzb-'.
@@ -6075,7 +6077,7 @@ function pzbSave() {
         if (rate != null) { const b=[]; document.querySelectorAll('.pzb-bunks input[type=checkbox][data-p="'+p+'"][data-g="'+g+'"]').forEach(cb => { if (cb.checked) b.push(cb.value); }); o.bunks=b; }
         st[p][g] = o;
       });
-      st[p].school = pzNum('pzb-'+p+'-school');
+      PZ_ADDL.forEach(([k]) => { st[p][k] = pzNum('pzb-'+p+'-'+k); });
     });
     localStorage.setItem('el_pizza_beta_v1', JSON.stringify(st));
   } catch(e) {}
@@ -6090,7 +6092,7 @@ function pzbRecalc(p) {
     const slEl = document.getElementById('pzb-'+p+'-'+g+'-sl'); if (slEl) slEl.textContent = slices ? pzFmt(slices) : '0';
     const pzEl = document.getElementById('pzb-'+p+'-'+g+'-pz'); if (pzEl) pzEl.textContent = pizzas.toFixed(1);
   });
-  total += pzNum('pzb-'+p+'-school');
+  PZ_ADDL.forEach(([k]) => { total += pzNum('pzb-'+p+'-'+k); });
   const tEl = document.getElementById('pzb-'+p+'-total'); if (tEl) tEl.textContent = total.toFixed(1);
   pzbSave();
 }
@@ -6139,8 +6141,9 @@ function pzbBuild() {
       block += '<div class="pz-gtot"><span>Total Pizzas for '+label+'</span><span class="pz-gtot-v"><span id="pzb-'+p+'-'+g+'-pz">0.0</span><span class="pz-sl">(<span id="pzb-'+p+'-'+g+'-sl">0</span> slices)</span></span></div></div>';
       body += block;
     });
-    body += '<div class="pz-group"><div class="pz-gname">School<span class="pz-rate">enter pizzas directly</span></div>' +
-      '<div class="pz-row"><span class="pz-lbl">School pizzas</span>'+inp('pzb-'+p+'-school', ps.school)+'</div></div>';
+    let addl = '<div class="pz-group"><div class="pz-gname">Additional Pies<span class="pz-rate">enter pizzas directly</span></div>';
+    PZ_ADDL.forEach(([k,lbl]) => { addl += '<div class="pz-row"><span class="pz-lbl">'+lbl+'</span>'+inp('pzb-'+p+'-'+k, ps[k])+'</div>'; });
+    body += addl + '</div>';
     cols += '<div class="pz-card"><div class="pz-title">'+title+'</div>'+body +
       '<div class="pz-grandrow"><span>Grand Total Pizzas to Order</span><span class="pz-grand" id="pzb-'+p+'-total">0.0</span></div></div>';
   });
@@ -6223,8 +6226,7 @@ function pzbExportCSV() {
       total += pizzas;
       rows.push([label, rate != null ? c : '', s, slices, pizzas.toFixed(1)]);
     });
-    const school = pzNum('pzb-'+p+'-school'); total += school;
-    rows.push(['School (manual)', '', '', '', school.toFixed(1)]);
+    PZ_ADDL.forEach(([k,lbl]) => { const n = pzNum('pzb-'+p+'-'+k); total += n; rows.push([lbl, '', '', '', n.toFixed(1)]); });
     rows.push(['Grand Total Pizzas to Order', '', '', '', total.toFixed(1)]);
     rows.push([]);
   });
