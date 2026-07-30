@@ -2319,12 +2319,15 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-sheet-tbl th,.px-sheet-tbl td{border:1px solid #333!important}
 .px-sheet-tbl .px-grp{border-left:2.5px solid #000!important}
 /* All Rates master (printable) */
-.px-ar-wrap{max-width:8.5in;margin:0 auto}
-.px-ar-head{text-align:center;margin-bottom:.7rem}
-.px-ar-tbl{width:100%;border-collapse:collapse;font-size:.8rem;margin-bottom:1.1rem;break-inside:avoid}
-.px-ar-cap{caption-side:top;background:#6d1f2f;color:#fff;font-weight:700;padding:.4rem .5rem;font-size:.92rem;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.px-ar-tbl th,.px-ar-tbl td{border:1px solid #bbb;padding:.28rem .45rem;text-align:center}
-.px-ar-tbl thead th{background:#efe7e9;font-weight:700;font-size:.72rem;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.px-ar-wrap{max-width:7.7in;margin:0 auto}
+.px-ar-head{text-align:center;margin-bottom:.35rem}
+.px-ar-head h2{font-size:1.15rem;margin:.1rem 0}
+.px-ar-tbl{width:100%;border-collapse:collapse;font-size:.72rem;margin-bottom:.3rem;table-layout:fixed;line-height:1.2}
+.px-ar-cap{caption-side:top;background:#6d1f2f;color:#fff;font-weight:700;padding:.22rem .5rem;font-size:.8rem;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.px-ar-tbl th,.px-ar-tbl td{border:1px solid #bbb;padding:.05rem .3rem;text-align:center}
+.px-ar-tbl thead th{background:#efe7e9;font-weight:700;font-size:.6rem;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.px-ar-tbl thead th:first-child{width:50px}   /* Weeks */
+.px-ar-tbl thead th:nth-child(2){width:60px}  /* Days/wk; the rate columns then split the rest equally */
 .px-ar-tbl td.px-ar-wk{background:#f4e9ec;font-weight:700;vertical-align:middle;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .px-ar-tbd{color:#c9c9c9}
 .px-sheet-sectitle{display:table-caption}
