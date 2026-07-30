@@ -1220,7 +1220,18 @@ def api_pizza_bunk_counts():
     idx = (cur_week - 1) if cur_week else 0
     out = {"has_master": False, "in_season": bool(cur_week), "week": cur_week,
            "week_range": ranges[idx] if 0 <= idx < len(ranges) else "",
-           "groups": {"minors": [], "majors": [], "inter": [], "senior": [], "upper": []}}
+           "groups": {"minors": [], "majors": [], "inter": [], "senior": [], "upper": []},
+           "spec_areas": []}
+    # Specialist areas come straight from Payroll (any area that isn't a camp / support / director),
+    # with a head count per area. Independent of the master sheet.
+    _nonspec = {"junior", "inter", "senior", "upper", "minors", "majors", "support", "director", ""}
+    _spec = {}
+    for s in (_payroll_load().get("staff") or []):
+        a = (s.get("area") or "").strip()
+        if a.lower() in _nonspec:
+            continue
+        _spec[a] = _spec.get(a, 0) + 1
+    out["spec_areas"] = [{"area": a, "staff": _spec[a]} for a in sorted(_spec, key=str.lower)]
     fb = _load_master()
     if not fb:
         return jsonify(out)
@@ -3626,7 +3637,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       <summary>How does the Pizza Order Calculator work?</summary>
       <div class="faq-body">
         <p>The <strong>Pizza</strong> tab figures out how many pizzas to order for each lunch period. It has <strong>three identical columns</strong>, one per lunch period. For each group, pick the <strong>bunks</strong> in that period from the dropdown: the number of <strong>campers</strong> fills in from the current week's master-sheet enrollment and the number of <strong>staff</strong> fills in from the Payroll assignments for those bunks. You can type over either number if you need to, and the slices and pizzas calculate automatically.</p>
-        <p>Each pizza is <strong>16 slices</strong> (double-cut). Staff count as <strong>4 slices</strong> each. Campers count by group: <strong>Minors</strong> 2, <strong>Majors</strong> 2.25, <strong>Inter</strong> 2.5, <strong>Senior</strong> 3.25, <strong>Upper</strong> 3.5. In the <strong>Upper</strong> group you can also check <strong>FT CIT</strong> and enter how many full-time CITs are eating; each counts as 4 slices (staff rate). <strong>Specialists</strong> are staff only: instead of a headcount, open <strong>Areas</strong> and check the activity areas present that period (Athletics, Art &amp; Crafts, Ceramics, Drama, Music &amp; Dance, Nature, Ropes, Swim &amp; Wildercraft): each checked area counts as one specialist (4 slices). Each group's pizza count is <strong>rounded up to the nearest half pizza</strong>. The <strong>Additional Pies</strong> section is for direct entry, just type the number of pizzas for <strong>School</strong>, <strong>Office</strong>, <strong>Maintenance</strong>, and <strong>Vendor</strong>. Each column then shows a <strong>Grand Total Pizzas to Order</strong>.</p>
+        <p>Each pizza is <strong>16 slices</strong> (double-cut). Staff count as <strong>4 slices</strong> each. Campers count by group: <strong>Minors</strong> 2, <strong>Majors</strong> 2.25, <strong>Inter</strong> 2.5, <strong>Senior</strong> 3.25, <strong>Upper</strong> 3.5. In the <strong>Upper</strong> group's <strong>Bunks</strong> dropdown there's also an <strong>FT CIT</strong> checkbox; check it and enter how many full-time CITs are eating, each counting as 4 slices (staff rate). <strong>Specialists</strong> are staff only: instead of a headcount, open <strong>Areas</strong> and check the specialty areas present that period. The areas and their specialist counts come straight from the <strong>Payroll</strong> tab (the area each staffer is assigned to), and each selected specialist counts as 4 slices. You can still type over the resulting staff number. Each group's pizza count is <strong>rounded up to the nearest half pizza</strong>. The <strong>Additional Pies</strong> section is for direct entry, just type the number of pizzas for <strong>School</strong>, <strong>Office</strong>, <strong>Maintenance</strong>, and <strong>Vendor</strong>. Each column then shows a <strong>Grand Total Pizzas to Order</strong>.</p>
         <p>Your entries stay in your browser, so they're still there if you come back to the tab. <strong>Minors</strong> and <strong>Majors</strong> are set per Junior-Camp bunk in <strong>Utilities → Bunks &amp; Camps</strong>, via the Min/Maj dropdown; Inter/Senior/Upper are by camp.</p>
         <p>The narrow <strong>This Week</strong> column on the left shows the current camp week and, for reference, how many campers are enrolled in each group this week from the master sheet. It's a helper only.</p>
         <p>Use <strong>Print / Save PDF</strong> to print the three periods on one page (or save as a PDF) to hand off with your order, or <strong>Export CSV</strong> to download the numbers as a spreadsheet.</p>
@@ -6062,12 +6073,10 @@ const pzNum = id => { const el=document.getElementById(id); const v=parseFloat((
 const pzFmt = x => (Math.round(x*100)/100).toString();
 // Direct-entry pizzas (no camper math), shown under "Additional Pies". [key, label].
 const PZ_ADDL = [['school','School Pizzas'],['office','Office Pizza'],['maint','Maintenance Pizza'],['vendor','Vendor Pizza']];
-// Specialist activity areas; each checked area counts as one specialist (staff rate) per lunch period.
-const PZ_SPEC = ['Athletics','Art & Crafts','Ceramics','Drama','Music & Dance','Nature','Ropes','Swim & Wildercraft'];
 // ---------- Pizza Order Calculator (rendering) ----------
 // Each camper group has a bunk multi-select. Picking bunks auto-fills the campers field with the
 // current week's enrollment from the master (still editable). ids use 'pzb-'.
-let pzbData = {groups:{}, has_master:false, week:null};   // cached /api/pizza-bunk-counts
+let pzbData = {groups:{}, has_master:false, week:null, spec_areas:[]};   // cached /api/pizza-bunk-counts
 function pzbLoad() { try { return JSON.parse(localStorage.getItem('el_pizza_beta_v1')) || {}; } catch(e) { return {}; } }
 function pzbSave() {
   try {
@@ -6115,9 +6124,9 @@ function renderPizzaBeta() {
   const box = document.getElementById('pizzabeta-app'); if (!box) return;
   box.innerHTML = '<div style="color:#888;padding:1rem">Loading current-week bunk counts…</div>';
   fetch('/api/pizza-bunk-counts').then(r => r.ok ? r.json() : null).then(d => {
-    pzbData = d || {groups:{}, has_master:false, week:null};
+    pzbData = d || {groups:{}, has_master:false, week:null, spec_areas:[]};
     pzbBuild();
-  }).catch(() => { pzbData = {groups:{}, has_master:false, week:null}; pzbBuild(); });
+  }).catch(() => { pzbData = {groups:{}, has_master:false, week:null, spec_areas:[]}; pzbBuild(); });
 }
 function pzbBuild() {
   const box = document.getElementById('pizzabeta-app'); if (!box) return;
@@ -6136,22 +6145,23 @@ function pzbBuild() {
       if (rate != null) {
         const sel = {}; (gs.bunks || []).forEach(b => sel[b] = true);
         const bl = bunksOf(g);
-        if (bl.length) {
-          const checks = bl.map(b => '<label class="pzb-bunk"><input type="checkbox" data-p="'+p+'" data-g="'+g+'" data-cnt="'+b.count+'" data-staff="'+(b.staff||0)+'" value="'+famEsc(b.bunk)+'"'+(sel[b.bunk]?' checked':'')+'> '+famEsc(b.bunk.replace(/^\s*\d+\s*/,''))+' <span class="pzb-cnt">('+b.count+' camp · '+(b.staff||0)+' staff)</span></label>').join('');
-          block += '<details class="pzb-bunks"><summary>Bunks<span class="pzb-selc" id="pzb-'+p+'-'+g+'-selc"></span></summary><div class="pzb-bunklist">'+checks+'</div></details>';
+        let checks = bl.map(b => '<label class="pzb-bunk"><input type="checkbox" data-p="'+p+'" data-g="'+g+'" data-cnt="'+b.count+'" data-staff="'+(b.staff||0)+'" value="'+famEsc(b.bunk)+'"'+(sel[b.bunk]?' checked':'')+'> '+famEsc(b.bunk.replace(/^\s*\d+\s*/,''))+' <span class="pzb-cnt">('+b.count+' camp · '+(b.staff||0)+' staff)</span></label>').join('');
+        if (g === 'upper') {
+          const on = !!gs.ftcit;
+          checks += '<label class="pzb-bunk pzb-ftcit-row"><input type="checkbox" class="pzb-ftcit" data-p="'+p+'" id="pzb-'+p+'-upper-ftcit"'+(on?' checked':'')+'> FT CIT'+
+            '<input class="pz-in pzb-ftcitn" id="pzb-'+p+'-upper-ftcitn" inputmode="decimal" placeholder="#" value="'+(gs.ftcitN?gs.ftcitN:'')+'"'+(on?'':' style="display:none"')+'></label>';
         }
+        if (checks) block += '<details class="pzb-bunks"><summary>Bunks<span class="pzb-selc" id="pzb-'+p+'-'+g+'-selc"></span></summary><div class="pzb-bunklist">'+checks+'</div></details>';
         block += '<div class="pz-row"><span class="pz-lbl">'+label+' campers</span>'+inp('pzb-'+p+'-'+g+'-c', gs.c)+'</div>';
       } else if (isSpec) {
         const sel = {}; (gs.bunks || []).forEach(a => sel[a] = true);
-        const checks = PZ_SPEC.map(a => '<label class="pzb-bunk"><input type="checkbox" data-p="'+p+'" data-g="specialists" data-cnt="0" data-staff="1" value="'+famEsc(a)+'"'+(sel[a]?' checked':'')+'> '+famEsc(a)+'</label>').join('');
-        block += '<details class="pzb-bunks"><summary>Areas<span class="pzb-selc" id="pzb-'+p+'-specialists-selc"></span></summary><div class="pzb-bunklist">'+checks+'</div></details>';
+        const al = pzbData.spec_areas || [];
+        if (al.length) {
+          const checks = al.map(a => '<label class="pzb-bunk"><input type="checkbox" data-p="'+p+'" data-g="specialists" data-cnt="0" data-staff="'+(a.staff||0)+'" value="'+famEsc(a.area)+'"'+(sel[a.area]?' checked':'')+'> '+famEsc(a.area)+' <span class="pzb-cnt">('+(a.staff||0)+')</span></label>').join('');
+          block += '<details class="pzb-bunks"><summary>Areas<span class="pzb-selc" id="pzb-'+p+'-specialists-selc"></span></summary><div class="pzb-bunklist">'+checks+'</div></details>';
+        }
       }
       block += '<div class="pz-row"><span class="pz-lbl">'+label+' staff</span>'+inp('pzb-'+p+'-'+g+'-s', gs.s)+'</div>';
-      if (g === 'upper') {
-        const on = !!gs.ftcit;
-        block += '<div class="pz-row"><label class="pz-lbl" style="display:flex;align-items:center;gap:.35rem;cursor:pointer"><input type="checkbox" class="pzb-ftcit" data-p="'+p+'" id="pzb-'+p+'-upper-ftcit"'+(on?' checked':'')+'> FT CIT</label>' +
-          '<input class="pz-in" id="pzb-'+p+'-upper-ftcitn" inputmode="decimal" value="'+(gs.ftcitN?gs.ftcitN:'')+'"'+(on?'':' style="display:none"')+'></div>';
-      }
       block += '<div class="pz-gtot"><span>Total Pizzas for '+label+'</span><span class="pz-gtot-v"><span id="pzb-'+p+'-'+g+'-pz">0.0</span><span class="pz-sl">(<span id="pzb-'+p+'-'+g+'-sl">0</span> slices)</span></span></div></div>';
       body += block;
     });
@@ -6181,7 +6191,7 @@ function pzbBuild() {
     el.textContent = pzbData.has_master ? (bunksOf(g).reduce((a,b) => a+(b.count||0), 0)) : '—';
   });
   box.querySelectorAll('.pz-in').forEach(el => el.addEventListener('input', () => { pzbRecalc(+el.id.split('-')[1]); pzbAlignRef(); }));
-  box.querySelectorAll('.pzb-bunks input[type=checkbox]').forEach(cb => cb.addEventListener('change', () => pzbBunkChange(cb.dataset.p, cb.dataset.g)));
+  box.querySelectorAll('.pzb-bunks input[type=checkbox]:not(.pzb-ftcit)').forEach(cb => cb.addEventListener('change', () => pzbBunkChange(cb.dataset.p, cb.dataset.g)));
   box.querySelectorAll('.pzb-bunks').forEach(dl => dl.addEventListener('toggle', pzbAlignRef));
   box.querySelectorAll('.pzb-ftcit').forEach(cb => cb.addEventListener('change', () => {
     const n = document.getElementById('pzb-'+cb.dataset.p+'-upper-ftcitn');
