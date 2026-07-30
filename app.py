@@ -3540,7 +3540,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
         <p>Open the <strong>Rate Sheet</strong> sub-tab and click <strong>Print / Save PDF</strong> (prints to a single color page). It shows the full rate grid for both programs (<strong>2nd Grade+</strong> and <strong>Junior Camp, PS through 1st Grade</strong>), Early Season and Regular, with tuition, sibling, and with-transportation columns grouped by days per week (color-coded: 5-day blue, 4-day green, 3-day gold).</p>
         <p>Use the <strong>Show</strong> selector to choose which rates to display: <strong>2026 Actual</strong> (the as-published 2026 sheet), <strong>Current</strong>, or <strong>Proposed</strong>. Use <strong>Compare to</strong> to overlay the <strong>% change</strong> (to two decimals) in every cell versus another sheet, so you can see new-vs-older side by side.</p>
         <p>Everything is derived from your Regular Rate Settings: Junior Camp is 90% of 2nd Grade+ (rounded to $25), Early Season is 93% of the matching Regular rate (rounded to $25), sibling tuition is 10% off (rounded to $1, assumes 5 days), transportation is 2-way for that column's day count with a 10% sibling discount, 3/4-day tuition rounds to $25 (the 2026 Actual view rounds to $5 to match the published numbers), and Minicamp is a flat rate.</p>
-        <p>The <strong>All Rates PDF</strong> button (top-right of the Rate Sheet) generates a separate master sheet listing every program (2nd Grade+, Junior Camp, FT CIT) by weeks and days per week, with Final, Early Season, childcare, and sibling columns, handy for entering the season's rates into other software. (The Alumni/CC Sibling and 1st Year Sibling columns are shown blank for now, pending final confirmation of how they're calculated.)</p>
+        <p>The <strong>All Rates PDF</strong> button (top-right of the Rate Sheet) generates a separate master sheet listing every program (2nd Grade+, Junior Camp, FT CIT) by weeks and days per week, with <strong>Final</strong>, <strong>Early Season</strong>, the childcare columns (Junior), and the <strong>Alumni/CC Sibling</strong> and <strong>1st Year Sibling</strong> columns (the childcare sibling weekly rates × weeks; for FT CIT these use the regular rate when it's lower). Handy for entering the season's rates into other software. Alternating week-groups are shaded for readability.</p>
       </div>
     </details>
 
@@ -5906,8 +5906,8 @@ function renderPxSheet() {
 }
 
 // Build the "All Rates" master (every program x weeks x days) for the printable PDF.
-// The two sibling columns (Alumni/CC Sibling, 1st Year Sibling) are intentionally left blank
-// pending Jeanette's confirmation of their formula; everything else is calculated.
+// Sibling columns = the childcare sibling weekly rates x weeks (same across sections); for FT CIT
+// they're capped at that row's Final ("use the regular rate if it's lower").
 function pxAllRatesHTML() {
   const A = pricing.assumptions || {};
   const dm = pricing.camp.day_mult || {};
@@ -5930,30 +5930,31 @@ function pxAllRatesHTML() {
   const es  = v => r25(ESF*v);                                                                             // Early Season = 93% of Final
   const ccB  = (w,d) => Number((cc[d]||{}).base||0)*wksN(w);                                               // Year Round Childcare weekly x weeks
   const cc1B = (w,d) => Number((cc1[d]||{}).base||0)*wksN(w);                                              // 1st Year Childcare weekly x weeks
+  const ccSib  = (w,d) => Number((cc[d]||{}).sibling2||0)*wksN(w);                                         // CC Sibling/Alumni weekly x weeks
+  const cc1Sib = (w,d) => Number((cc1[d]||{}).sibling2||0)*wksN(w);                                        // 1st Year CC Sibling weekly x weeks
+  const capCit = fn => (w,d) => Math.min(cit(w,d), fn(w,d));                                               // FT CIT: use the regular rate if it's lower
   const wks=['8','7','6','5','4'], days=['5','4','3'];
-  const TBD = '<span class="px-ar-tbd">&mdash;</span>';
   function section(title, cols) {
     let s = '<table class="px-ar-tbl"><caption class="px-ar-cap">'+title+'</caption><thead><tr><th>Weeks</th><th>Days/wk</th>'+cols.map(c=>'<th>'+c.head+'</th>').join('')+'</tr></thead><tbody>';
     wks.forEach((w,wi) => { const sh = (wi % 2 === 0) ? ' class="px-ar-shade"' : ''; days.forEach((d,di) => {
       s += '<tr'+sh+'>' + (di===0 ? '<td class="px-ar-wk" rowspan="3">'+w+' wk</td>' : '') + '<td>'+d+'-day</td>' +
-        cols.map(c => '<td>'+(c.fn ? money(c.fn(w,d)) : TBD)+'</td>').join('') + '</tr>';
+        cols.map(c => '<td>'+money(c.fn(w,d))+'</td>').join('') + '</tr>';
     }); });
     return s + '</tbody></table>';
   }
   let out = '<div class="px-ar-wrap"><div class="px-ar-head">' +
     '<h2 style="margin:.2rem 0;font-family:\'Roboto Slab\',serif;color:#6d1f2f">Elbow Lane Day Camp</h2>' +
-    '<div style="color:#555;font-weight:600">All Rates &mdash; '+famEsc(seasonLbl)+'</div>' +
-    '<div style="color:#999;font-size:.72rem;margin-top:.15rem">Alumni/CC Sibling and 1st Year Sibling columns are pending final confirmation.</div></div>';
+    '<div style="color:#555;font-weight:600">All Rates &mdash; '+famEsc(seasonLbl)+'</div></div>';
   out += section('2nd Grade+ (Regular)', [
     {head:'Final', fn:g2}, {head:'Early Season', fn:(w,d)=>es(g2(w,d))},
-    {head:'Alumni/CC Sibling', fn:null}, {head:'1st Year Sibling', fn:null} ]);
+    {head:'Alumni/CC Sibling', fn:ccSib}, {head:'1st Year Sibling', fn:cc1Sib} ]);
   out += section('Junior Camp', [
     {head:'Final', fn:jr}, {head:'Early Season', fn:(w,d)=>es(jr(w,d))},
-    {head:'ChildCare', fn:ccB}, {head:'Alumni/CC Sibling', fn:null},
-    {head:'1st Year CC', fn:cc1B}, {head:'1st Year Sibling', fn:null} ]);
+    {head:'ChildCare', fn:ccB}, {head:'Alumni/CC Sibling', fn:ccSib},
+    {head:'1st Year CC', fn:cc1B}, {head:'1st Year Sibling', fn:cc1Sib} ]);
   out += section('FT CIT', [
     {head:'Final', fn:cit}, {head:'Early Season', fn:(w,d)=>es(cit(w,d))},
-    {head:'Alumni/CC Sibling', fn:null}, {head:'1st Year Sibling', fn:null} ]);
+    {head:'Alumni/CC Sibling', fn:capCit(ccSib)}, {head:'1st Year Sibling', fn:capCit(cc1Sib)} ]);
   return out + '</div>';
 }
 
