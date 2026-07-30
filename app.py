@@ -3076,7 +3076,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <div class="card-hd">
       <div>
         <div class="card-title">Pizza Order Calculator</div>
-        <div class="card-hint">For each group you can pick the <strong>bunks</strong> in that lunch period from a dropdown, and the camper count fills in automatically from the current week's master-sheet enrollment. You can still type over any number. Your entries are kept in this browser.</div>
+        <div class="card-hint">For each group you can pick the <strong>bunks</strong> in that lunch period from a dropdown, and the camper count fills in automatically from the current week's master-sheet enrollment. You can still type over any number.</div>
       </div>
     </div>
     <div id="pizzabeta-app"></div>
