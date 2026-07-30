@@ -2318,6 +2318,15 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .px-sheet-tbl td.px-l,.px-sheet-tbl th.px-l{text-align:center}
 .px-sheet-tbl th,.px-sheet-tbl td{border:1px solid #333!important}
 .px-sheet-tbl .px-grp{border-left:2.5px solid #000!important}
+/* All Rates master (printable) */
+.px-ar-wrap{max-width:8.5in;margin:0 auto}
+.px-ar-head{text-align:center;margin-bottom:.7rem}
+.px-ar-tbl{width:100%;border-collapse:collapse;font-size:.8rem;margin-bottom:1.1rem;break-inside:avoid}
+.px-ar-cap{caption-side:top;background:#6d1f2f;color:#fff;font-weight:700;padding:.4rem .5rem;font-size:.92rem;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.px-ar-tbl th,.px-ar-tbl td{border:1px solid #bbb;padding:.28rem .45rem;text-align:center}
+.px-ar-tbl thead th{background:#efe7e9;font-weight:700;font-size:.72rem;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.px-ar-tbl td.px-ar-wk{background:#f4e9ec;font-weight:700;vertical-align:middle;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.px-ar-tbd{color:#c9c9c9}
 .px-sheet-sectitle{display:table-caption}
 .px-chgs{font-size:.9em;font-weight:600}
 /* Pizza calculator */
@@ -3517,6 +3526,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
         <p>Open the <strong>Rate Sheet</strong> sub-tab and click <strong>Print / Save PDF</strong> (prints to a single color page). It shows the full rate grid for both programs (<strong>2nd Grade+</strong> and <strong>Junior Camp, PS through 1st Grade</strong>), Early Season and Regular, with tuition, sibling, and with-transportation columns grouped by days per week (color-coded: 5-day blue, 4-day green, 3-day gold).</p>
         <p>Use the <strong>Show</strong> selector to choose which rates to display: <strong>2026 Actual</strong> (the as-published 2026 sheet), <strong>Current</strong>, or <strong>Proposed</strong>. Use <strong>Compare to</strong> to overlay the <strong>% change</strong> (to two decimals) in every cell versus another sheet, so you can see new-vs-older side by side.</p>
         <p>Everything is derived from your Regular Rate Settings: Junior Camp is 90% of 2nd Grade+ (rounded to $25), Early Season is 93% of the matching Regular rate (rounded to $25), sibling tuition is 10% off (rounded to $1, assumes 5 days), transportation is 2-way for that column's day count with a 10% sibling discount, 3/4-day tuition rounds to $25 (the 2026 Actual view rounds to $5 to match the published numbers), and Minicamp is a flat rate.</p>
+        <p>The <strong>All Rates PDF</strong> button (top-right of the Rate Sheet) generates a separate master sheet listing every program (2nd Grade+, Junior Camp, FT CIT) by weeks and days per week, with Final, Early Season, childcare, and sibling columns, handy for entering the season's rates into other software. (The Alumni/CC Sibling and 1st Year Sibling columns are shown blank for now, pending final confirmation of how they're calculated.)</p>
       </div>
     </details>
 
@@ -5816,6 +5826,7 @@ function renderPxSheet() {
     '<button class="px-btn" id="px-print" style="height:38px">🖨 Print / Save PDF</button>' +
     '<label class="px-field" style="margin:0">Show<select id="px-sheet-season">'+showOpts+'</select></label>' +
     '<label class="px-field" style="margin:0">Compare to<select id="px-sheet-compare">'+cmpOpts+'</select></label>' +
+    '<button class="px-btn ghost" id="px-allrates-btn" style="height:38px;margin-left:auto">📋 All Rates PDF</button>' +
     '</div>';
   const headSub = comparing ? (labelFor(primary)+' vs '+labelFor(compareKey)+' (% change shown per cell)') : (labelFor(primary)+' Rates');
   h += '<div class="px-sheet-head"><h2>Elbow Lane Day Camp</h2><div style="color:#666;font-weight:600">'+famEsc(headSub)+'</div></div>';
@@ -5823,7 +5834,19 @@ function renderPxSheet() {
   h += section('junior','ES',     'Early Season Junior Camp Rates (PS through 1st Grade)');
   h += section('twoGrade','Final','Rates (2nd Grade+)');
   h += section('junior','Final',  'Junior Camp Rates (PS through 1st Grade)');
+  h += '<div id="px-allrates" style="display:none"></div>';   // All Rates master (built on demand, printed to PDF)
   box.innerHTML = h;
+  const arBtn = document.getElementById('px-allrates-btn');
+  if (arBtn) arBtn.addEventListener('click', () => {
+    document.getElementById('px-allrates').innerHTML = pxAllRatesHTML();
+    let st = document.getElementById('px-print-style');
+    if (!st) { st = document.createElement('style'); st.id = 'px-print-style'; document.head.appendChild(st); }
+    st.textContent = '@media print{ body *{visibility:hidden!important}' +
+      ' #px-allrates{display:block!important;position:absolute;left:0;top:0;width:100%}' +
+      ' #px-allrates *{visibility:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}' +
+      ' @page{size:portrait;margin:.4in} }';
+    window.print();
+  });
   document.getElementById('px-print').addEventListener('click', () => {
     let st = document.getElementById('px-print-style');
     if (!st) { st = document.createElement('style'); st.id = 'px-print-style'; document.head.appendChild(st); }
@@ -5849,6 +5872,58 @@ function renderPxSheet() {
   if (seasonSel) seasonSel.addEventListener('change', e => { pxSheetSeason = e.target.value; renderPxSheet(); });
   const cmpSel = document.getElementById('px-sheet-compare');
   if (cmpSel) cmpSel.addEventListener('change', e => { pxSheetCompare = e.target.value; renderPxSheet(); });
+}
+
+// Build the "All Rates" master (every program x weeks x days) for the printable PDF.
+// The two sibling columns (Alumni/CC Sibling, 1st Year Sibling) are intentionally left blank
+// pending Jeanette's confirmation of their formula; everything else is calculated.
+function pxAllRatesHTML() {
+  const A = pricing.assumptions || {};
+  const dm = pricing.camp.day_mult || {};
+  const rT = Number(A.round_tuition)||25;
+  const JR = (Number(A.junior_pct)||90)/100;
+  const citF = 1 - (Number(A.cit_disc_pct)||33)/100;
+  const ESF = (Number(A.early_season_pct)||93)/100;
+  const cc = pricing.childcare || {}, cc1 = pricing.childcare_1yr || {};
+  const seasonKey = (pxSheetSeason==='current'||pxSheetSeason==='original') ? pxSheetSeason : 'proposed';
+  const seasonBase = seasonKey==='original' ? (pricing.camp.original||{}) : seasonKey==='current' ? (pricing.camp.current||{}) : pricing.camp.tiers;
+  const base = seasonBase.Final || {};
+  const seasonLbl = seasonKey==='original' ? '2026 Actual' : seasonKey==='current' ? ('Current '+(pricing.season_label||'')) : ('Proposed '+(pricing.proposed_label||''));
+  const dayF = d => d==='5' ? 1 : Number(dm[d]!=null ? dm[d] : 1);
+  const r25 = x => Math.round(x/rT)*rT;
+  const money = x => (x==null) ? '' : '$'+Number(x).toLocaleString();
+  const wksN = w => parseInt(w,10)||0;
+  const g2  = (w,d) => { const b=Number(base[w]||0); return d==='5' ? Math.round(b) : r25(b*dayF(d)); };  // 2nd Grade+ Final
+  const jr  = (w,d) => { const j5=r25(JR*g2(w,'5')); return d==='5' ? j5 : r25(j5*dayF(d)); };            // Junior Final
+  const cit = (w,d) => r25(citF*g2(w,d));                                                                  // FT CIT Final
+  const es  = v => r25(ESF*v);                                                                             // Early Season = 93% of Final
+  const ccB  = (w,d) => Number((cc[d]||{}).base||0)*wksN(w);                                               // Year Round Childcare weekly x weeks
+  const cc1B = (w,d) => Number((cc1[d]||{}).base||0)*wksN(w);                                              // 1st Year Childcare weekly x weeks
+  const wks=['8','7','6','5','4'], days=['5','4','3'];
+  const TBD = '<span class="px-ar-tbd">&mdash;</span>';
+  function section(title, cols) {
+    let s = '<table class="px-ar-tbl"><caption class="px-ar-cap">'+title+'</caption><thead><tr><th>Weeks</th><th>Days/wk</th>'+cols.map(c=>'<th>'+c.head+'</th>').join('')+'</tr></thead><tbody>';
+    wks.forEach(w => days.forEach((d,di) => {
+      s += '<tr>' + (di===0 ? '<td class="px-ar-wk" rowspan="3">'+w+' wk</td>' : '') + '<td>'+d+'-day</td>' +
+        cols.map(c => '<td>'+(c.fn ? money(c.fn(w,d)) : TBD)+'</td>').join('') + '</tr>';
+    }));
+    return s + '</tbody></table>';
+  }
+  let out = '<div class="px-ar-wrap"><div class="px-ar-head">' +
+    '<h2 style="margin:.2rem 0;font-family:\'Roboto Slab\',serif;color:#6d1f2f">Elbow Lane Day Camp</h2>' +
+    '<div style="color:#555;font-weight:600">All Rates &mdash; '+famEsc(seasonLbl)+'</div>' +
+    '<div style="color:#999;font-size:.72rem;margin-top:.15rem">Alumni/CC Sibling and 1st Year Sibling columns are pending final confirmation.</div></div>';
+  out += section('2nd Grade+ (Regular)', [
+    {head:'Final', fn:g2}, {head:'Early Season', fn:(w,d)=>es(g2(w,d))},
+    {head:'Alumni/CC Sibling', fn:null}, {head:'1st Year Sibling', fn:null} ]);
+  out += section('Junior Camp', [
+    {head:'Final', fn:jr}, {head:'Early Season', fn:(w,d)=>es(jr(w,d))},
+    {head:'ChildCare', fn:ccB}, {head:'Alumni/CC Sibling', fn:null},
+    {head:'1st Year CC', fn:cc1B}, {head:'1st Year Sibling', fn:null} ]);
+  out += section('FT CIT', [
+    {head:'Final', fn:cit}, {head:'Early Season', fn:(w,d)=>es(cit(w,d))},
+    {head:'Alumni/CC Sibling', fn:null}, {head:'1st Year Sibling', fn:null} ]);
+  return out + '</div>';
 }
 
 // ---------- Pizza Order Calculator ----------
