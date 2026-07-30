@@ -2188,7 +2188,7 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 #pricing-box .px-close:hover{color:var(--brand)}
 #pricing-box h2{font-family:'Roboto Slab',serif;font-size:1.4rem;color:var(--brand-dark);text-align:center;margin-bottom:.3rem}
 #pricing-box .px-sub{text-align:center;font-size:.85rem;color:#888;margin-bottom:2rem}
-.px-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem}
+.px-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.1rem;max-width:640px;margin:0 auto}
 .px-card{border:2px solid var(--border);border-radius:12px;padding:1.6rem 1.4rem;display:flex;flex-direction:column;gap:.6rem;position:relative;transition:border-color .2s,box-shadow .2s}
 .px-card:hover{border-color:var(--brand-mid);box-shadow:0 6px 24px rgba(109,31,47,.1)}
 .px-card.featured{border-color:var(--brand);box-shadow:0 6px 24px rgba(109,31,47,.15)}
@@ -2707,7 +2707,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <div class="px-grid">
       <div class="px-card">
         <div class="px-tier">Starter</div>
-        <div class="px-price">$34.99<span>/mo</span></div>
+        <div class="px-price">$29.99<span>/mo</span></div>
         <p class="px-desc">Great for smaller camps getting started with digital reporting.</p>
         <ul class="px-features">
           <li>Up to 50 reports per month</li>
@@ -2722,34 +2722,22 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
         <button class="px-cta" onclick="window.location='mailto:bhimpele@gmail.com?subject=Start%20my%20EL%20Operations%20Center%20trial%20(Starter)'">Start Free Trial</button>
       </div>
       <div class="px-card featured">
-        <div class="px-badge">Most Popular</div>
-        <div class="px-tier">Pro</div>
-        <div class="px-price">$49.99<span>/mo</span></div>
-        <p class="px-desc">For active camps running reports and payroll all season long.</p>
+        <div class="px-badge">Everything Included</div>
+        <div class="px-tier">Unlimited</div>
+        <div class="px-price">$99.99<span>/mo</span></div>
+        <p class="px-desc">Full access for active or multi-camp operations, everything the site does.</p>
         <ul class="px-features">
           <li class="px-feat-head">Everything in Starter, plus:</li>
-          <li>Up to 50 reports per month</li>
-          <li>Up to 10 staff logins</li>
+          <li>Unlimited reports</li>
+          <li>Unlimited staff logins</li>
           <li>Payroll &amp; staff attendance tracking</li>
           <li>Pricing workspace: calculate any family's cost (every camp rate type, siblings, transportation &amp; AM/PM extended care)</li>
           <li>Model next season's tuition and print a shareable one-page rate sheet, all from one editable set of rates</li>
           <li>Camper Schedules: set each camper's weekly attendance days</li>
           <li>Families directory: search a family, view &amp; edit contacts and schedules</li>
           <li>Family contacts + custom mailing &amp; transportation labels</li>
-          <li>Recent reports history</li>
-          <li>Priority email support</li>
-        </ul>
-        <button class="px-cta" onclick="window.location='mailto:bhimpele@gmail.com?subject=Start%20my%20EL%20Operations%20Center%20trial%20(Pro)'">Start Free Trial</button>
-      </div>
-      <div class="px-card">
-        <div class="px-tier">Unlimited</div>
-        <div class="px-price">$99.99<span>/mo</span></div>
-        <p class="px-desc">Full access for large or multi-camp operations.</p>
-        <ul class="px-features">
-          <li class="px-feat-head">Everything in Pro, plus:</li>
-          <li>Unlimited reports</li>
-          <li>Unlimited staff logins</li>
           <li>Multi-camp &amp; unlimited bunks</li>
+          <li>Recent reports history</li>
           <li>Onboarding &amp; setup assistance</li>
           <li>Priority support</li>
         </ul>
