@@ -1,5 +1,5 @@
 """
-EL Reporting Center — Flask Application
+EL Operations Center — Flask Application
 -----------------------------------------
 Drop-in Excel report converter for Elbow Lane Day Camp.
 Shares the same design system as Transport Pro.
@@ -2136,7 +2136,7 @@ HTML = r"""<!DOCTYPE html>
 <meta http-equiv="Pragma" content="no-cache">
 <link rel="icon" type="image/png" href="/logo.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Elbow Lane — Reporting Center</title>
+<title>Elbow Lane — Operations Center</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
 <style>
@@ -2669,7 +2669,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
 <div id="pw-overlay">
   <div id="pw-box">
     <div class="pw-logo"><img src="/logo.png" alt="Elbow Lane Day Camp"></div>
-    <h2>Elbow Lane Reporting Center</h2>
+    <h2>Elbow Lane Operations Center</h2>
 
     <div id="login-view">
       <p class="pw-sub">Sign in to continue.</p>
@@ -2713,7 +2713,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li>Print-ready Excel &amp; Word output</li>
           <li>Email support</li>
         </ul>
-        <button class="px-cta" onclick="window.location='mailto:bhimpele@gmail.com?subject=Start%20my%20EL%20Reporting%20Center%20trial%20(Starter)'">Start Free Trial</button>
+        <button class="px-cta" onclick="window.location='mailto:bhimpele@gmail.com?subject=Start%20my%20EL%20Operations%20Center%20trial%20(Starter)'">Start Free Trial</button>
       </div>
       <div class="px-card featured">
         <div class="px-badge">Most Popular</div>
@@ -2733,7 +2733,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li>Recent reports history</li>
           <li>Priority email support</li>
         </ul>
-        <button class="px-cta" onclick="window.location='mailto:bhimpele@gmail.com?subject=Start%20my%20EL%20Reporting%20Center%20trial%20(Pro)'">Start Free Trial</button>
+        <button class="px-cta" onclick="window.location='mailto:bhimpele@gmail.com?subject=Start%20my%20EL%20Operations%20Center%20trial%20(Pro)'">Start Free Trial</button>
       </div>
       <div class="px-card">
         <div class="px-tier">Unlimited</div>
@@ -2747,7 +2747,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li>Onboarding &amp; setup assistance</li>
           <li>Priority support</li>
         </ul>
-        <button class="px-cta" onclick="window.location='mailto:bhimpele@gmail.com?subject=Start%20my%20EL%20Reporting%20Center%20trial%20(Unlimited)'">Start Free Trial</button>
+        <button class="px-cta" onclick="window.location='mailto:bhimpele@gmail.com?subject=Start%20my%20EL%20Operations%20Center%20trial%20(Unlimited)'">Start Free Trial</button>
       </div>
     </div>
     <p class="px-note">All plans include a 14-day free trial &mdash; no credit card required. No setup fees &middot; your data stays yours.</p>
@@ -2785,7 +2785,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="h-logo" role="img" aria-label="Elbow Lane Day Camp"></div>
   <div class="h-titlewrap">
     <div class="h-title">Elbow Lane Day Camp</div>
-    <div class="h-sub">Reporting Center</div>
+    <div class="h-sub">Operations Center</div>
   </div>
   <div class="h-nav">
     <span class="h-user" id="h-user" style="display:none">
@@ -2796,7 +2796,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       </div>
     </span>
     <button class="h-pricing" id="pricing-btn">$ <span class="h-lbl">Pricing</span></button>
-    <a class="h-support" href="mailto:bhimpele@gmail.com?subject=EL%20Reporting%20Center%20Support">✉ <span class="h-lbl">Support</span></a>
+    <a class="h-support" href="mailto:bhimpele@gmail.com?subject=EL%20Operations%20Center%20Support">✉ <span class="h-lbl">Support</span></a>
   </div>
 </header>
 
@@ -3602,7 +3602,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     </details>
 
     <div style="margin-top:1.4rem;padding-top:1rem;border-top:1px solid #eee;font-size:.85rem;color:#666">
-      Still stuck? <a class="h-support" style="background:var(--brand);border:none" href="mailto:bhimpele@gmail.com?subject=EL%20Reporting%20Center%20Help">✉ Email Support</a>
+      Still stuck? <a class="h-support" style="background:var(--brand);border:none" href="mailto:bhimpele@gmail.com?subject=EL%20Operations%20Center%20Help">✉ Email Support</a>
     </div>
   </div>
 </div><!-- /tab-help -->
@@ -6227,13 +6227,13 @@ document.getElementById('usr-add').addEventListener('click', async () => {
     // Build a shareable credentials message + Copy / Email actions
     const url = window.location.origin;
     const message =
-      `Elbow Lane Reporting Center — your login\n` +
+      `Elbow Lane Operations Center — your login\n` +
       `Site: ${url}\n` +
       `Username: ${username}\n` +
       `Password: ${password}\n\n` +
       `Sign in at the link above. Keep this private.`;
     document.getElementById('usr-creds').textContent = message;
-    const subject = 'Your Elbow Lane Reporting Center login';
+    const subject = 'Your Elbow Lane Operations Center login';
     document.getElementById('usr-email-link').href =
       `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
     document.getElementById('usr-copy-msg').textContent = '';
