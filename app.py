@@ -1207,6 +1207,53 @@ def api_pizza_week_counts():
     return jsonify(out)
 
 
+@app.route("/api/pizza-bunk-counts", methods=["GET"])
+def api_pizza_bunk_counts():
+    """Current-week camper counts per BUNK, grouped by pizza group, for the Pizza Beta bunk pickers.
+    Minors = Munchkins/Rugrats bunks; Majors = the rest of Junior Camp; Inter/Senior/Upper by camp."""
+    cur_week, _ = _current_week_day()
+    ranges = _season_week_strings()
+    idx = (cur_week - 1) if cur_week else 0
+    out = {"has_master": False, "in_season": bool(cur_week), "week": cur_week,
+           "week_range": ranges[idx] if 0 <= idx < len(ranges) else "",
+           "groups": {"minors": [], "majors": [], "inter": [], "senior": [], "upper": []}}
+    fb = _load_master()
+    if not fb:
+        return jsonify(out)
+    out["has_master"] = True
+    try:
+        campers = parse_master(fb) or []
+        config = _s3_load_config() or load_bunk_config(CONFIG_PATH)
+    except Exception as e:
+        out["error"] = str(e)
+        return jsonify(out)
+    # Per-bunk current-week count
+    bunk_count = {}
+    for c in campers:
+        weeks = c.get("weeks") or []
+        if not (idx < len(weeks) and int(weeks[idx] or 0)):
+            continue
+        bk = c.get("bunk", "")
+        bunk_count[bk] = bunk_count.get(bk, 0) + 1
+    # Map each bunk (in config order) to its pizza group with its current-week count
+    for camp in config.get("camps", []):
+        cl = (camp.get("name") or "").lower()
+        for b in camp.get("bunks", []):
+            nm = b.get("name") or ""
+            entry = {"bunk": nm, "count": bunk_count.get(nm, 0)}
+            low = nm.lower()
+            if cl.startswith("junior"):
+                out["groups"]["minors" if ("munchkin" in low or "rugrat" in low) else "majors"].append(entry)
+            elif cl.startswith("inter"):
+                out["groups"]["inter"].append(entry)
+            elif cl.startswith("senior"):
+                out["groups"]["senior"].append(entry)
+            elif cl.startswith("upper"):
+                out["groups"]["upper"].append(entry)
+            # FT CITs and unmapped bunks are omitted
+    return jsonify(out)
+
+
 @app.route("/api/families/full", methods=["GET"])
 def api_families_full():
     """Grouped family records joined with master (age/grade/enrollment) and
@@ -2363,6 +2410,16 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .pz-refval{font-weight:800;font-variant-numeric:tabular-nums;color:#6d1f2f;font-size:.9rem;line-height:1.35}
 .pz-refna{color:#ccc;font-weight:400}
 .pz-refweekline{font-size:.85rem;color:#555;margin-bottom:.7rem}
+/* Pizza Beta bunk picker */
+.pzb-bunks{margin:.1rem 0 .35rem;font-size:.8rem}
+.pzb-bunks>summary{cursor:pointer;color:#6d1f2f;font-weight:600;list-style:none;padding:.1rem 0}
+.pzb-bunks>summary::-webkit-details-marker{display:none}
+.pzb-bunks>summary::before{content:"▸ "}
+.pzb-bunks[open]>summary::before{content:"▾ "}
+.pzb-selc{color:#999;font-weight:400}
+.pzb-bunklist{display:flex;flex-direction:column;gap:.1rem;padding:.3rem .4rem;background:#faf6f7;border:1px solid #eadfe2;border-radius:6px;margin-top:.15rem}
+.pzb-bunk{display:flex;align-items:center;gap:.35rem;font-size:.78rem;color:#444;white-space:nowrap}
+.pzb-cnt{color:#aaa}
 .pz-card{border:1px solid #e6dade;border-radius:10px;background:#fff;overflow:hidden;min-width:0;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .pz-title{background:#6d1f2f;color:#fff;font-weight:700;font-size:.98rem;padding:.5rem .8rem}
 .pz-group{padding:.5rem .8rem;border-bottom:1px solid #efe7e9}
@@ -2802,7 +2859,8 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="tab" data-tab="snap" id="tab-snap-nav">📸 <span>Camp Snapshot</span></div>
   <div class="tab" data-tab="families">👪 <span>Families</span></div>
   <div class="tab" data-tab="pricing" id="tab-pricing-nav">💲 <span>Pricing</span></div>
-  <div class="tab" data-tab="pizza" id="tab-pizza-nav">🍕 <span>Pizza</span><span class="nav-new">NEW</span></div>
+  <div class="tab" data-tab="pizza" id="tab-pizza-nav">🍕 <span>Pizza</span></div>
+  <div class="tab" data-tab="pizzabeta" id="tab-pizzabeta-nav">🍕 <span>Pizza Beta</span><span class="nav-new">BETA</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
   <div class="tab" data-tab="help">❓ <span>FAQs</span></div>
 </nav>
@@ -3004,6 +3062,18 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
       </div>
     </div>
     <div id="pizza-app"></div>
+  </div>
+</div>
+
+<div class="tab-panel" id="tab-pizzabeta">
+  <div class="card">
+    <div class="card-hd">
+      <div>
+        <div class="card-title">Pizza Order Calculator <span style="font-size:.7rem;color:#b26a00;font-weight:700">BETA</span></div>
+        <div class="card-hint">Same as the Pizza tab, but for each group you can pick the <strong>bunks</strong> in that lunch period from a dropdown, and the camper count fills in automatically from the current week's master-sheet enrollment. You can still type over any number. Your entries are kept in this browser.</div>
+      </div>
+    </div>
+    <div id="pizzabeta-app"></div>
   </div>
 </div>
 
@@ -3554,6 +3624,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
         <p>Enter fresh headcounts each time you order: the calculator does <strong>not</strong> pull from the master sheet, because lunch assignments change from week to week. Your entries stay in your browser, so they're still there if you come back to the tab.</p>
         <p>The narrow <strong>This Week</strong> column on the left shows the current camp week and, for reference, how many campers are enrolled in each group this week from the master sheet (<strong>Minors</strong> = Munchkins &amp; Rugrats bunks; <strong>Majors</strong> = the rest of Junior Camp; Inter/Senior/Upper by camp). It's a helper only, it never fills in the calculator.</p>
         <p>Use <strong>Print / Save PDF</strong> to print the three periods on one page (or save as a PDF) to hand off with your order, or <strong>Export CSV</strong> to download the numbers as a spreadsheet.</p>
+        <p>There's also a <strong>Pizza Beta</strong> tab that works the same way, but for each group you can pick the <strong>bunks</strong> in that lunch period from a dropdown, and the camper count fills in automatically from the current week's enrollment (you can still type over it).</p>
       </div>
     </details>
 
@@ -3621,6 +3692,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     if (tab.dataset.tab === 'families') loadFamiliesDir();
     if (tab.dataset.tab === 'pricing') loadPricing();
     if (tab.dataset.tab === 'pizza') renderPizza();
+    if (tab.dataset.tab === 'pizzabeta') renderPizzaBeta();
   });
 });
 
@@ -6108,6 +6180,174 @@ function pzExportCSV() {
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = 'pizza-order.csv';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+// ========== Pizza Order Calculator — BETA ==========
+// Same as the Pizza tab, but each camper group has a bunk multi-select. Picking bunks auto-fills the
+// campers field with the current week's enrollment from the master (still editable). ids use 'pzb-'.
+let pzbData = {groups:{}, has_master:false, week:null};   // cached /api/pizza-bunk-counts
+function pzbLoad() { try { return JSON.parse(localStorage.getItem('el_pizza_beta_v1')) || {}; } catch(e) { return {}; } }
+function pzbSave() {
+  try {
+    const st = {};
+    PZ_PERIODS.forEach((_,p) => {
+      st[p] = {};
+      PZ_GROUPS.forEach(([g,,rate]) => {
+        const o = {c:pzNum('pzb-'+p+'-'+g+'-c'), s:pzNum('pzb-'+p+'-'+g+'-s')};
+        if (rate != null) { const b=[]; document.querySelectorAll('.pzb-bunks input[type=checkbox][data-p="'+p+'"][data-g="'+g+'"]').forEach(cb => { if (cb.checked) b.push(cb.value); }); o.bunks=b; }
+        st[p][g] = o;
+      });
+      st[p].school = pzNum('pzb-'+p+'-school');
+    });
+    localStorage.setItem('el_pizza_beta_v1', JSON.stringify(st));
+  } catch(e) {}
+}
+function pzbRecalc(p) {
+  let total = 0;
+  PZ_GROUPS.forEach(([g,,rate]) => {
+    const c = pzNum('pzb-'+p+'-'+g+'-c'), s = pzNum('pzb-'+p+'-'+g+'-s');
+    const slices = (rate != null ? c*rate : 0) + s*PZ_STAFF;
+    const pizzas = pzRoundHalf(slices/PZ_SLICES);
+    total += pizzas;
+    const slEl = document.getElementById('pzb-'+p+'-'+g+'-sl'); if (slEl) slEl.textContent = slices ? pzFmt(slices) : '0';
+    const pzEl = document.getElementById('pzb-'+p+'-'+g+'-pz'); if (pzEl) pzEl.textContent = pizzas.toFixed(1);
+  });
+  total += pzNum('pzb-'+p+'-school');
+  const tEl = document.getElementById('pzb-'+p+'-total'); if (tEl) tEl.textContent = total.toFixed(1);
+  pzbSave();
+}
+function pzbSelc(p,g) {
+  let n = 0; document.querySelectorAll('.pzb-bunks input[type=checkbox][data-p="'+p+'"][data-g="'+g+'"]').forEach(cb => { if (cb.checked) n++; });
+  const el = document.getElementById('pzb-'+p+'-'+g+'-selc'); if (el) el.textContent = n ? ' ('+n+' selected)' : '';
+}
+function pzbBunkChange(p,g) {
+  let sum = 0; document.querySelectorAll('.pzb-bunks input[type=checkbox][data-p="'+p+'"][data-g="'+g+'"]').forEach(cb => { if (cb.checked) sum += Number(cb.dataset.cnt)||0; });
+  const camp = document.getElementById('pzb-'+p+'-'+g+'-c'); if (camp) camp.value = sum ? sum : '';
+  pzbSelc(p,g); pzbRecalc(+p); pzbAlignRef();
+}
+function renderPizzaBeta() {
+  const box = document.getElementById('pizzabeta-app'); if (!box) return;
+  box.innerHTML = '<div style="color:#888;padding:1rem">Loading current-week bunk counts…</div>';
+  fetch('/api/pizza-bunk-counts').then(r => r.ok ? r.json() : null).then(d => {
+    pzbData = d || {groups:{}, has_master:false, week:null};
+    pzbBuild();
+  }).catch(() => { pzbData = {groups:{}, has_master:false, week:null}; pzbBuild(); });
+}
+function pzbBuild() {
+  const box = document.getElementById('pizzabeta-app'); if (!box) return;
+  const st = pzbLoad();
+  const inp = (id,v) => '<input class="pz-in" id="'+id+'" inputmode="decimal" value="'+(v?v:'')+'">';
+  const bunksOf = g => (pzbData.groups && pzbData.groups[g]) || [];
+  let cols = '';
+  PZ_PERIODS.forEach((title,p) => {
+    const ps = st[p] || {};
+    let body = '';
+    PZ_GROUPS.forEach(([g,label,rate]) => {
+      const gs = ps[g] || {};
+      const note = rate != null ? (rate+' slices/camper') : 'staff only';
+      let block = '<div class="pz-group"><div class="pz-gname">'+label+'<span class="pz-rate">'+note+'</span></div>';
+      if (rate != null) {
+        const sel = {}; (gs.bunks || []).forEach(b => sel[b] = true);
+        const bl = bunksOf(g);
+        if (bl.length) {
+          const checks = bl.map(b => '<label class="pzb-bunk"><input type="checkbox" data-p="'+p+'" data-g="'+g+'" data-cnt="'+b.count+'" value="'+famEsc(b.bunk)+'"'+(sel[b.bunk]?' checked':'')+'> '+famEsc(b.bunk)+' <span class="pzb-cnt">('+b.count+')</span></label>').join('');
+          block += '<details class="pzb-bunks"><summary>Bunks<span class="pzb-selc" id="pzb-'+p+'-'+g+'-selc"></span></summary><div class="pzb-bunklist">'+checks+'</div></details>';
+        }
+        block += '<div class="pz-row"><span class="pz-lbl">'+label+' campers</span>'+inp('pzb-'+p+'-'+g+'-c', gs.c)+'</div>';
+      }
+      block += '<div class="pz-row"><span class="pz-lbl">'+label+' staff</span>'+inp('pzb-'+p+'-'+g+'-s', gs.s)+'</div>';
+      block += '<div class="pz-gtot"><span>Total Pizzas for '+label+'</span><span class="pz-gtot-v"><span id="pzb-'+p+'-'+g+'-pz">0.0</span><span class="pz-sl">(<span id="pzb-'+p+'-'+g+'-sl">0</span> slices)</span></span></div></div>';
+      body += block;
+    });
+    body += '<div class="pz-group"><div class="pz-gname">School<span class="pz-rate">enter pizzas directly</span></div>' +
+      '<div class="pz-row"><span class="pz-lbl">School pizzas</span>'+inp('pzb-'+p+'-school', ps.school)+'</div></div>';
+    cols += '<div class="pz-card"><div class="pz-title">'+title+'</div>'+body +
+      '<div class="pz-grandrow"><span>Grand Total Pizzas to Order</span><span class="pz-grand" id="pzb-'+p+'-total">0.0</span></div></div>';
+  });
+  const head = '<div class="pz-toolbar px-noprint" style="display:flex;gap:.5rem;margin-bottom:.8rem">' +
+      '<button class="px-btn" id="pzb-print" style="height:36px">🖨 Print / Save PDF</button>' +
+      '<button class="px-btn ghost" id="pzb-csv" style="height:36px">⬇ Export CSV</button></div>' +
+    '<div class="pz-print-head" style="display:none;text-align:center;margin-bottom:.7rem">' +
+      '<div style="font-size:1.3rem;font-weight:800;color:#6d1f2f">Elbow Lane Day Camp</div>' +
+      '<div style="font-weight:600;color:#444">Pizza Order &mdash; <span id="pzb-print-date"></span></div></div>';
+  let refBody = '';
+  PZ_GROUPS.forEach(([g,label,rate]) => {
+    if (rate == null) return;
+    refBody += '<div class="pz-group pz-refgroup"><div class="pz-gname pz-refname"><span>'+label+'</span><span class="pz-refval" id="pzb-ref-'+g+'">–</span></div></div>';
+  });
+  const ref = '<div class="pz-card pz-refcard"><div class="pz-title pz-reftitle" id="pzb-ref-week">This Week</div>' + refBody + '</div>';
+  box.innerHTML = head + '<div class="pz-grid">'+ref+cols+'</div>';
+  const dt = document.getElementById('pzb-print-date'); if (dt) { try { dt.textContent = new Date().toLocaleDateString(); } catch(e){} }
+  const wk = document.getElementById('pzb-ref-week'); if (wk) wk.textContent = pzbData.week ? ('Week '+pzbData.week) : 'Off-season';
+  ['minors','majors','inter','senior','upper'].forEach(g => {
+    const el = document.getElementById('pzb-ref-'+g); if (!el) return;
+    el.textContent = pzbData.has_master ? (bunksOf(g).reduce((a,b) => a+(b.count||0), 0)) : '—';
+  });
+  box.querySelectorAll('.pz-in').forEach(el => el.addEventListener('input', () => { pzbRecalc(+el.id.split('-')[1]); pzbAlignRef(); }));
+  box.querySelectorAll('.pzb-bunks input[type=checkbox]').forEach(cb => cb.addEventListener('change', () => pzbBunkChange(cb.dataset.p, cb.dataset.g)));
+  box.querySelectorAll('.pzb-bunks').forEach(dl => dl.addEventListener('toggle', pzbAlignRef));
+  PZ_PERIODS.forEach((_,p) => PZ_GROUPS.forEach(([g,,rate]) => { if (rate != null) pzbSelc(p,g); }));
+  PZ_PERIODS.forEach((_,p) => pzbRecalc(p));
+  pzbAlignRef();
+  const pb = document.getElementById('pzb-print');
+  if (pb) pb.addEventListener('click', () => {
+    let stp = document.getElementById('pz-print-style');
+    if (!stp) { stp = document.createElement('style'); stp.id = 'pz-print-style'; document.head.appendChild(stp); }
+    stp.textContent = '@media print{ body *{visibility:hidden!important}' +
+      ' #tab-pizzabeta,#tab-pizzabeta *{visibility:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}' +
+      ' #tab-pizzabeta{position:absolute;left:0;top:0;width:100%}' +
+      ' .px-noprint{display:none!important} .pzb-bunks{display:none!important}' +
+      ' #tab-pizzabeta .card{border:none!important;box-shadow:none!important;padding:0!important;margin:0!important;background:transparent!important}' +
+      ' #tab-pizzabeta .card-hint,#tab-pizzabeta .card-title{display:none!important}' +
+      ' .pz-print-head{display:block!important}' +
+      ' .pz-refcard{display:none!important}' +
+      ' .pz-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:.5rem!important} .pz-card{break-inside:avoid;box-shadow:none!important;border:1px solid #6d1f2f!important}' +
+      ' .pz-title{font-size:12px!important;padding:4px 8px!important}' +
+      ' .pz-group{padding:3px 8px!important} .pz-gname{font-size:11px!important;margin-bottom:1px!important}' +
+      ' .pz-row{font-size:10px!important;padding:1px 0!important}' +
+      ' .pz-gtot{font-size:10px!important;margin-top:2px!important;padding-top:2px!important}' +
+      ' .pz-in{border:1px solid #bbb!important;width:52px!important;font-size:10px!important;padding:1px 3px!important}' +
+      ' .pz-grandrow{font-size:11px!important;padding:4px 8px!important} .pz-grand{font-size:13px!important}' +
+      ' @page{size:landscape;margin:.35in} }';
+    window.print();
+  });
+  const cb = document.getElementById('pzb-csv');
+  if (cb) cb.addEventListener('click', pzbExportCSV);
+}
+function pzbAlignRef() {
+  const app = document.getElementById('pizzabeta-app'); if (!app) return;
+  const per = app.querySelector('.pz-card:not(.pz-refcard)');
+  const refc = app.querySelector('.pz-refcard');
+  if (!per || !refc) return;
+  const perGroups = per.querySelectorAll('.pz-group');
+  const refGroups = refc.querySelectorAll('.pz-refgroup');
+  const stacked = getComputedStyle(app.querySelector('.pz-grid')).gridTemplateColumns.split(' ').length < 2;
+  refGroups.forEach((rg, i) => { rg.style.height = (!stacked && perGroups[i]) ? (perGroups[i].getBoundingClientRect().height + 'px') : ''; });
+}
+window.addEventListener('resize', () => { const p = document.getElementById('tab-pizzabeta'); if (p && p.classList.contains('active')) pzbAlignRef(); });
+function pzbExportCSV() {
+  const q = x => { x = (x == null ? '' : String(x)); return /[",\n]/.test(x) ? '"'+x.replace(/"/g,'""')+'"' : x; };
+  const rows = [['Elbow Lane Day Camp - Pizza Order (Beta)'], []];
+  PZ_PERIODS.forEach((title,p) => {
+    rows.push([title]);
+    rows.push(['Group','Campers','Staff','Slices','Pizzas']);
+    let total = 0;
+    PZ_GROUPS.forEach(([g,label,rate]) => {
+      const c = pzNum('pzb-'+p+'-'+g+'-c'), s = pzNum('pzb-'+p+'-'+g+'-s');
+      const slices = (rate != null ? c*rate : 0) + s*PZ_STAFF, pizzas = pzRoundHalf(slices/PZ_SLICES);
+      total += pizzas;
+      rows.push([label, rate != null ? c : '', s, slices, pizzas.toFixed(1)]);
+    });
+    const school = pzNum('pzb-'+p+'-school'); total += school;
+    rows.push(['School (manual)', '', '', '', school.toFixed(1)]);
+    rows.push(['Grand Total Pizzas to Order', '', '', '', total.toFixed(1)]);
+    rows.push([]);
+  });
+  const csv = rows.map(r => r.map(q).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'pizza-order-beta.csv';
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
 
