@@ -220,6 +220,12 @@ def _canon_days(s):
     return "".join(L for L in "MTWRF" if L in up)
 
 
+def _today_stamp() -> str:
+    """Eastern-time date (YYYY-MM-DD), used to log a returning session once per day."""
+    now = datetime.now(_EASTERN) if _EASTERN else datetime.now()
+    return now.strftime("%Y-%m-%d")
+
+
 def _now_eastern_stamp() -> str:
     """Formatted Eastern-time timestamp, e.g. '6/19/2026 4:00 PM EDT'."""
     now = datetime.now(_EASTERN) if _EASTERN else datetime.now()
@@ -1718,9 +1724,9 @@ def api_me():
         return jsonify({"authenticated": False, "has_users": any_users})
     # A session restored from the cookie (refresh / return visit) never hits /api/login,
     # so record it once per session. The "logged" flag keeps refreshes from spamming the log.
-    if not session.get("logged"):
+    if session.get("logged_day") != _today_stamp():
         _loginlog_record(u["username"], u.get("name") or u["username"], "active session")
-        session["logged"] = True
+        session["logged_day"] = _today_stamp()
     return jsonify({"authenticated": True, "username": u["username"],
                     "name": u.get("name") or u["username"], "is_admin": bool(u.get("is_admin")),
                     "readonly": bool(u.get("readonly"))})
@@ -1734,7 +1740,7 @@ def api_login():
         return jsonify({"error": "Invalid username or password."}), 401
     session.permanent = True
     session["user"] = u["username"]
-    session["logged"] = True
+    session["logged_day"] = _today_stamp()
     _loginlog_record(u["username"], u.get("name") or u["username"], "sign-in")
     return jsonify({"username": u["username"], "name": u.get("name") or u["username"],
                     "is_admin": bool(u.get("is_admin")), "readonly": bool(u.get("readonly"))})
@@ -1761,7 +1767,7 @@ def api_register():
     _users_save(data)
     session.permanent = True
     session["user"] = username
-    session["logged"] = True
+    session["logged_day"] = _today_stamp()
     _loginlog_record(username, entry["name"], "new account")
     return jsonify({"username": username, "name": entry["name"], "is_admin": entry["is_admin"], "readonly": False})
 
@@ -3572,7 +3578,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
           <li>Everyone signs in with their own <strong>username + password</strong>; new users register with the shared <strong>access code</strong>.</li>
           <li>Change your own password by clicking <strong>your name</strong> in the top-right.</li>
           <li>Admins manage accounts (add / rename / reset password / remove) in <strong>Utilities → User Accounts</strong>.</li>
-          <li>Admins can review the <strong>most recent 20 sign-ins</strong> (who, when, how, and IP) in <strong>Utilities → Sign-In Activity</strong>. "How" distinguishes a fresh sign-in, a new account, and an active session resumed on a return visit (a refresh with a still-valid login logs once, not every time).</li>
+          <li>Admins can review the <strong>most recent 20 sign-ins</strong> (who, when, how, and IP) in <strong>Utilities → Sign-In Activity</strong>. "How" distinguishes a fresh sign-in, a new account, and an active session resumed on a return visit (a still-valid login is logged once per day, so refreshing throughout the day doesn't pile up entries).</li>
           <li><strong>Read-only</strong> access: toggle <strong>Read-only</strong> for any account in <strong>Utilities → User Accounts</strong>. A read-only user can view and print <strong>Payroll</strong> and <strong>Rate Settings</strong> but can't save changes to them (enforced on the server). They use the rest of the app normally.</li>
         </ul>
       </div>
