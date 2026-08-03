@@ -2899,7 +2899,7 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
   <div class="tab" data-tab="snap" id="tab-snap-nav">📸 <span>Camp Snapshot</span></div>
   <div class="tab" data-tab="families">👪 <span>Families</span></div>
   <div class="tab" data-tab="pricing" id="tab-pricing-nav">💲 <span>Pricing</span></div>
-  <div class="tab" data-tab="pizzabeta" id="tab-pizzabeta-nav">🍕 <span>Pizza</span><span class="nav-new">NEW</span></div>
+  <div class="tab" data-tab="pizzabeta" id="tab-pizzabeta-nav">🍕 <span>Pizza</span></div>
   <div class="tab" data-tab="config">⚙️ <span>Utilities</span></div>
   <div class="tab" data-tab="help">❓ <span>FAQs</span></div>
 </nav>
