@@ -2531,8 +2531,9 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 .payroll-table tfoot .pr-dayclear:hover{color:#7a1420}
 .payroll-table.pr-locked tfoot .pr-dayclear{opacity:.3;cursor:not-allowed}
 /* Weeks grid: fixed column widths so the layout doesn't shift when filtering */
-.payroll-table.pr-weeks{table-layout:fixed}
+.payroll-table.pr-weeks{table-layout:fixed;min-width:960px}
 .pr-weeks .pr-hnum{width:38px}
+.pr-weeks .pr-hstaff{width:150px}
 .pr-weeks .pr-harea{width:104px}
 .pr-weeks .pr-day{width:54px}
 .pr-weeks .pr-extra{width:46px}
