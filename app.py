@@ -2262,6 +2262,13 @@ header{background:var(--brand);color:#fff;padding:0 2rem;display:flex;align-item
 #notice-box p{font-size:.9rem;color:#444;line-height:1.5;margin:0 0 .8rem}
 #notice-box .notice-btn{margin-top:.4rem;padding:.6rem 1.6rem;background:var(--brand);color:#fff;border:none;border-radius:8px;font-family:'Roboto Slab',serif;font-weight:700;font-size:.85rem;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
 #notice-box .notice-btn:hover{background:var(--brand-dark)}
+#congrats-overlay{position:fixed;inset:0;background:rgba(20,6,9,.72);backdrop-filter:blur(4px);z-index:10001;display:flex;align-items:center;justify-content:center;padding:1.5rem}
+#congrats-overlay.hidden{display:none}
+#congrats-box{background:#fff;border-radius:16px;padding:2.2rem 2rem 1.8rem;max-width:440px;width:94%;box-shadow:0 20px 60px rgba(0,0,0,.35);text-align:center;border-top:6px solid var(--gold)}
+#congrats-box .c-icon{font-size:2.8rem;margin-bottom:.6rem}
+#congrats-box h2{font-family:'Roboto Slab',serif;font-size:1.25rem;line-height:1.35;color:var(--brand);margin:0 0 1rem}
+#congrats-box .notice-btn{padding:.6rem 1.8rem;background:var(--brand);color:#fff;border:none;border-radius:8px;font-family:'Roboto Slab',serif;font-weight:700;font-size:.85rem;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
+#congrats-box .notice-btn:hover{background:var(--brand-dark)}
 /* ---- Change-password modal ---- */
 #cpw-overlay{position:fixed;inset:0;background:rgba(20,6,9,.72);backdrop-filter:blur(4px);z-index:10001;display:flex;align-items:center;justify-content:center;padding:1.5rem}
 #cpw-overlay.hidden{display:none}
@@ -2854,6 +2861,15 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <p>The <strong>Bunks &amp; Camps</strong> tab is now <strong>Utilities</strong>. From now on, upload your <strong>Master Sheet</strong> from the <strong>Utilities</strong> tab (not the Reports tab).</p>
     <p style="color:#777;font-size:.82rem">You can also import &amp; manage <strong>Family Contacts</strong> there. Bunks &amp; Camps settings moved to the bottom of that tab.</p>
     <button id="notice-ok" class="notice-btn">Got it</button>
+  </div>
+</div>
+
+<!-- End-of-season congratulations (shows once per user) -->
+<div id="congrats-overlay" class="hidden">
+  <div id="congrats-box">
+    <div class="c-icon">🎉</div>
+    <h2>Congratulations on a great camp season, and have a great final week!</h2>
+    <button id="congrats-ok" class="notice-btn">Thank you</button>
   </div>
 </div>
 
@@ -6279,6 +6295,19 @@ function maybeShowNotice() {
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 }
 
+// One-time end-of-season congratulations, shown once per user account (per browser).
+function maybeShowCongrats() {
+  if (!currentUser) return;
+  const KEY = 'el_congrats_2027final_' + (currentUser.username || '').toLowerCase();
+  try { if (localStorage.getItem(KEY)) return; } catch(e) {}
+  const overlay = document.getElementById('congrats-overlay');
+  if (!overlay) return;
+  const close = () => { overlay.classList.add('hidden'); try { localStorage.setItem(KEY, '1'); } catch(e) {} };
+  overlay.classList.remove('hidden');
+  document.getElementById('congrats-ok').onclick = close;
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+}
+
 // ---- Pricing modal ----
 (function() {
   const overlay = document.getElementById('pricing-overlay');
@@ -6424,6 +6453,7 @@ document.getElementById('usr-copy').addEventListener('click', async () => {
     document.getElementById('h-user-name').textContent = user.name || user.username;
     loadAllData();
     maybeShowNotice();
+    maybeShowCongrats();
   }
 
   document.getElementById('show-register').addEventListener('click', () => {
