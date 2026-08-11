@@ -3511,9 +3511,8 @@ header{padding:0 .8rem;gap:.6rem;height:64px}
     <details class="faq">
       <summary>How do the attendance cells work?</summary>
       <div class="faq-body">
-        <p>Click a day cell to cycle <strong>blank → ✓ (present) → ✗</strong>. The count on the left totals the ✓ marks for the two-week block (a ½ counts as half a day). Changes <strong>save automatically</strong> and are shared across devices.</p>
+        <p>Click a day cell to cycle <strong>blank → ✓ (present) → ½ (half day) → ✗</strong>. The count on the left totals the days for the two-week block (a ✓ is a full day, a ½ counts as half a day). Changes <strong>save automatically</strong> and are shared across devices.</p>
         <p>The <strong>BS</strong> and <strong>SP\MTC</strong> columns appear on the Weeks 1 &amp; 2 block only and cycle ✓ / ✗ / ½ / N/A (they're never counted).</p>
-        <p><strong>July 3</strong> has an extra <strong>½</strong> option (blank → ✓ → ½ → ✗), so a half-day holiday can be paid as half a day.</p>
       </div>
     </details>
 
@@ -4322,13 +4321,6 @@ function cellState(id, iso) {
   return '';
 }
 
-// Days that may be marked ½ (half-day pay), matched by m/d label
-const PR_HALF_DAYS = ['7/3'];
-function prHalfDay(iso) {
-  const d = (payroll.days || []).find(x => x.iso === iso);
-  return !!(d && PR_HALF_DAYS.includes(d.md));
-}
-
 function prDayValue(st) { return st === 'check' ? 1 : st === 'half' ? 0.5 : 0; }
 
 function prCount(id) {
@@ -4345,14 +4337,12 @@ function symFor(st) {
   return st === 'check' ? '✓' : st === 'x' ? '✗' : st === 'half' ? '½' : st === 'na' ? 'N/A' : '';
 }
 
-// Day cell click — blank -> ✓ -> ✗ -> blank, or blank -> ✓ -> ½ -> ✗ -> blank on half-day dates
+// Day cell click cycles blank -> ✓ -> ½ -> ✗ -> blank
 async function prClickDayCell(cell) {
   if (payroll.locked) return;
   const id = cell.dataset.id, dt = cell.dataset.date;
   const cur = cellState(id, dt);
-  const next = prHalfDay(dt)
-    ? (cur === '' ? 'check' : cur === 'check' ? 'half' : cur === 'half' ? 'x' : '')
-    : (cur === '' ? 'check' : cur === 'check' ? 'x' : '');
+  const next = cur === '' ? 'check' : cur === 'check' ? 'half' : cur === 'half' ? 'x' : '';
   payroll.checks[id] = payroll.checks[id] || {};
   if (next) payroll.checks[id][dt] = next; else delete payroll.checks[id][dt];
   cell.textContent = symFor(next);
