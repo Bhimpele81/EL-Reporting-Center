@@ -2172,9 +2172,20 @@ def api_recent():
         return jsonify({"error": str(e)}), 500
 
 
+# Cached forecast so we don't hit Open-Meteo on every request (and can serve the
+# last good forecast if a later fetch times out or gets rate-limited).
+_WX_CACHE = {"ts": None, "payload": None}
+_WX_TTL = 1800   # seconds a cached forecast is considered fresh
+
+
 @app.route("/api/weather")
 def api_weather():
-    """5-day forecast for Warrington, PA via Open-Meteo (no API key required)."""
+    """5-day forecast for Warrington, PA via Open-Meteo (no API key required).
+    Cached for ~30 min; if a fresh fetch fails, the last good forecast is served."""
+    now = datetime.utcnow()
+    cached = _WX_CACHE["payload"]
+    if cached is not None and _WX_CACHE["ts"] is not None and (now - _WX_CACHE["ts"]).total_seconds() < _WX_TTL:
+        return jsonify(cached)
     try:
         url = (
             "https://api.open-meteo.com/v1/forecast"
@@ -2186,7 +2197,11 @@ def api_weather():
             "&timezone=America%2FNew_York"
             "&forecast_days=5"
         )
-        with urllib.request.urlopen(url, timeout=5) as resp:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "ElbowLaneOperationsCenter/1.0 (camp back-office weather tile)",
+            "Accept": "application/json",
+        })
+        with urllib.request.urlopen(req, timeout=12) as resp:
             data = json.loads(resp.read())
         daily = data["daily"]
         def _num(arr, i):
@@ -2198,16 +2213,24 @@ def api_weather():
         for i in range(5):
             days.append({
                 "date":    daily["time"][i],
-                "high":    round(daily["temperature_2m_max"][i]),
-                "low":     round(daily["temperature_2m_min"][i]),
+                "high":    _num(daily.get("temperature_2m_max", []), i),
+                "low":     _num(daily.get("temperature_2m_min", []), i),
                 "code":    daily["weathercode"][i],
                 "pop":     _num(daily.get("precipitation_probability_max", []), i),
                 "wind":    _num(daily.get("windspeed_10m_max", []), i),
             })
         cw = data.get("current_weather") or {}
         current = {"temp": round(cw["temperature"]), "code": cw.get("weathercode")} if cw.get("temperature") is not None else None
-        return jsonify({"days": days, "current": current})
+        payload = {"days": days, "current": current}
+        _WX_CACHE["ts"] = now
+        _WX_CACHE["payload"] = payload
+        return jsonify(payload)
     except Exception as e:
+        # If we ever fetched successfully, serve that instead of an error.
+        if cached is not None:
+            stale = dict(cached)
+            stale["stale"] = True
+            return jsonify(stale)
         return jsonify({"error": str(e)}), 500
 
 
